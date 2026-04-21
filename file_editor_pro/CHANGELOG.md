@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.6 — Restore dark icon and logo
+
+- Reverted `icon.png` and `logo.png` to the original dark ha-palette look (navy tile, amber dashes, light-grey rows) while keeping the 320 px-wide logo canvas from 1.3.4 so the "Pro" wordmark still fits on HA's Info tab.
+
 ## 1.3.5 — Softer indent dots
 
 - Whitespace dots toned down from 55 % → 15 % of `--text-muted` so they sit quietly in the background and read as faint guides instead of strokes of their own. Same intensity applied to the tab arrow.
