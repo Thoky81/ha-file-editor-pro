@@ -1,0 +1,1243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HA File Editor</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/dialog/dialog.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldgutter.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/lint/lint.min.css">
+
+  <style>
+    :root {
+      --bg-darkest: #060a10;
+      --bg-dark:    #0a0e18;
+      --bg-mid:     #0f1520;
+      --bg-light:   #161d2e;
+      --bg-hover:   #1c2538;
+      --bg-active:  #1e2a40;
+      --text-primary:   #c9d4e8;
+      --text-secondary: #8896b3;
+      --text-muted:     #506080;
+      --accent:        #f0a500;
+      --accent-dim:    rgba(240,165,0,.15);
+      --accent-blue:   #4d9ef8;
+      --accent-green:  #4ec994;
+      --accent-red:    #f07070;
+      --border:        #1e2a40;
+      --border-light:  #263350;
+      --activity-width: 48px;
+      --sidebar-width:  260px;
+      --tab-height:     36px;
+      --status-height:  22px;
+      --font-mono: 'JetBrains Mono','Fira Code',monospace;
+      --font-ui:   'Inter',system-ui,sans-serif;
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{height:100%;overflow:hidden}
+    body{font-family:var(--font-ui);background:var(--bg-darkest);color:var(--text-primary);display:flex;flex-direction:column;font-size:13px}
+
+    /* ── LAYOUT ── */
+    .app-layout{display:flex;flex:1;overflow:hidden;height:calc(100vh - var(--status-height))}
+
+    /* ── ACTIVITY BAR ── */
+    .activity-bar{width:var(--activity-width);background:var(--bg-darkest);border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;padding:8px 0;gap:4px;flex-shrink:0}
+    .activity-item{width:36px;height:36px;display:flex;align-items:center;justify-content:center;border-radius:8px;cursor:pointer;color:var(--text-muted);transition:all .15s;position:relative;border:1px solid transparent}
+    .activity-item:hover{color:var(--text-primary);background:var(--bg-hover)}
+    .activity-item.active{color:var(--accent);background:var(--accent-dim);border-color:rgba(240,165,0,.2)}
+    .activity-item svg{width:18px;height:18px;stroke-width:1.5}
+    .activity-badge{position:absolute;top:4px;right:4px;width:8px;height:8px;background:var(--accent);border-radius:50%;border:2px solid var(--bg-darkest);display:none}
+    .activity-spacer{flex:1}
+
+    /* ── SIDEBAR ── */
+    .sidebar{width:var(--sidebar-width);background:var(--bg-dark);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden}
+    .sidebar-header{padding:10px 12px 8px;font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+    .sidebar-header-actions{display:flex;gap:4px}
+    .icon-btn{width:22px;height:22px;display:flex;align-items:center;justify-content:center;border-radius:4px;cursor:pointer;color:var(--text-muted);transition:all .1s;background:none;border:none}
+    .icon-btn:hover{color:var(--text-primary);background:var(--bg-hover)}
+    .icon-btn svg{width:14px;height:14px}
+    .sidebar-content{flex:1;overflow-y:auto;overflow-x:hidden}
+    .sidebar-content::-webkit-scrollbar{width:4px}
+    .sidebar-content::-webkit-scrollbar-thumb{background:var(--border-light);border-radius:2px}
+
+    /* ── FILE TREE ── */
+    .file-tree{padding:4px 0}
+    .tree-item{display:flex;align-items:center;padding:3px 8px;cursor:pointer;color:var(--text-secondary);user-select:none;transition:background .1s;position:relative;white-space:nowrap}
+    .tree-item:hover{background:var(--bg-hover);color:var(--text-primary)}
+    .tree-item.active{background:var(--bg-active);color:var(--text-primary)}
+    .tree-item.active::before{content:'';position:absolute;left:0;width:2px;height:100%;background:var(--accent);border-radius:0 2px 2px 0}
+    .tree-arrow{width:16px;height:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:transform .15s}
+    .tree-arrow.open{transform:rotate(90deg)}
+    .tree-arrow svg{width:10px;height:10px;stroke-width:2}
+    .tree-icon{width:16px;height:16px;margin-right:5px;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+    .tree-icon svg{width:14px;height:14px}
+    .tree-name{font-family:var(--font-mono);font-size:12px;overflow:hidden;text-overflow:ellipsis}
+    .tree-git-badge{margin-left:auto;font-size:10px;font-family:var(--font-mono);flex-shrink:0;padding-left:8px;font-weight:600}
+    .git-M{color:var(--accent)}
+    .git-A{color:var(--accent-green)}
+    .git-U{color:var(--accent-blue)}
+    .git-D{color:var(--accent-red)}
+    .tree-children{display:none}
+    .tree-children.open{display:block}
+
+    /* ── SEARCH PANEL ── */
+    .search-input-wrap{position:relative;margin-bottom:8px}
+    .search-input{width:100%;background:var(--bg-mid);border:1px solid var(--border-light);border-radius:6px;padding:6px 10px 6px 32px;color:var(--text-primary);font-family:var(--font-mono);font-size:12px;outline:none;transition:border-color .15s}
+    .search-input:focus{border-color:var(--accent)}
+    .search-icon{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--text-muted);pointer-events:none}
+    .search-icon svg{width:14px;height:14px}
+    .search-results{font-family:var(--font-mono);font-size:11px}
+    .search-file{padding:4px 8px;color:var(--accent-blue);font-weight:500;cursor:pointer}
+    .search-match{padding:2px 8px 2px 20px;color:var(--text-secondary);cursor:pointer;border-radius:4px;transition:background .1s;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .search-match:hover{background:var(--bg-hover);color:var(--text-primary)}
+    .search-match-line{color:var(--text-muted);margin-right:6px}
+    .search-match-highlight{color:var(--accent);font-weight:600}
+
+    /* ── GIT PANEL ── */
+    .git-panel{padding:8px}
+    .git-section-title{font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);padding:6px 4px 4px}
+    .git-file{display:flex;align-items:center;gap:6px;padding:4px 8px;border-radius:4px;cursor:pointer;transition:background .1s;font-family:var(--font-mono);font-size:11px}
+    .git-file:hover{background:var(--bg-hover)}
+    .git-status-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+    .git-file-name{color:var(--text-secondary);flex:1}
+    .git-commit-area{margin-top:12px;border-top:1px solid var(--border);padding-top:12px}
+    .git-commit-input{width:100%;background:var(--bg-mid);border:1px solid var(--border-light);border-radius:6px;padding:8px;color:var(--text-primary);font-family:var(--font-ui);font-size:12px;outline:none;resize:vertical;min-height:60px;transition:border-color .15s}
+    .git-commit-input:focus{border-color:var(--accent)}
+    .git-btn{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;margin-top:8px;padding:7px 12px;background:var(--accent-dim);border:1px solid rgba(240,165,0,.3);border-radius:6px;color:var(--accent);font-family:var(--font-ui);font-size:12px;font-weight:500;cursor:pointer;transition:all .15s}
+    .git-btn:hover{background:rgba(240,165,0,.25);border-color:rgba(240,165,0,.5)}
+    .git-branch-info{display:flex;align-items:center;gap:8px;padding:8px;background:var(--bg-mid);border-radius:6px;margin-bottom:12px;font-family:var(--font-mono);font-size:11px;color:var(--text-secondary);border:1px solid var(--border)}
+
+    /* ── EDITOR AREA ── */
+    .editor-area{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--bg-darkest)}
+    .tab-bar{height:var(--tab-height);background:var(--bg-dark);border-bottom:1px solid var(--border);display:flex;align-items:flex-end;overflow-x:auto;overflow-y:hidden;flex-shrink:0;scrollbar-width:none}
+    .tab-bar::-webkit-scrollbar{display:none}
+    .tab{height:32px;display:flex;align-items:center;gap:6px;padding:0 12px 0 14px;border-right:1px solid var(--border);cursor:pointer;white-space:nowrap;flex-shrink:0;font-family:var(--font-mono);font-size:12px;color:var(--text-muted);background:var(--bg-dark);position:relative;transition:background .1s,color .1s;user-select:none}
+    .tab:hover{color:var(--text-secondary);background:var(--bg-mid)}
+    .tab.active{color:var(--text-primary);background:var(--bg-darkest);border-bottom:1px solid var(--bg-darkest);margin-bottom:-1px}
+    .tab.active::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:var(--accent)}
+    .tab-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);flex-shrink:0}
+    .tab-close{width:16px;height:16px;display:flex;align-items:center;justify-content:center;border-radius:3px;color:var(--text-muted);transition:all .1s;flex-shrink:0;margin-left:2px}
+    .tab-close:hover{background:var(--bg-hover);color:var(--accent-red)}
+    .tab-close svg{width:10px;height:10px;stroke-width:2.5}
+    .tab-empty{flex:1;border-bottom:1px solid var(--border)}
+    .breadcrumb{padding:5px 14px;font-family:var(--font-mono);font-size:11px;color:var(--text-muted);border-bottom:1px solid var(--border);background:var(--bg-dark);display:none;align-items:center;gap:4px;flex-shrink:0}
+    .breadcrumb-part:last-child{color:var(--text-secondary)}
+    .breadcrumb-sep{color:var(--border-light)}
+    .editor-wrapper{flex:1;overflow:hidden;position:relative}
+    .no-file-open{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text-muted);gap:12px}
+    .no-file-open svg{width:48px;height:48px;opacity:.3}
+    .no-file-open p{font-size:13px}
+
+    /* ── CODEMIRROR ── */
+    .CodeMirror{height:100% !important;background:var(--bg-darkest) !important;color:var(--text-primary) !important;font-family:var(--font-mono) !important;font-size:13px !important;line-height:1.7 !important}
+    .CodeMirror-gutters{background:var(--bg-darkest) !important;border-right:1px solid var(--border) !important}
+    .CodeMirror-linenumber{color:var(--text-muted) !important;padding:0 12px 0 8px !important}
+    .CodeMirror-cursor{border-left:2px solid var(--accent) !important}
+    .CodeMirror-selected{background:rgba(240,165,0,.1) !important}
+    .CodeMirror-activeline-background{background:rgba(255,255,255,.025) !important}
+    .CodeMirror-matchingbracket{color:var(--accent) !important;background:var(--accent-dim) !important;border:1px solid rgba(240,165,0,.4) !important}
+    .CodeMirror-scroll::-webkit-scrollbar{width:6px;height:6px}
+    .CodeMirror-scroll::-webkit-scrollbar-thumb{background:var(--border-light);border-radius:3px}
+    .CodeMirror-foldgutter{width:12px}
+    .CodeMirror-foldgutter-open,.CodeMirror-foldgutter-folded{color:var(--text-muted) !important}
+    .CodeMirror-dialog{background:var(--bg-light) !important;border-color:var(--border-light) !important;color:var(--text-primary) !important}
+    .CodeMirror-dialog input{background:var(--bg-mid) !important;border:1px solid var(--border-light) !important;color:var(--text-primary) !important;border-radius:4px !important;padding:2px 6px !important;font-family:var(--font-mono) !important;outline:none !important}
+
+    /* ── HA-DARK THEME TOKENS ── */
+    .cm-s-ha-dark .cm-comment{color:#546e7a !important;font-style:italic !important}
+    .cm-s-ha-dark .cm-atom{color:#f07070 !important}
+    .cm-s-ha-dark .cm-number{color:#f78c6c !important}
+    .cm-s-ha-dark .cm-keyword{color:#c792ea !important}
+    .cm-s-ha-dark .cm-def{color:#82aaff !important}
+    .cm-s-ha-dark .cm-variable{color:var(--text-primary) !important}
+    .cm-s-ha-dark .cm-variable-2{color:#82aaff !important}
+    .cm-s-ha-dark .cm-string{color:#c3e88d !important}
+    .cm-s-ha-dark .cm-string-2{color:#a5d6ff !important}
+    .cm-s-ha-dark .cm-meta{color:var(--accent) !important}
+    .cm-s-ha-dark .cm-qualifier{color:#4ec994 !important}
+    .cm-s-ha-dark .cm-builtin{color:#4ec994 !important}
+    .cm-s-ha-dark .cm-tag{color:var(--accent) !important}
+    .cm-s-ha-dark .cm-attribute{color:#82aaff !important}
+    .cm-s-ha-dark .cm-header{color:var(--accent) !important;font-weight:bold !important}
+    .cm-s-ha-dark .cm-error{background:rgba(240,112,112,.15) !important;color:#f07070 !important}
+
+    /* ── STATUS BAR ── */
+    .status-bar{height:var(--status-height);background:var(--accent);display:flex;align-items:center;padding:0 12px;gap:16px;flex-shrink:0}
+    .status-item{display:flex;align-items:center;gap:5px;color:#0a0e18;font-family:var(--font-mono);font-size:11px;font-weight:500;cursor:default;opacity:.85;transition:opacity .1s;white-space:nowrap}
+    .status-item:hover{opacity:1}
+    .status-item svg{width:12px;height:12px;stroke-width:2}
+    .status-spacer{flex:1}
+    .status-error-state{color:#6b0000 !important}
+    .status-ok-state{color:#0a3a2a !important}
+
+    /* ── TOAST ── */
+    .toast{position:fixed;bottom:34px;right:16px;background:var(--bg-light);border:1px solid var(--border-light);border-radius:8px;padding:8px 14px;font-family:var(--font-mono);font-size:12px;color:var(--accent-green);display:flex;align-items:center;gap:8px;opacity:0;transform:translateY(8px);transition:all .2s;pointer-events:none;z-index:1000;box-shadow:0 4px 20px rgba(0,0,0,.6)}
+    .toast.show{opacity:1;transform:translateY(0)}
+    .toast svg{width:14px;height:14px}
+
+    /* ── CONTEXT MENU ── */
+    .context-menu{position:fixed;background:var(--bg-light);border:1px solid var(--border-light);border-radius:8px;padding:4px;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.6);min-width:170px;display:none}
+    .context-menu.show{display:block}
+    .context-item{padding:6px 12px;border-radius:4px;cursor:pointer;font-size:12px;color:var(--text-secondary);display:flex;align-items:center;gap:10px;transition:all .1s}
+    .context-item:hover{background:var(--bg-hover);color:var(--text-primary)}
+    .context-item svg{width:13px;height:13px;stroke-width:1.5;flex-shrink:0}
+    .context-divider{height:1px;background:var(--border);margin:4px 0}
+    .context-shortcut{margin-left:auto;font-family:var(--font-mono);font-size:10px;color:var(--text-muted)}
+
+    /* ── PANEL VISIBILITY ── */
+    .panel-content{display:none;flex-direction:column;height:100%}
+    .panel-content.active{display:flex}
+  </style>
+</head>
+<body>
+
+<div class="app-layout">
+
+  <!-- Activity Bar -->
+  <div class="activity-bar">
+    <div class="activity-item active" id="act-files" onclick="switchPanel('files')" title="Files (⌘⇧E)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+    </div>
+    <div class="activity-item" id="act-search" onclick="switchPanel('search')" title="Search (⌘⇧F)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+    </div>
+    <div class="activity-item" id="act-git" onclick="switchPanel('git')" title="Source Control">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>
+      <div class="activity-badge" id="git-badge"></div>
+    </div>
+    <div class="activity-spacer"></div>
+    <div class="activity-item" title="Settings (disabled)" style="opacity:.25;cursor:default">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93A10 10 0 0 0 6.99 3.34L8.5 6.16A7 7 0 0 1 17.5 7.5l2.57-2.57zM4.93 19.07A10 10 0 0 0 17.01 20.66L15.5 17.84A7 7 0 0 1 6.5 16.5l-1.57 2.57zM20.66 17.01A10 10 0 0 0 22 12h-3a7 7 0 0 1-1.5 4.33l2.16 1.5 1-.82zM2 12a10 10 0 0 0 1.34 5.01l2.16-1.5A7 7 0 0 1 5 12H2z"/></svg>
+    </div>
+  </div>
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+
+    <!-- FILES PANEL -->
+    <div class="panel-content active" id="panel-files">
+      <div class="sidebar-header">
+        <span>Explorer</span>
+        <div class="sidebar-header-actions">
+          <button class="icon-btn" title="New File" onclick="promptNewFile()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
+          </button>
+          <button class="icon-btn" title="Refresh" onclick="renderFileTree()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.82"/></svg>
+          </button>
+          <button class="icon-btn" title="Collapse All" onclick="collapseAll()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="sidebar-content">
+        <div class="file-tree" id="file-tree"></div>
+      </div>
+    </div>
+
+    <!-- SEARCH PANEL -->
+    <div class="panel-content" id="panel-search">
+      <div class="sidebar-header"><span>Search</span></div>
+      <div class="sidebar-content" style="padding:8px">
+        <div class="search-input-wrap">
+          <div class="search-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></div>
+          <input type="text" class="search-input" id="global-search" placeholder="Search all files…" oninput="performSearch(this.value)">
+        </div>
+        <div class="search-results" id="search-results"></div>
+      </div>
+    </div>
+
+    <!-- GIT PANEL -->
+    <div class="panel-content" id="panel-git">
+      <div class="sidebar-header"><span>Source Control</span></div>
+      <div class="sidebar-content">
+        <div class="git-panel">
+          <div class="git-branch-info">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:12px;height:12px"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>
+            <span id="git-branch-name">main</span>
+            <span style="margin-left:auto;color:var(--text-muted)">↑2 ↓0</span>
+          </div>
+          <div class="git-section-title">Changes (<span id="git-count">0</span>)</div>
+          <div id="git-changes"></div>
+          <div class="git-commit-area">
+            <textarea class="git-commit-input" id="git-commit-msg" placeholder="Commit message (Ctrl+Enter)"></textarea>
+            <button class="git-btn" onclick="mockCommit()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:13px;height:13px"><circle cx="12" cy="12" r="3"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/></svg>
+              Commit to main
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /sidebar -->
+
+  <!-- Editor Area -->
+  <div class="editor-area">
+    <div class="tab-bar" id="tab-bar"><div class="tab-empty"></div></div>
+    <div class="breadcrumb" id="breadcrumb"></div>
+    <div class="editor-wrapper" id="editor-wrapper">
+      <div class="no-file-open" id="no-file-msg">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+        <p>Open a file from the explorer</p>
+        <p style="font-size:11px;color:var(--text-muted)">Ctrl+S to save · Ctrl+F to find · Ctrl+H to replace</p>
+      </div>
+      <textarea id="editor-textarea"></textarea>
+    </div>
+  </div>
+
+</div><!-- /app-layout -->
+
+<!-- Status Bar -->
+<div class="status-bar">
+  <div class="status-item" id="status-branch">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>
+    main
+  </div>
+  <div class="status-item" id="status-errors">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><polyline points="20 6 9 17 4 12"/></svg>
+    <span id="status-errors-text">–</span>
+  </div>
+  <div class="status-spacer"></div>
+  <div class="status-item" id="status-pos">Ln 1, Col 1</div>
+  <div class="status-item" id="status-mode">–</div>
+  <div class="status-item">UTF-8</div>
+  <div class="status-item">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    HA Demo
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="save-toast">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+  <span id="toast-msg">Saved</span>
+</div>
+
+<!-- Context Menu -->
+<div class="context-menu" id="context-menu">
+  <div class="context-item" onclick="ctxCopy()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+    Copy <span class="context-shortcut">⌘C</span>
+  </div>
+  <div class="context-item" onclick="ctxCut()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="6" cy="20" r="3"/><circle cx="6" cy="4" r="3"/><line x1="6" y1="7" x2="6" y2="17"/><line x1="4" y1="2" x2="19.6" y2="17.6"/><line x1="19" y1="2" x2="4.4" y2="17.6"/></svg>
+    Cut <span class="context-shortcut">⌘X</span>
+  </div>
+  <div class="context-item" onclick="ctxPaste()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>
+    Paste <span class="context-shortcut">⌘V</span>
+  </div>
+  <div class="context-divider"></div>
+  <div class="context-item" onclick="editor&&editor.execCommand('findPersistent')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+    Find <span class="context-shortcut">⌘F</span>
+  </div>
+  <div class="context-item" onclick="editor&&editor.execCommand('replace')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+    Replace <span class="context-shortcut">⌘H</span>
+  </div>
+  <div class="context-divider"></div>
+  <div class="context-item" onclick="saveCurrentFile()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+    Save <span class="context-shortcut">⌘S</span>
+  </div>
+  <div class="context-item" onclick="editor&&editor.execCommand('toggleComment')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+    Toggle Comment <span class="context-shortcut">⌘/</span>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ SCRIPTS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/yaml/yaml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/shell/shell.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closebrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/selection/active-line.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldgutter.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/indent-fold.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/search/searchcursor.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/search/search.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/search/jump-to-line.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/dialog/dialog.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/comment/comment.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// MOCK FILE SYSTEM — replace with HA API calls (see stubs below)
+// ═══════════════════════════════════════════════════════════════
+const FILES = {
+  'configuration.yaml': { mode:'yaml', gitStatus:'M', content:
+`# Home Assistant Configuration
+homeassistant:
+  name: My Home
+  latitude: 48.1486
+  longitude: 17.1077
+  elevation: 151
+  unit_system: metric
+  time_zone: Europe/Bratislava
+  country: SK
+  currency: EUR
+  language: sk
+
+# Includes
+automation: !include automations.yaml
+script:     !include scripts.yaml
+scene:      !include scenes.yaml
+
+# HTTP
+http:
+  use_x_forwarded_for: true
+  trusted_proxies:
+    - 172.16.0.0/12
+    - 192.168.1.0/24
+  ip_ban_enabled: true
+  login_attempts_threshold: 5
+
+# Recorder
+recorder:
+  db_url: sqlite:////config/home-assistant_v2.db
+  purge_keep_days: 30
+  exclude:
+    domains: [media_player, weather]
+
+# Logger
+logger:
+  default: warning
+  logs:
+    homeassistant.core: info
+    homeassistant.components.automation: info
+    custom_components: debug
+
+# Frontend
+frontend:
+  themes: !include_dir_merge_named themes/
+`},
+  'automations.yaml': { mode:'yaml', gitStatus:'M', content:
+`- id: 'morning_lights'
+  alias: Morning Lights
+  description: Turn on lights at sunrise
+  trigger:
+    - platform: sun
+      event: sunrise
+      offset: '-00:30:00'
+  condition:
+    - condition: state
+      entity_id: input_boolean.vacation_mode
+      state: 'off'
+  action:
+    - service: light.turn_on
+      target:
+        area_id: living_room
+      data:
+        brightness_pct: 50
+        transition: 300
+  mode: single
+
+- id: 'vacuum_morning'
+  alias: Vacuum - Morning Cleaning
+  description: Start Roborock at 9am weekdays
+  trigger:
+    - platform: time
+      at: '09:00:00'
+  condition:
+    - condition: time
+      weekday: [mon, tue, wed, thu, fri]
+    - condition: state
+      entity_id: input_boolean.vacation_mode
+      state: 'off'
+  action:
+    - service: vacuum.start
+      target:
+        entity_id: vacuum.roborock_qrevo_edge
+  mode: single
+
+- id: 'irrigation_zone1'
+  alias: Irrigation - Morning Zone 1
+  trigger:
+    - platform: time
+      at: '06:30:00'
+  condition:
+    - condition: numeric_state
+      entity_id: sensor.netatmo_rain_1h
+      below: 5
+    - condition: state
+      entity_id: input_boolean.irrigation_enabled
+      state: 'on'
+  action:
+    - service: switch.turn_on
+      target:
+        entity_id: switch.irrigation_zone_1
+    - delay:
+        minutes: 15
+    - service: switch.turn_off
+      target:
+        entity_id: switch.irrigation_zone_1
+  mode: single
+`},
+  'scripts.yaml': { mode:'yaml', gitStatus:null, content:
+`notify_all:
+  alias: Notify All Devices
+  sequence:
+    - service: notify.tomas_jitka
+      data:
+        title: "{{ title }}"
+        message: "{{ message }}"
+  fields:
+    title:
+      description: Notification title
+      default: Home Assistant
+    message:
+      description: The message body
+      required: true
+
+good_night:
+  alias: Good Night Routine
+  sequence:
+    - service: light.turn_off
+      target:
+        area_id: all
+    - service: switch.turn_off
+      target:
+        entity_id: [switch.tv, switch.amplifier]
+    - service: alarm_control_panel.arm_home
+      target:
+        entity_id: alarm_control_panel.main
+    - service: script.notify_all
+      data:
+        title: Good Night
+        message: House is secured. Sleep well!
+`},
+  'secrets.yaml': { mode:'yaml', gitStatus:'U', content:
+`# Secrets — NOT committed to git
+openai_api_key:         sk-...
+anthropic_api_key:      sk-ant-...
+netatmo_client_id:      your_netatmo_client_id
+netatmo_client_secret:  your_netatmo_client_secret
+vapid_private_key:      your_vapid_private_key
+`},
+  'packages/lights.yaml': { mode:'yaml', gitStatus:null, content:
+`# Lights Package
+input_select:
+  living_room_scene:
+    name: Living Room Scene
+    options: [Relax, Work, Movie, Party, Sleep]
+    initial: Relax
+    icon: mdi:lightbulb-group
+
+light:
+  - platform: group
+    name: Living Room Lights
+    entities:
+      - light.sofa_lamp
+      - light.ceiling_light
+      - light.floor_lamp
+`},
+  'packages/climate.yaml': { mode:'yaml', gitStatus:'A', content:
+`# Climate Package
+input_number:
+  target_temperature_day:
+    name: Daytime Target Temp
+    min: 16; max: 28; step: 0.5
+    unit_of_measurement: "°C"
+    icon: mdi:thermometer
+    initial: 21
+
+automation:
+  - id: 'climate_morning'
+    alias: Climate - Morning Warmup
+    trigger:
+      - platform: time
+        at: '06:00:00'
+    action:
+      - service: climate.set_temperature
+        target:
+          entity_id: climate.main_thermostat
+        data:
+          temperature: "{{ states('input_number.target_temperature_day') }}"
+          hvac_mode: heat
+`},
+  'custom_components/my_integration/__init__.py': { mode:'python', gitStatus:null, content:
+`"""My Custom Integration for Home Assistant."""
+from __future__ import annotations
+import logging
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant
+
+_LOGGER = logging.getLogger(__name__)
+DOMAIN = "my_integration"
+PLATFORMS = ["sensor", "switch"]
+
+
+async def async_setup(hass: HomeAssistant, config: dict) -> bool:
+    """Set up the component."""
+    hass.data.setdefault(DOMAIN, {})
+    return True
+
+
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Set up from a config entry."""
+    _LOGGER.debug("Setting up %s", DOMAIN)
+    hass.data[DOMAIN][entry.entry_id] = {}
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    return True
+
+
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Unload a config entry."""
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if unload_ok:
+        hass.data[DOMAIN].pop(entry.entry_id)
+    return unload_ok
+`},
+  'custom_components/my_integration/manifest.json': { mode:'javascript', gitStatus:null, content:
+`{
+  "domain": "my_integration",
+  "name": "My Integration",
+  "version": "1.0.0",
+  "documentation": "https://github.com/tomas/my_ha_integration",
+  "dependencies": [],
+  "codeowners": ["@tomas"],
+  "requirements": ["aiohttp==3.9.1"],
+  "iot_class": "local_polling",
+  "config_flow": true
+}
+`},
+};
+
+const GIT_CHANGES = [
+  { path:'configuration.yaml', status:'M' },
+  { path:'automations.yaml',   status:'M' },
+  { path:'packages/climate.yaml', status:'A' },
+  { path:'secrets.yaml',       status:'U' },
+];
+
+// File tree definition
+const TREE = [
+  { name:'config', type:'dir', open:true, children:[
+    { name:'configuration.yaml', path:'configuration.yaml' },
+    { name:'automations.yaml',   path:'automations.yaml'   },
+    { name:'scripts.yaml',       path:'scripts.yaml'       },
+    { name:'scenes.yaml',        path:null                 },
+    { name:'secrets.yaml',       path:'secrets.yaml'       },
+    { name:'packages', type:'dir', open:false, children:[
+      { name:'lights.yaml',  path:'packages/lights.yaml'  },
+      { name:'climate.yaml', path:'packages/climate.yaml' },
+      { name:'sensors.yaml', path:null                    },
+    ]},
+    { name:'custom_components', type:'dir', open:false, children:[
+      { name:'my_integration', type:'dir', open:false, children:[
+        { name:'__init__.py',    path:'custom_components/my_integration/__init__.py'   },
+        { name:'manifest.json',  path:'custom_components/my_integration/manifest.json' },
+      ]},
+    ]},
+    { name:'www', type:'dir', open:false, children:[] },
+    { name:'.storage', type:'dir', open:false, children:[] },
+  ]},
+];
+
+// ═══════════════════════════════════════════════════════════════
+// APP STATE
+// ═══════════════════════════════════════════════════════════════
+let tabs = [];
+let activeTabId = null;
+let editor = null;
+let activePanel = 'files';
+
+// ═══════════════════════════════════════════════════════════════
+// EDITOR INIT
+// ═══════════════════════════════════════════════════════════════
+function initEditor() {
+  const ta = document.getElementById('editor-textarea');
+  editor = CodeMirror.fromTextArea(ta, {
+    theme: 'ha-dark',
+    lineNumbers: true,
+    lineWrapping: false,
+    tabSize: 2,
+    indentWithTabs: false,
+    autoCloseBrackets: true,
+    matchBrackets: true,
+    styleActiveLine: true,
+    foldGutter: true,
+    gutters: ['CodeMirror-linenumbers', 'CodeMirror-foldgutter'],
+    foldOptions: { rangeFinder: CodeMirror.fold.indent },
+    extraKeys: {
+      'Ctrl-S':  saveCurrentFile,
+      'Cmd-S':   saveCurrentFile,
+      'Ctrl-/':  'toggleComment',
+      'Cmd-/':   'toggleComment',
+      'Ctrl-F':  'findPersistent',
+      'Cmd-F':   'findPersistent',
+      'Ctrl-H':  'replace',
+      'Cmd-H':   'replace',
+      'Alt-G':   'jumpToLine',
+      'Ctrl-D':  duplicateLine,
+      'Cmd-D':   duplicateLine,
+      'Tab':     (cm) => cm.execCommand('indentMore'),
+      'Shift-Tab': (cm) => cm.execCommand('indentLess'),
+    },
+  });
+
+  editor.on('cursorActivity', () => {
+    const cur = editor.getCursor();
+    document.getElementById('status-pos').textContent = `Ln ${cur.line+1}, Col ${cur.ch+1}`;
+  });
+
+  editor.on('change', () => {
+    if (!activeTabId) return;
+    const tab = tabs.find(t => t.id === activeTabId);
+    if (tab && !tab.modified) { tab.modified = true; renderTabs(); }
+    validateYAML();
+  });
+
+  editor.getWrapperElement().addEventListener('contextmenu', e => {
+    e.preventDefault();
+    const m = document.getElementById('context-menu');
+    m.style.left = e.clientX + 'px';
+    m.style.top  = e.clientY + 'px';
+    m.classList.add('show');
+  });
+
+  document.addEventListener('click', () =>
+    document.getElementById('context-menu').classList.remove('show'));
+}
+
+function duplicateLine(cm) {
+  const cur  = cm.getCursor();
+  const line = cm.getLine(cur.line);
+  cm.replaceRange('\n' + line, { line: cur.line, ch: line.length });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FILE TREE
+// ═══════════════════════════════════════════════════════════════
+function renderFileTree() {
+  const c = document.getElementById('file-tree');
+  c.innerHTML = '';
+  renderNodes(TREE, c, 0);
+}
+
+function renderNodes(nodes, container, depth) {
+  nodes.forEach(node => {
+    const isDir = node.type === 'dir';
+    const indent = 8 + depth * 16;
+
+    const item = document.createElement('div');
+    item.className = 'tree-item';
+    item.style.paddingLeft = indent + 'px';
+
+    if (isDir) {
+      const arrowId = 'arr-' + node.name.replace(/\W/g,'-');
+      item.innerHTML = `
+        <div class="tree-arrow ${node.open?'open':''}" id="${arrowId}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+        <div class="tree-icon" style="color:#f0a500">
+          <svg viewBox="0 0 24 24" fill="${node.open?'rgba(240,165,0,.2)':'none'}" stroke="currentColor" stroke-width="1.5"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+        </div>
+        <span class="tree-name">${node.name}</span>`;
+      item.onclick = () => toggleDir(node, item, container, depth);
+    } else {
+      const gs  = FILES[node.path]?.gitStatus;
+      const col = fileColor(node.name);
+      item.innerHTML = `
+        <div class="tree-arrow" style="opacity:0"></div>
+        <div class="tree-icon" style="color:${col}">${fileIcon()}</div>
+        <span class="tree-name">${node.name}</span>
+        ${gs ? `<span class="tree-git-badge git-${gs}">${gs}</span>` : ''}`;
+      if (node.path) item.onclick = () => openFile(node.path, item);
+    }
+    container.appendChild(item);
+
+    if (isDir) {
+      const wrap = document.createElement('div');
+      wrap.className = 'tree-children ' + (node.open ? 'open' : '');
+      wrap.id = 'ch-' + node.name.replace(/\W/g,'-');
+      container.appendChild(wrap);
+      if (node.open && node.children?.length) renderNodes(node.children, wrap, depth+1);
+    }
+  });
+}
+
+function toggleDir(node, item, container, depth) {
+  node.open = !node.open;
+  const arrow = item.querySelector('.tree-arrow');
+  const wrap  = document.getElementById('ch-' + node.name.replace(/\W/g,'-'));
+  const icon  = item.querySelector('.tree-icon svg');
+  arrow.classList.toggle('open', node.open);
+  icon.setAttribute('fill', node.open ? 'rgba(240,165,0,.2)' : 'none');
+  wrap.classList.toggle('open', node.open);
+  if (node.open && !wrap.children.length && node.children?.length)
+    renderNodes(node.children, wrap, depth+1);
+}
+
+function collapseAll() {
+  function collapse(nodes) { nodes.forEach(n => { if(n.type==='dir'){n.open=false;collapse(n.children||[]); } }); }
+  collapse(TREE);
+  renderFileTree();
+}
+
+function fileColor(name) {
+  if (/\.ya?ml$/.test(name)) return '#f0a500';
+  if (/\.py$/.test(name))    return '#4d9ef8';
+  if (/\.json$/.test(name))  return '#4ec994';
+  if (/\.js$/.test(name))    return '#f0d060';
+  return '#8896b3';
+}
+
+function fileIcon() {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FILE OPERATIONS
+// ═══════════════════════════════════════════════════════════════
+function openFile(path, treeItem) {
+  const file = FILES[path];
+  if (!file) return;
+
+  const existing = tabs.find(t => t.path === path);
+  if (existing) { switchTab(existing.id); return; }
+
+  const tab = {
+    id: 'tab-' + Date.now(),
+    name: path.split('/').pop(),
+    path,
+    modified: false,
+    doc: CodeMirror.Doc(file.content, file.mode),
+    mode: file.mode,
+  };
+  tabs.push(tab);
+  renderTabs();
+  switchTab(tab.id);
+}
+
+function switchTab(id) {
+  if (!editor) return;
+  activeTabId = id;
+  const tab = tabs.find(t => t.id === id);
+  if (!tab) return;
+
+  document.getElementById('no-file-msg').style.display = 'none';
+  editor.getWrapperElement().style.display = 'block';
+  editor.swapDoc(tab.doc);
+  editor.setOption('mode', tab.mode);
+  document.getElementById('status-mode').textContent = tab.mode.toUpperCase();
+  updateBreadcrumb(tab.path);
+  setTimeout(() => { editor.refresh(); editor.focus(); }, 10);
+  renderTabs();
+  validateYAML();
+
+  // Highlight in tree
+  document.querySelectorAll('.tree-item').forEach(el => el.classList.remove('active'));
+}
+
+function closeTab(id, e) {
+  e?.stopPropagation();
+  const idx = tabs.findIndex(t => t.id === id);
+  if (idx < 0) return;
+  tabs.splice(idx, 1);
+  if (activeTabId === id) {
+    if (!tabs.length) {
+      activeTabId = null;
+      document.getElementById('no-file-msg').style.display = 'flex';
+      editor.getWrapperElement().style.display = 'none';
+      document.getElementById('breadcrumb').style.display = 'none';
+    } else {
+      switchTab(tabs[Math.min(idx, tabs.length-1)].id);
+    }
+  }
+  renderTabs();
+}
+
+function renderTabs() {
+  const bar = document.getElementById('tab-bar');
+  bar.innerHTML = '';
+  tabs.forEach(tab => {
+    const el = document.createElement('div');
+    el.className = 'tab' + (tab.id === activeTabId ? ' active' : '');
+    el.onclick = () => switchTab(tab.id);
+    el.innerHTML = `
+      ${tab.modified ? '<div class="tab-dot"></div>' : ''}
+      <span>${tab.name}</span>
+      <div class="tab-close" onclick="closeTab('${tab.id}',event)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </div>`;
+    bar.appendChild(el);
+  });
+  const spacer = document.createElement('div');
+  spacer.className = 'tab-empty';
+  bar.appendChild(spacer);
+}
+
+function updateBreadcrumb(path) {
+  const bc = document.getElementById('breadcrumb');
+  const parts = ('config/' + path).split('/');
+  bc.style.display = 'flex';
+  bc.innerHTML = parts.map((p, i) =>
+    `<span class="breadcrumb-part">${p}</span>${i<parts.length-1?'<span class="breadcrumb-sep"> › </span>':''}`
+  ).join('');
+}
+
+function saveCurrentFile() {
+  if (!activeTabId || !editor) return;
+  const tab = tabs.find(t => t.id === activeTabId);
+  if (!tab) return;
+  const content = editor.getValue();
+  if (FILES[tab.path]) FILES[tab.path].content = content;
+  tab.modified = false;
+  renderTabs();
+  showToast('File saved');
+  // → haWriteFile(tab.path, content);
+}
+
+function promptNewFile() {
+  const name = prompt('New file name:', 'new_automation.yaml');
+  if (!name) return;
+  const mode = /\.ya?ml$/.test(name) ? 'yaml' : /\.py$/.test(name) ? 'python' : 'javascript';
+  FILES[name] = { mode, gitStatus:'A', content:'' };
+  GIT_CHANGES.push({ path:name, status:'A' });
+  renderGitPanel();
+  renderFileTree();
+  openFile(name);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// YAML VALIDATION
+// ═══════════════════════════════════════════════════════════════
+function validateYAML() {
+  const errEl = document.getElementById('status-errors');
+  const errTxt = document.getElementById('status-errors-text');
+  const tab = tabs.find(t => t.id === activeTabId);
+  if (!tab || tab.mode !== 'yaml') { errTxt.textContent = '–'; errEl.className='status-item'; return; }
+  try {
+    jsyaml.loadAll(editor.getValue());
+    errTxt.textContent = 'Valid YAML';
+    errEl.className = 'status-item status-ok-state';
+  } catch (e) {
+    errTxt.textContent = 'YAML Error';
+    errEl.className = 'status-item status-error-state';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PANEL SWITCHING
+// ═══════════════════════════════════════════════════════════════
+function switchPanel(panel) {
+  activePanel = panel;
+  ['files','search','git'].forEach(p => {
+    document.getElementById('panel-' + p).classList.remove('active');
+    const act = document.getElementById('act-' + p);
+    if (act) act.classList.remove('active');
+  });
+  document.getElementById('panel-' + panel).classList.add('active');
+  const actEl = document.getElementById('act-' + panel);
+  if (actEl) actEl.classList.add('active');
+  if (panel === 'search') setTimeout(() => document.getElementById('global-search').focus(), 50);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// GLOBAL SEARCH
+// ═══════════════════════════════════════════════════════════════
+function performSearch(query) {
+  const results = document.getElementById('search-results');
+  if (!query.trim()) { results.innerHTML=''; return; }
+  const q = query.toLowerCase();
+  let html = '';
+
+  Object.entries(FILES).forEach(([path, file]) => {
+    const lines = file.content.split('\n');
+    const matches = [];
+    lines.forEach((line, i) => {
+      const li = line.toLowerCase();
+      const idx = li.indexOf(q);
+      if (idx >= 0) {
+        matches.push({ line:i+1,
+          before: esc(line.substring(0, idx)),
+          match:  esc(line.substring(idx, idx+q.length)),
+          after:  esc(line.substring(idx+q.length)),
+        });
+      }
+    });
+    if (matches.length) {
+      html += `<div class="search-file" onclick="openFile('${path}')">${path}</div>`;
+      matches.slice(0,4).forEach(m => {
+        html += `<div class="search-match" onclick="openFileAtLine('${path}',${m.line})">
+          <span class="search-match-line">${m.line}</span>${m.before}<span class="search-match-highlight">${m.match}</span>${m.after}
+        </div>`;
+      });
+      if (matches.length > 4)
+        html += `<div class="search-match" style="color:var(--text-muted)">  +${matches.length-4} more matches</div>`;
+    }
+  });
+
+  results.innerHTML = html || '<div style="padding:8px;color:var(--text-muted);font-size:11px">No results found</div>';
+}
+
+function openFileAtLine(path, line) {
+  openFile(path);
+  setTimeout(() => {
+    if (editor) { editor.setCursor({line:line-1,ch:0}); editor.scrollIntoView({line:line-1,ch:0},80); }
+    switchPanel('files');
+  }, 60);
+}
+
+function esc(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// GIT PANEL
+// ═══════════════════════════════════════════════════════════════
+function renderGitPanel() {
+  const el    = document.getElementById('git-changes');
+  const badge = document.getElementById('git-badge');
+  const count = document.getElementById('git-count');
+  count.textContent = GIT_CHANGES.length;
+  badge.style.display = GIT_CHANGES.length ? 'block' : 'none';
+
+  const colors = { M:'#f0a500', A:'#4ec994', U:'#4d9ef8', D:'#f07070' };
+  const labels = { M:'Modified', A:'Added', U:'Untracked', D:'Deleted' };
+
+  el.innerHTML = GIT_CHANGES.map(f => `
+    <div class="git-file" onclick="openFile('${f.path}')">
+      <div class="git-status-dot" style="background:${colors[f.status]}"></div>
+      <span class="git-file-name">${f.path}</span>
+      <span style="color:${colors[f.status]};font-family:var(--font-mono);font-size:10px;font-weight:600">${labels[f.status]}</span>
+    </div>`).join('');
+}
+
+function mockCommit() {
+  const msg = document.getElementById('git-commit-msg').value.trim();
+  if (!msg) {
+    document.getElementById('git-commit-msg').style.borderColor = 'var(--accent-red)';
+    return;
+  }
+  document.getElementById('git-commit-msg').style.borderColor = '';
+  showToast(`Committed: "${msg.substring(0,40)}"`);
+  document.getElementById('git-commit-msg').value = '';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CONTEXT MENU ACTIONS
+// ═══════════════════════════════════════════════════════════════
+function ctxCopy() {
+  if (editor) { const s = editor.getSelection(); if(s) navigator.clipboard?.writeText(s); }
+}
+function ctxCut() {
+  if (editor) { const s = editor.getSelection(); if(s){ navigator.clipboard?.writeText(s); editor.replaceSelection(''); } }
+}
+function ctxPaste() {
+  if (editor) navigator.clipboard?.readText().then(t => editor.replaceSelection(t));
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════════════════════════════
+let _toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('save-toast');
+  document.getElementById('toast-msg').textContent = msg;
+  t.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// KEYBOARD
+// ═══════════════════════════════════════════════════════════════
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey||e.metaKey) && e.key==='s') { e.preventDefault(); saveCurrentFile(); }
+  if ((e.ctrlKey||e.metaKey) && e.shiftKey && e.key==='E') { e.preventDefault(); switchPanel('files'); }
+  if ((e.ctrlKey||e.metaKey) && e.shiftKey && e.key==='F') { e.preventDefault(); switchPanel('search'); }
+  if (e.key === 'Escape') document.getElementById('context-menu').classList.remove('show');
+});
+
+document.getElementById('git-commit-msg').addEventListener('keydown', e => {
+  if ((e.ctrlKey||e.metaKey) && e.key==='Enter') mockCommit();
+});
+
+// ═══════════════════════════════════════════════════════════════
+// BACKEND API (File Editor Pro add-on)
+// ═══════════════════════════════════════════════════════════════
+// When served by the add-on, the app talks to the FastAPI backend
+// scoped to /config. Ingress prefixes the URL path, so we resolve
+// API routes relative to the document location.
+const API = {
+  available: false,
+  base: (() => {
+    const p = window.location.pathname;
+    return p.endsWith('/') ? p : p.replace(/[^/]*$/, '');
+  })(),
+  url(p) { return this.base.replace(/\/$/, '') + p; },
+  async health() {
+    try {
+      const r = await fetch(this.url('/api/health'), { cache: 'no-store' });
+      return r.ok;
+    } catch { return false; }
+  },
+  async tree() {
+    const r = await fetch(this.url('/api/files/tree'), { cache: 'no-store' });
+    if (!r.ok) throw new Error('tree ' + r.status);
+    return r.json();
+  },
+  async read(path) {
+    const r = await fetch(this.url('/api/files/read?path=' + encodeURIComponent(path)));
+    if (!r.ok) throw new Error('read ' + r.status);
+    return r.json();
+  },
+  async write(path, content) {
+    const r = await fetch(this.url('/api/files/write'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path, content }),
+    });
+    if (!r.ok) throw new Error('write ' + r.status);
+    return r.json();
+  },
+};
+
+function modeForPath(name) {
+  if (/\.ya?ml$/i.test(name)) return 'yaml';
+  if (/\.py$/i.test(name)) return 'python';
+  if (/\.(json|jsonc)$/i.test(name)) return 'javascript';
+  return 'javascript';
+}
+
+function ingestBackendTree(nodes) {
+  for (const key of Object.keys(FILES)) delete FILES[key];
+  function walk(list) {
+    return list.map(n => {
+      if (n.type === 'dir') {
+        return { name: n.name, type: 'dir', open: false, children: walk(n.children || []) };
+      }
+      FILES[n.path] = { mode: modeForPath(n.name), gitStatus: null, content: null, loaded: false };
+      return { name: n.name, path: n.path };
+    });
+  }
+  TREE.length = 0;
+  TREE.push({ name: 'config', type: 'dir', open: true, children: walk(nodes) });
+}
+
+const __origOpenFile = openFile;
+window.openFile = async function(path, treeItem) {
+  if (API.available) {
+    const entry = FILES[path];
+    if (entry && !entry.loaded) {
+      try {
+        const { content } = await API.read(path);
+        entry.content = content;
+        entry.loaded = true;
+      } catch (e) {
+        showToast('Failed to open: ' + path);
+        return;
+      }
+    }
+  }
+  return __origOpenFile(path, treeItem);
+};
+
+const __origSave = saveCurrentFile;
+window.saveCurrentFile = async function() {
+  if (!API.available) return __origSave();
+  if (!activeTabId || !editor) return;
+  const tab = tabs.find(t => t.id === activeTabId);
+  if (!tab) return;
+  const content = editor.getValue();
+  try {
+    await API.write(tab.path, content);
+    if (FILES[tab.path]) FILES[tab.path].content = content;
+    tab.modified = false;
+    renderTabs();
+    showToast('File saved');
+  } catch (e) {
+    showToast('Save failed: ' + e.message);
+  }
+};
+
+// ═══════════════════════════════════════════════════════════════
+// BOOT
+// ═══════════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', async () => {
+  initEditor();
+  editor.getWrapperElement().style.display = 'none';
+
+  API.available = await API.health();
+  if (API.available) {
+    try {
+      const { tree } = await API.tree();
+      ingestBackendTree(tree);
+    } catch (e) {
+      console.warn('Backend tree fetch failed, using demo data', e);
+      API.available = false;
+    }
+  }
+
+  renderFileTree();
+  renderGitPanel();
+
+  const preferred = ['configuration.yaml', 'automations.yaml', 'scripts.yaml'];
+  const first = preferred.find(p => FILES[p]) || Object.keys(FILES)[0];
+  if (first) openFile(first);
+});
+
+
+// ═══════════════════════════════════════════════════════════════
+// HA INTEGRATION STUBS — replace mock calls with these
+// ═══════════════════════════════════════════════════════════════
+/*
+  DEPLOYMENT:
+    1. Place this file in /config/www/ha-editor/index.html
+    2. In configuration.yaml add:
+         panel_custom:
+           - name: ha-file-editor
+             url_path: editor
+             sidebar_title: File Editor
+             sidebar_icon: mdi:file-code
+             module_url: /local/ha-editor/panel.js
+    3. Create panel.js as a thin wrapper that loads this page in an iframe
+       or build a proper custom element (see below)
+
+  FILE API (File Editor addon):
+    The official File Editor addon exposes a simple REST API via ingress:
+    GET  /api/hassio/ingress/{slug}/api/?path=/config/automations.yaml
+    POST /api/hassio/ingress/{slug}/api/  body: { file, content }
+
+  WEBSOCKET APPROACH (no addon dependency):
+    async function haReadFile(hass, path) {
+      return hass.callApi('GET', `config/core/check_config`);
+      // or use hassio supervisor API:
+      const r = await fetch(`/api/hassio/core/api/config/core/check_config`, {
+        headers: { Authorization: `Bearer ${hass.auth.accessToken}` }
+      });
+      return r.json();
+    }
+
+  Replace saveCurrentFile() body with:
+    await fetch('/api/hassio/ingress/SLUG/api/', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${window.__ha_access_token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ file: tab.path, content }),
+    });
+
+  GIT:
+    Real git requires either:
+    - SSH addon + REST calls to a thin script
+    - A custom Docker sidecar exposing a git HTTP API
+    - Writing files then using HA's built-in backup/snapshot
+*/
+</script>
+</body>
+</html>
