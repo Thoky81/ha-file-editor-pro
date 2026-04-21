@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.9.2 — Indent guides in indent area only, rainbow brackets, File Editor theme
+
+- **Indent guides no longer paint across whole lines.** Old CSS used a line-width background-gradient that drew vertical lines across every row from top to bottom. Now guides come from an overlay (`_guidesOverlay`) that tags each tab-stop position inside the actual leading whitespace with `cm-ig-line`. CSS renders a 1 px `box-shadow` on those spans only — zero paint on blank lines or the content area.
+- **Rainbow style** now combines the indent colors with the new in-indent guide lines (previously it added the whole-line guides class).
+- **Rainbow brackets fixed**. The `.cm-s-ha.bp-on .cm-bp-N` CSS gate was too brittle. Removed the `.bp-on` class; color rules now apply as soon as the overlay starts tagging brackets with `cm-bp-N` — and the overlay is added/removed based on `PREFS.bracketColors`.
+- **Rainbow/gradient/bars indent levels**: removed the `width: 1ch` clip on marker spans. CodeMirror merges consecutive same-class tokens into one span, so a single `ir-0` span may cover 2+ spaces. The old rule was shrinking it to one character and the visible level looked wrong.
+- **New theme: "File Editor (classic)"**. Ace-textmate-style palette matching the default HA File Editor add-on — cream bg, navy keys/identifiers, dark-red strings/numbers, italic gray comments. Pick it under Settings → Theme.
+- **Terminal diagnostics**: pre-connect health check against `/api/terminal/available` so failures show an actionable error instead of hanging; logs the WS URL and close codes. `bash` added to the add-on image so the PTY prefers it over `/bin/sh`.
+
 ## 1.9.1 — Bug sweep: icons, filter, opacity, indent switch, rainbow gaps
 
 - **Folder icons** now render **filled solid amber** so directories are instantly distinct from (outlined) file icons. YAML files recolored from amber → red/pink to avoid collision with the folder color.

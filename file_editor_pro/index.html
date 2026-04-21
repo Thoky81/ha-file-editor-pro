@@ -50,6 +50,24 @@
       --status-text:#ffffff;
     }
 
+    /* ── file-editor (classic HA File Editor palette) ──
+       Recreates the Ace textmate-style look: cream bg, navy keys
+       and identifiers, dark-red strings/numbers, gray italic
+       comments. Matches the standard HA File Editor add-on. */
+    [data-theme="file-editor"] {
+      --bg-darkest:#fdfdf5; --bg-dark:#f6f4e8; --bg-mid:#efeddf;
+      --bg-light:#fdfdf5; --bg-hover:#e8e6d8; --bg-active:#dcd9c9;
+      --text-primary:#1f2328; --text-secondary:#4a5057; --text-muted:#8b8f95;
+      --accent:#1e5b8a; --accent-dim:rgba(30,91,138,.10);
+      --accent-blue:#1e5b8a; --accent-green:#297a3a; --accent-red:#a82a2a;
+      --border:#dedcca; --border-light:#d4d2c0;
+      --selection:rgba(30,91,138,.18);
+      --syn-comment:#8b8f95; --syn-keyword:#a82a2a; --syn-string:#a82a2a;
+      --syn-number:#a82a2a; --syn-def:#1e5b8a; --syn-tag:#1e5b8a;
+      --syn-builtin:#a82a2a; --syn-atom:#a82a2a; --syn-meta:#1e5b8a;
+      --status-text:#ffffff;
+    }
+
     /* ── ha-light (clean white + amber) ── */
     [data-theme="ha-light"] {
       --bg-darkest:#ffffff; --bg-dark:#f6f8fa; --bg-mid:#eef1f4;
@@ -525,26 +543,29 @@
        Using background-color (not the background shorthand) so the
        .cm-ws-space background-image layer still shows through. */
 
-    /* ── BRACKET PAIR COLORIZATION ── (opt-in via PREFS.bracketColors) */
-    .cm-s-ha.bp-on .cm-bp-0{color:#e06c75 !important}
-    .cm-s-ha.bp-on .cm-bp-1{color:#d19a66 !important}
-    .cm-s-ha.bp-on .cm-bp-2{color:#e5c07b !important}
-    .cm-s-ha.bp-on .cm-bp-3{color:#98c379 !important}
-    .cm-s-ha.bp-on .cm-bp-4{color:#61afef !important}
-    .cm-s-ha.bp-on .cm-bp-5{color:#c678dd !important}
+    /* ── BRACKET PAIR COLORIZATION ── */
+    .cm-s-ha .cm-bp-0{color:#e06c75 !important}
+    .cm-s-ha .cm-bp-1{color:#d19a66 !important}
+    .cm-s-ha .cm-bp-2{color:#e5c07b !important}
+    .cm-s-ha .cm-bp-3{color:#98c379 !important}
+    .cm-s-ha .cm-bp-4{color:#61afef !important}
+    .cm-s-ha .cm-bp-5{color:#c678dd !important}
 
-    /* Marker spans render as inline-block with exactly the editor
-       line-height so the coloured background paints edge-to-edge
-       vertically and row-to-row — no white sliver between lines.
-       vertical-align:top kills the default baseline gap; opacity
-       from --indent-opacity scales the whole rendered layer so the
-       Settings transparency slider works in every browser without
-       relying on calc() inside rgba(). */
-    .cm-s-ha [class*="cm-ir-"],
-    .cm-s-ha [class*="cm-ib-"],
-    .cm-s-ha [class*="cm-ig-"]{
+    /* Marker spans (rainbow/bars/gradient/guides). Let them take
+       their NATURAL content width — CodeMirror merges adjacent
+       same-class tokens into one span, so a single span may wrap
+       several space characters. A fixed width:1ch clipped merged
+       spans to a single char. line-height:inherit + vertical-align:top
+       + zero margin/padding keep rows flush so backgrounds connect. */
+    .cm-s-ha .cm-ir-0, .cm-s-ha .cm-ir-1, .cm-s-ha .cm-ir-2,
+    .cm-s-ha .cm-ir-3, .cm-s-ha .cm-ir-4, .cm-s-ha .cm-ir-5,
+    .cm-s-ha .cm-ib-0, .cm-s-ha .cm-ib-1, .cm-s-ha .cm-ib-2,
+    .cm-s-ha .cm-ib-3, .cm-s-ha .cm-ib-4, .cm-s-ha .cm-ib-5,
+    .cm-s-ha .cm-ig-0, .cm-s-ha .cm-ig-1, .cm-s-ha .cm-ig-2,
+    .cm-s-ha .cm-ig-3, .cm-s-ha .cm-ig-4, .cm-s-ha .cm-ig-5,
+    .cm-s-ha .cm-ig-6, .cm-s-ha .cm-ig-7, .cm-s-ha .cm-ig-8,
+    .cm-s-ha .cm-ig-line{
       display: inline-block;
-      width: 1ch;
       line-height: inherit;
       vertical-align: top;
       margin: 0;
@@ -579,19 +600,9 @@
     .cm-s-ha .cm-ig-7{background-color:color-mix(in srgb, var(--accent) 33%, transparent)}
     .cm-s-ha .cm-ig-8{background-color:color-mix(in srgb, var(--accent) 37%, transparent)}
 
-    /* Indent guides (CSS-gradient background) — alpha scales with
-       --indent-opacity so the single slider governs this style too. */
-    .CodeMirror.indent-guides .CodeMirror-line{
-      position: relative;
-    }
-    .CodeMirror.indent-guides .CodeMirror-line::before{
-      content:''; position:absolute; inset:0; pointer-events:none;
-      background-image: linear-gradient(to right,
-        color-mix(in srgb, var(--text-muted) calc(20% * var(--indent-opacity, 1)), transparent) 1px,
-        transparent 1px);
-      background-size: var(--indent-ch, 2ch) 100%;
-      background-repeat: repeat-x;
-      background-position-x: calc(-1 * var(--indent-ch, 2ch));
+    /* ── INDENT GUIDES ── (overlay-tagged, ONLY in the indent area) */
+    .cm-s-ha .cm-ig-line{
+      box-shadow: inset 1px 0 0 color-mix(in srgb, var(--text-muted) 25%, transparent);
     }
 
     /* ── HINT POPUP (CodeMirror show-hint) ── */
@@ -2604,6 +2615,7 @@ async function haReload(domain) {
 const PREFS_KEY = 'fep-prefs';
 const THEMES = [
   { id: 'github-light',     name: 'GitHub Light',     kind: 'light' },
+  { id: 'file-editor',      name: 'File Editor (classic)', kind: 'light' },
   { id: 'ha-light',         name: 'HA Light',         kind: 'light' },
   { id: 'solarized-light',  name: 'Solarized Light',  kind: 'light' },
   { id: 'ha-cream',         name: 'HA Cream',         kind: 'light' },
@@ -2837,7 +2849,8 @@ function applyBracketColors() {
   const wrap = editor.getWrapperElement();
   if (PREFS.bracketColors && !_bpActive) { editor.addOverlay(_bpOverlay); _bpActive = true; }
   else if (!PREFS.bracketColors && _bpActive) { editor.removeOverlay(_bpOverlay); _bpActive = false; }
-  wrap.classList.toggle('bp-on', !!PREFS.bracketColors);
+  // No longer gate on a wrapper class — the CSS rules apply as soon
+  // as the overlay starts adding cm-bp-N classes to brackets.
 }
 function toggleBracketColors() {
   PREFS.bracketColors = !PREFS.bracketColors;
@@ -3154,6 +3167,27 @@ const _ibOverlay = {
   }
 };
 
+// Guides: one vertical line at each tab-stop, INSIDE the indent area
+// only (no line painted across blank lines or beyond the last indent
+// character, unlike the old CSS-gradient approach).
+const _guidesOverlay = {
+  token(stream) {
+    const m = stream.string.match(/^[ \t]*/);
+    const leadingLen = m ? m[0].length : 0;
+    if (stream.pos < leadingLen) {
+      const startCol = stream.pos;
+      stream.next();
+      const tabSize = Math.max(1, PREFS.tabSize || 2);
+      if (startCol > 0 && (startCol % tabSize) === 0) {
+        return 'ig-line';
+      }
+      return null;
+    }
+    stream.skipToEnd();
+    return null;
+  }
+};
+
 // Gradient: every leading-whitespace space gets cm-ig-N with N capped
 // at 8 — the deeper the level, the stronger the tint.
 const _igOverlay = {
@@ -3172,33 +3206,32 @@ const _igOverlay = {
   }
 };
 
-let _currentStyleOverlay = null;   // whichever overlay is active
+// Two overlays can be active at once for rainbow (colors + guides).
+let _currentStyleOverlay = null;
+let _currentGuidesOverlay = null;
 
 function applyIndentStyle() {
   if (!editor) return;
-  // Remove any currently-active style overlay
-  if (_currentStyleOverlay) {
-    editor.removeOverlay(_currentStyleOverlay);
-    _currentStyleOverlay = null;
-  }
-  // Remove guides-class (CSS mechanism, not an overlay)
-  const wrap = editor.getWrapperElement();
-  wrap.classList.remove('indent-guides');
+  if (_currentStyleOverlay)  { editor.removeOverlay(_currentStyleOverlay);  _currentStyleOverlay = null; }
+  if (_currentGuidesOverlay) { editor.removeOverlay(_currentGuidesOverlay); _currentGuidesOverlay = null; }
 
   switch (PREFS.indentStyle) {
     case 'guides':
-      wrap.classList.add('indent-guides');
+      editor.addOverlay(_guidesOverlay);
+      _currentGuidesOverlay = _guidesOverlay;
       break;
     case 'rainbow':
-      // Rainbow also shows the faint grey guide lines (like VS Code's
-      // Indent Rainbow extension) so users can see both the tint and
-      // the crisp level boundary.
-      wrap.classList.add('indent-guides');
-      _currentStyleOverlay = _irOverlay;
-      editor.addOverlay(_irOverlay);
+      // Rainbow + grey tab-stop lines (like the VS Code Indent Rainbow
+      // extension).
+      editor.addOverlay(_irOverlay);    _currentStyleOverlay  = _irOverlay;
+      editor.addOverlay(_guidesOverlay);_currentGuidesOverlay = _guidesOverlay;
       break;
-    case 'bars':     _currentStyleOverlay = _ibOverlay; editor.addOverlay(_ibOverlay); break;
-    case 'gradient': _currentStyleOverlay = _igOverlay; editor.addOverlay(_igOverlay); break;
+    case 'bars':
+      editor.addOverlay(_ibOverlay);    _currentStyleOverlay = _ibOverlay;
+      break;
+    case 'gradient':
+      editor.addOverlay(_igOverlay);    _currentStyleOverlay = _igOverlay;
+      break;
     case 'none':
     default: /* nothing */ break;
   }
@@ -3348,15 +3381,30 @@ function setupTerminal() {
   window.addEventListener('resize', () => { if (_termFit) _termFit.fit(); });
 }
 
-function openTerminalWS() {
+async function openTerminalWS() {
+  // Check backend terminal availability first so we can show a clear
+  // error instead of a silent disconnection.
+  try {
+    const r = await fetch(API.url('/api/terminal/available'));
+    const info = await r.json();
+    if (!info.available) {
+      _term.writeln(`\x1b[31mTerminal unavailable: ${info.error || 'PTY not installed in the image.'}\x1b[0m`);
+      return;
+    }
+  } catch (e) {
+    _term.writeln('\x1b[31mCannot reach /api/terminal/available: ' + e.message + '\x1b[0m');
+    _term.writeln('\x1b[90mMake sure the add-on is running. If this is the standalone HTML file, the terminal requires the FastAPI backend.\x1b[0m');
+    return;
+  }
+
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  // Build a URL that respects HA ingress path prefix.
   const base = API.base.replace(/\/$/, '');
   const url = `${proto}//${location.host}${base}/api/terminal`;
+  _term.writeln(`\x1b[90mConnecting ${url}…\x1b[0m`);
   try {
     _termWs = new WebSocket(url);
   } catch (e) {
-    _term.writeln('\x1b[31mWebSocket failed: ' + e.message + '\x1b[0m');
+    _term.writeln('\x1b[31mWebSocket ctor failed: ' + e.message + '\x1b[0m');
     return;
   }
   _termWs.onopen = () => {
@@ -3367,10 +3415,15 @@ function openTerminalWS() {
     try {
       const msg = JSON.parse(ev.data);
       if (msg.type === 'output') _term.write(msg.data);
-    } catch {}
+    } catch (e) {
+      _term.writeln('\r\n\x1b[31m[bad frame: ' + e.message + ']\x1b[0m');
+    }
   };
-  _termWs.onclose = () => { _term.writeln('\r\n\x1b[90m[shell exited]\x1b[0m'); _termWs = null; };
-  _termWs.onerror = () => _term.writeln('\r\n\x1b[31m[websocket error]\x1b[0m');
+  _termWs.onclose = (e) => {
+    _term.writeln(`\r\n\x1b[90m[connection closed, code ${e.code}${e.reason ? ': ' + e.reason : ''}]\x1b[0m`);
+    _termWs = null;
+  };
+  _termWs.onerror = () => _term.writeln('\r\n\x1b[31m[websocket error — see browser devtools Network tab]\x1b[0m');
 }
 
 function clearTerminal() { if (_term) _term.clear(); }

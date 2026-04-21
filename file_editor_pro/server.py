@@ -15,10 +15,11 @@ from pydantic import BaseModel
 
 try:
     import ptyprocess  # type: ignore
-    import fcntl, termios
     _HAS_PTY = True
-except ImportError:
+    _PTY_ERROR = ""
+except ImportError as _pty_err:
     _HAS_PTY = False
+    _PTY_ERROR = str(_pty_err)
 
 APP_DIR = Path(__file__).parent
 INDEX_HTML = APP_DIR / "index.html"
@@ -587,27 +588,41 @@ async def ha_reload(body: ReloadBody):
 @app.get("/api/terminal/available")
 async def terminal_available():
     """Tell the frontend whether the terminal feature is usable."""
-    return {"available": _HAS_PTY}
+    return {
+        "available": _HAS_PTY,
+        "error": _PTY_ERROR,
+        "shell": os.environ.get("SHELL", "/bin/sh"),
+    }
 
 
 @app.websocket("/api/terminal")
 async def terminal_ws(ws: WebSocket):
-    """Bidirectional PTY bridge. The client sends:
-      {"type":"input", "data":"..."}   — user keystrokes
-      {"type":"resize","cols":N,"rows":M} — terminal resize
-    The server pushes:
-      {"type":"output","data":"..."}   — PTY stdout/stderr
-    """
+    """Bidirectional PTY bridge."""
     await ws.accept()
     if not _HAS_PTY:
-        await ws.send_json({"type": "output", "data": "PTY support is not available in this image.\r\n"})
+        await ws.send_json({"type": "output",
+            "data": f"PTY support unavailable: {_PTY_ERROR}\r\n"})
         await ws.close()
         return
 
     shell = os.environ.get("SHELL", "/bin/sh")
-    proc = ptyprocess.PtyProcessUnicode.spawn(
-        [shell], cwd=str(CONFIG_ROOT), dimensions=(24, 80)
-    )
+    # Prefer bash if available — Alpine ships /bin/ash but /bin/bash
+    # is installed in our image. bashio loads there too.
+    for candidate in ("/bin/bash", shell, "/bin/ash", "/bin/sh"):
+        if os.path.exists(candidate):
+            shell = candidate
+            break
+    try:
+        proc = ptyprocess.PtyProcessUnicode.spawn(
+            [shell, "-l"], cwd=str(CONFIG_ROOT), dimensions=(24, 80),
+            env={**os.environ, "TERM": "xterm-256color"},
+        )
+    except Exception as e:
+        await ws.send_json({"type": "output",
+            "data": f"Failed to spawn shell ({shell}): {e}\r\n"})
+        await ws.close()
+        return
+    await ws.send_json({"type": "output", "data": f"\x1b[90m[{shell}] \x1b[0m"})
 
     loop = asyncio.get_event_loop()
 
