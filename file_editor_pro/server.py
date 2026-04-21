@@ -11,6 +11,7 @@ import httpx
 import uvicorn
 from fastapi import FastAPI, File, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, Response
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 try:
@@ -64,6 +65,13 @@ OPTIONS = load_options()
 SHOW_HIDDEN = bool(OPTIONS.get("show_hidden", False))
 
 app = FastAPI(title="File Editor Pro", docs_url=None, redoc_url=None)
+
+# Mount the bundled third-party assets (xterm.js etc.). HA ingress
+# plus a strict CSP means loading from external CDNs isn't reliable,
+# so we ship these files with the image and serve them locally.
+_VENDOR_DIR = APP_DIR / "vendor"
+if _VENDOR_DIR.exists():
+    app.mount("/vendor", StaticFiles(directory=str(_VENDOR_DIR)), name="vendor")
 
 
 # ─────────────────────────────── Paths ────────────────────────────────

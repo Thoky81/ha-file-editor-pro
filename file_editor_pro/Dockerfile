@@ -9,6 +9,7 @@ COPY requirements.txt ./
 RUN pip3 install --break-system-packages --no-cache-dir -r requirements.txt
 
 COPY server.py index.html ./
+COPY vendor/ ./vendor/
 COPY run.sh /run.sh
 RUN chmod a+x /run.sh
 

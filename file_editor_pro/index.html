@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/lint/lint.min.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/merge/merge.min.css">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/xterm/5.3.0/css/xterm.min.css">
+  <link rel="stylesheet" href="vendor/xterm.min.css">
 
   <style>
     :root {
@@ -1190,8 +1190,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/lint/lint.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/diff_match_patch/20121119/diff_match_patch.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/merge/merge.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xterm/5.3.0/xterm.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xterm-addon-fit/0.8.0/xterm-addon-fit.min.js"></script>
+<script src="vendor/xterm.min.js"></script>
+<script src="vendor/xterm-addon-fit.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
 
 <script>
@@ -3030,35 +3030,33 @@ function buildSettingsUI() {
   }
 }
 
+// Defensive helpers — a missing element in any one field must not
+// stop the others from updating (e.g. a toggle not flipping visually
+// because of a typo or missing id elsewhere in the block).
+function _setVal(id, v) { const e = document.getElementById(id); if (e) e.value = v; }
+function _setText(id, t) { const e = document.getElementById(id); if (e) e.textContent = t; }
+function _setToggle(id, on) { const e = document.getElementById(id); if (e) e.classList.toggle('on', !!on); }
+
 function refreshSettingsUI() {
-  document.getElementById('set-theme').value = PREFS.theme;
-  document.getElementById('set-fontsize').value = PREFS.fontSize;
-  document.getElementById('set-fontsize-num').value = PREFS.fontSize;
-  document.getElementById('set-fontsize-label').textContent = PREFS.fontSize + ' px';
-  document.getElementById('set-tabsize').value = String(PREFS.tabSize);
-  document.getElementById('set-indent').value = PREFS.indentWithTabs ? 'tabs' : 'spaces';
-  const styleSel = document.getElementById('set-indentstyle');
-  if (styleSel) styleSel.value = PREFS.indentStyle || 'none';
-  const dl = document.getElementById('set-default-light');
-  if (dl) dl.value = PREFS.defaultLight || 'github-light';
-  const dd = document.getElementById('set-default-dark');
-  if (dd) dd.value = PREFS.defaultDark || 'ha-dark';
-  const sbs  = document.getElementById('set-sidebar-fontsize');
-  const sbsn = document.getElementById('set-sidebar-fontsize-num');
-  if (sbs)  sbs.value  = PREFS.sidebarFontSize;
-  if (sbsn) sbsn.value = PREFS.sidebarFontSize;
-  const sbsl = document.getElementById('set-sidebar-fontsize-label');
-  if (sbsl) sbsl.textContent = PREFS.sidebarFontSize + ' px';
-  const io  = document.getElementById('set-indent-opacity');
-  const ion = document.getElementById('set-indent-opacity-num');
-  if (io)  io.value  = PREFS.indentOpacity;
-  if (ion) ion.value = PREFS.indentOpacity;
-  const iol = document.getElementById('set-indent-opacity-label');
-  if (iol) iol.textContent = PREFS.indentOpacity + ' %';
-  document.getElementById('set-ws').classList.toggle('on', !!PREFS.showWhitespace);
-  document.getElementById('set-bp').classList.toggle('on', !!PREFS.bracketColors);
-  document.getElementById('set-minimap').classList.toggle('on', !!PREFS.minimap);
-  document.getElementById('set-wrap').classList.toggle('on', !!PREFS.lineWrapping);
+  _setVal('set-theme',        PREFS.theme);
+  _setVal('set-fontsize',     PREFS.fontSize);
+  _setVal('set-fontsize-num', PREFS.fontSize);
+  _setText('set-fontsize-label', PREFS.fontSize + ' px');
+  _setVal('set-tabsize',      String(PREFS.tabSize));
+  _setVal('set-indent',       PREFS.indentWithTabs ? 'tabs' : 'spaces');
+  _setVal('set-indentstyle',  PREFS.indentStyle || 'none');
+  _setVal('set-default-light', PREFS.defaultLight || 'github-light');
+  _setVal('set-default-dark',  PREFS.defaultDark  || 'ha-dark');
+  _setVal('set-sidebar-fontsize',     PREFS.sidebarFontSize);
+  _setVal('set-sidebar-fontsize-num', PREFS.sidebarFontSize);
+  _setText('set-sidebar-fontsize-label', PREFS.sidebarFontSize + ' px');
+  _setVal('set-indent-opacity',     PREFS.indentOpacity);
+  _setVal('set-indent-opacity-num', PREFS.indentOpacity);
+  _setText('set-indent-opacity-label', PREFS.indentOpacity + ' %');
+  _setToggle('set-ws',      PREFS.showWhitespace);
+  _setToggle('set-bp',      PREFS.bracketColors);
+  _setToggle('set-minimap', PREFS.minimap);
+  _setToggle('set-wrap',    PREFS.lineWrapping);
 }
 
 // Dismiss on backdrop click

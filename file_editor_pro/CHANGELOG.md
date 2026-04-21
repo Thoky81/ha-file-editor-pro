@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.9.3 — Terminal fixed (bundled xterm), defensive settings refresh
+
+- **Terminal was crashing with `ReferenceError: Can't find variable: Terminal`** because the xterm.js CDN URLs I used (cdnjs) 404'd, so the global never loaded. Bundled `xterm.min.js`, `xterm.min.css`, and `xterm-addon-fit.min.js` into `file_editor_pro/vendor/` and served them as static files from the FastAPI backend. CDN dependency removed; terminal now works in ingress with strict CSP.
+- **Settings toggles not switching visually** (e.g. Rainbow brackets): `refreshSettingsUI` was doing `document.getElementById(id).classList.toggle(...)` directly — a single missing or renamed id earlier in the function would throw and halt updates to every toggle after it. Rewrote with `_setVal` / `_setText` / `_setToggle` helpers that silently no-op if the element is missing, so every control refreshes independently.
+
 ## 1.9.2 — Indent guides in indent area only, rainbow brackets, File Editor theme
 
 - **Indent guides no longer paint across whole lines.** Old CSS used a line-width background-gradient that drew vertical lines across every row from top to bottom. Now guides come from an overlay (`_guidesOverlay`) that tags each tab-stop position inside the actual leading whitespace with `cm-ig-line`. CSS renders a 1 px `box-shadow` on those spans only — zero paint on blank lines or the content area.
