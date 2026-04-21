@@ -418,6 +418,22 @@ async def git_pull():
     return {"ok": True, "output": out}
 
 
+@app.get("/api/git/show")
+async def git_show(path: str, ref: str = "HEAD"):
+    """Return `git show ref:path` so the frontend can diff it."""
+    if not has_git():
+        raise HTTPException(400, "Not a git repository")
+    # Paths may be root-prefixed (e.g. "config/foo.yaml"). Git works
+    # relative to CONFIG_ROOT — strip the "config/" prefix if present.
+    rel = path
+    if rel.startswith("config/"):
+        rel = rel[len("config/"):]
+    code, out, err = await run_git("show", f"{ref}:{rel}", cwd=CONFIG_ROOT)
+    if code != 0:
+        return {"ok": False, "error": err.strip() or out.strip()}
+    return {"ok": True, "content": out, "ref": ref}
+
+
 class InitBody(BaseModel):
     branch: str = "main"
 

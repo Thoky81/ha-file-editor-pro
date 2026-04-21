@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldgutter.min.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/lint/lint.min.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/merge/merge.min.css">
 
   <style>
     :root {
@@ -375,6 +376,16 @@
     .fab-menu-shortcut{margin-left:auto;font-family:var(--font-mono);font-size:10px;color:var(--text-muted)}
     .fab-menu-divider{height:1px;background:var(--border);margin:4px 2px}
 
+    /* ── STICKY SCROLL ──
+       Pinned breadcrumb that floats above the editor and shows the
+       path of YAML keys above the top-most visible line, so deep in
+       a nested block you can see where you are. */
+    .sticky-scroll{position:absolute;top:0;left:0;right:0;background:var(--bg-dark);border-bottom:1px solid var(--border);padding:3px 10px 3px 54px;font-family:var(--font-mono);font-size:11px;color:var(--text-secondary);z-index:5;pointer-events:none;display:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .sticky-scroll.show{display:block}
+    .sticky-scroll .sticky-sep{color:var(--text-muted);margin:0 4px}
+    .sticky-scroll .sticky-key{color:var(--syn-tag)}
+    .editor-wrapper{position:relative}
+
     /* ── OUTLINE PANEL ── */
     .outline-list{overflow-y:auto;display:flex;flex-direction:column;gap:1px;padding:6px 8px}
     .outline-item{padding:4px 8px;border-radius:4px;cursor:pointer;color:var(--text-secondary);display:flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:12px}
@@ -397,6 +408,18 @@
     .insert-item-name{font-family:var(--font-mono);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .insert-item-desc{font-family:var(--font-ui);font-size:10px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .insert-empty{padding:20px;text-align:center;color:var(--text-muted);font-size:11px}
+
+    /* ── DIFF VIEW MODAL ── */
+    .diff-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1850;display:none;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
+    .diff-overlay.show{display:flex}
+    .diff-modal{width:min(1200px,96vw);height:min(720px,90vh);background:var(--bg-light);border:1px solid var(--border-light);border-radius:10px;box-shadow:0 20px 60px rgba(0,0,0,.5);display:flex;flex-direction:column;overflow:hidden}
+    .diff-header{display:flex;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);gap:10px}
+    .diff-title{font-size:13px;font-weight:600;color:var(--text-primary)}
+    .diff-subtitle{font-size:11px;color:var(--text-muted);font-family:var(--font-mono)}
+    .diff-close{margin-left:auto;background:none;border:none;color:var(--text-muted);font-size:22px;cursor:pointer;line-height:1;padding:2px 8px;border-radius:4px}
+    .diff-close:hover{background:var(--bg-hover);color:var(--text-primary)}
+    .diff-body{flex:1;min-height:0;overflow:hidden}
+    .diff-body .CodeMirror{height:100% !important;background:var(--bg-darkest) !important}
 
     /* ── UNSAVED-CHANGES CONFIRM DIALOG ── */
     .confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2100;display:none;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
@@ -492,6 +515,14 @@
       vertical-align: bottom;
       position: relative;
     }
+
+    /* ── BRACKET PAIR COLORIZATION ── (opt-in via PREFS.bracketColors) */
+    .cm-s-ha.bp-on .cm-bp-0{color:#e06c75 !important}
+    .cm-s-ha.bp-on .cm-bp-1{color:#d19a66 !important}
+    .cm-s-ha.bp-on .cm-bp-2{color:#e5c07b !important}
+    .cm-s-ha.bp-on .cm-bp-3{color:#98c379 !important}
+    .cm-s-ha.bp-on .cm-bp-4{color:#61afef !important}
+    .cm-s-ha.bp-on .cm-bp-5{color:#c678dd !important}
 
     /* ── INDENT RAINBOW ── */
     .cm-s-ha .cm-ir-0{background-color:rgba(255, 92, 92, calc(.07 * var(--indent-opacity, 1)))}
@@ -708,6 +739,7 @@
     <div class="tab-bar" id="tab-bar"><div class="tab-empty"></div></div>
     <div class="breadcrumb" id="breadcrumb"></div>
     <div class="editor-wrapper" id="editor-wrapper">
+      <div class="sticky-scroll" id="sticky-scroll"></div>
       <div class="no-file-open" id="no-file-msg">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
         <p>Open a file from the explorer</p>
@@ -831,6 +863,20 @@
   </div>
 </div>
 
+<!-- Diff viewer -->
+<div class="diff-overlay" id="diff-modal">
+  <div class="diff-modal">
+    <div class="diff-header">
+      <div>
+        <div class="diff-title">Diff view</div>
+        <div class="diff-subtitle" id="diff-subtitle"></div>
+      </div>
+      <button class="diff-close" onclick="closeDiff()">×</button>
+    </div>
+    <div class="diff-body" id="diff-body"></div>
+  </div>
+</div>
+
 <!-- Unsaved-changes confirm dialog -->
 <div class="confirm-overlay" id="confirm-modal">
   <div class="confirm-modal">
@@ -927,6 +973,14 @@
           </div>
           <div class="settings-control">
             <div class="settings-toggle" id="set-ws" onclick="toggleWhitespace(); refreshSettingsUI()"></div>
+          </div>
+        </div>
+        <div class="settings-row">
+          <div class="settings-label">Rainbow brackets
+            <span class="settings-help">Color () [] {} by nesting depth. Helps YAML flow style and Jinja templates.</span>
+          </div>
+          <div class="settings-control">
+            <div class="settings-toggle" id="set-bp" onclick="toggleBracketColors(); refreshSettingsUI()"></div>
           </div>
         </div>
       </div>
@@ -1063,6 +1117,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/anyword-hint.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/lint/lint.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/diff_match_patch/20121119/diff_match_patch.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/merge/merge.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
 
 <script>
@@ -1389,8 +1445,15 @@ function initEditor() {
       'Ctrl-H':  'replace',
       'Cmd-H':   'replace',
       'Alt-G':   'jumpToLine',
-      'Ctrl-D':  duplicateLine,
-      'Cmd-D':   duplicateLine,
+      // Multi-cursor (VS Code-style)
+      'Ctrl-D':        selectNextOccurrence,
+      'Cmd-D':         selectNextOccurrence,
+      'Ctrl-Shift-D':  duplicateLine,
+      'Cmd-Shift-D':   duplicateLine,
+      'Ctrl-Alt-Down': cm => addCursorVertically(cm, +1),
+      'Cmd-Alt-Down':  cm => addCursorVertically(cm, +1),
+      'Ctrl-Alt-Up':   cm => addCursorVertically(cm, -1),
+      'Cmd-Alt-Up':    cm => addCursorVertically(cm, -1),
       'Tab':     (cm) => cm.execCommand('indentMore'),
       'Shift-Tab': (cm) => cm.execCommand('indentLess'),
     },
@@ -1401,6 +1464,7 @@ function initEditor() {
     document.getElementById('status-pos').textContent = `Ln ${cur.line+1}, Col ${cur.ch+1}`;
   });
 
+  editor.on('scroll', () => updateStickyScroll());
   let _outlineDebounce = null;
   editor.on('change', () => {
     if (!activeTabId) return;
@@ -1429,6 +1493,81 @@ function duplicateLine(cm) {
   const cur  = cm.getCursor();
   const line = cm.getLine(cur.line);
   cm.replaceRange('\n' + line, { line: cur.line, ch: line.length });
+}
+
+// Multi-cursor: select the next occurrence of the current selection.
+// If no selection, select the word at the cursor first (VS Code-style).
+function selectNextOccurrence(cm) {
+  const sels = cm.listSelections();
+  const last = sels[sels.length - 1];
+  const collapsed = CodeMirror.cmpPos(last.anchor, last.head) === 0;
+  if (collapsed) {
+    const word = cm.findWordAt(last.head);
+    cm.setSelection(word.anchor, word.head);
+    return;
+  }
+  const text = cm.getRange(last.anchor, last.head);
+  if (!text) return;
+  const start = CodeMirror.cmpPos(last.anchor, last.head) < 0 ? last.head : last.anchor;
+  const cursor = cm.getSearchCursor(text, start, false);
+  if (cursor.findNext()) {
+    sels.push({ anchor: cursor.from(), head: cursor.to() });
+  } else {
+    // Wrap around from the top
+    const cursor2 = cm.getSearchCursor(text, { line: 0, ch: 0 }, false);
+    if (cursor2.findNext() && CodeMirror.cmpPos(cursor2.from(), last.anchor) !== 0) {
+      sels.push({ anchor: cursor2.from(), head: cursor2.to() });
+    }
+  }
+  cm.setSelections(sels);
+  cm.scrollIntoView(sels[sels.length - 1].head);
+}
+
+// Sticky scroll: recompute the breadcrumb of parent YAML keys
+// visible just off-screen above the current viewport and render it
+// pinned at the top of the editor.
+function updateStickyScroll() {
+  const el = document.getElementById('sticky-scroll');
+  if (!editor || !el) return;
+  const tab = tabs.find(t => t.id === activeTabId);
+  if (!tab || tab.mode !== 'yaml') { el.classList.remove('show'); return; }
+  const scroll = editor.getScrollInfo();
+  if (scroll.top <= 4) { el.classList.remove('show'); return; }
+  const topPos = editor.coordsChar({ left: 0, top: editor.getWrapperElement().getBoundingClientRect().top + 4 }, 'window');
+  const topLine = topPos.line;
+  const tabSize = Math.max(1, PREFS.tabSize || 2);
+  // Walk up from the top line; each key at a lower indent than the
+  // previous is an ancestor. Stop when we reach indent 0.
+  const ancestors = [];
+  let currentIndent = Infinity;
+  for (let i = topLine; i >= 0 && currentIndent > 0; i--) {
+    const line = editor.getLine(i) || '';
+    if (!line.trim() || line.trim().startsWith('#')) continue;
+    const indent = line.length - line.trimStart().length;
+    if (indent >= currentIndent) continue;
+    const m = /^([A-Za-z_][\w.-]*)\s*:/.exec(line.trimStart());
+    if (!m) continue;
+    ancestors.unshift({ name: m[1], indent });
+    currentIndent = indent;
+  }
+  if (!ancestors.length) { el.classList.remove('show'); return; }
+  el.innerHTML = ancestors.map((a, i) =>
+    `<span class="sticky-key">${escapeHtml(a.name)}</span>${i < ancestors.length - 1 ? '<span class="sticky-sep">›</span>' : ''}`
+  ).join('');
+  el.classList.add('show');
+}
+
+// Multi-cursor: add a cursor on the line above (-1) or below (+1).
+function addCursorVertically(cm, dir) {
+  const sels = cm.listSelections();
+  const last = sels[sels.length - 1];
+  const nextLine = last.head.line + dir;
+  if (nextLine < 0 || nextLine >= cm.lineCount()) return;
+  const lineLen = cm.getLine(nextLine).length;
+  const ch = Math.min(last.head.ch, lineLen);
+  sels.push({ anchor: { line: nextLine, ch }, head: { line: nextLine, ch } });
+  cm.setSelections(sels);
+  cm.scrollIntoView({ line: nextLine, ch });
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -2424,6 +2563,7 @@ const PREFS = {
   indentOpacity: 100,            // 0..150, % multiplier on indent-style alpha
   lineWrapping: false,
   showWhitespace: true,
+  bracketColors: false,          // rainbow brackets for () [] {}
 };
 
 function loadPrefs() {
@@ -2470,6 +2610,7 @@ function applyPrefs() {
   document.documentElement.style.setProperty('--indent-ch', PREFS.tabSize + 'ch');
   applyWhitespace();
   applyIndentStyle();
+  applyBracketColors();
   editor.refresh();
 }
 
@@ -2588,6 +2729,44 @@ function toggleLineWrap() {
   PREFS.lineWrapping = !PREFS.lineWrapping;
   savePrefs(); applyPrefs();
   showToast(`Line wrap: ${PREFS.lineWrapping ? 'on' : 'off'}`);
+}
+
+// Bracket pair colorization: overlay tags each bracket with
+// cm-bp-N based on its nesting depth. CSS colors only apply when
+// the wrapper has the bp-on class.
+const _bpOverlay = {
+  token(stream, state) {
+    const ch = stream.peek();
+    if (ch === '{' || ch === '[' || ch === '(') {
+      stream.next();
+      const depth = state._bpDepth || 0;
+      state._bpDepth = depth + 1;
+      return 'bp-' + (depth % 6);
+    }
+    if (ch === '}' || ch === ']' || ch === ')') {
+      stream.next();
+      const depth = Math.max(0, (state._bpDepth || 1) - 1);
+      state._bpDepth = depth;
+      return 'bp-' + (depth % 6);
+    }
+    stream.next();
+    return null;
+  },
+  startState() { return { _bpDepth: 0 }; },
+  copyState(s) { return { _bpDepth: s._bpDepth }; },
+};
+let _bpActive = false;
+function applyBracketColors() {
+  if (!editor) return;
+  const wrap = editor.getWrapperElement();
+  if (PREFS.bracketColors && !_bpActive) { editor.addOverlay(_bpOverlay); _bpActive = true; }
+  else if (!PREFS.bracketColors && _bpActive) { editor.removeOverlay(_bpOverlay); _bpActive = false; }
+  wrap.classList.toggle('bp-on', !!PREFS.bracketColors);
+}
+function toggleBracketColors() {
+  PREFS.bracketColors = !PREFS.bracketColors;
+  savePrefs(); applyBracketColors();
+  showToast(`Bracket colors: ${PREFS.bracketColors ? 'on' : 'off'}`);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -2724,6 +2903,7 @@ function refreshSettingsUI() {
   const iol = document.getElementById('set-indent-opacity-label');
   if (iol) iol.textContent = PREFS.indentOpacity + ' %';
   document.getElementById('set-ws').classList.toggle('on', !!PREFS.showWhitespace);
+  document.getElementById('set-bp').classList.toggle('on', !!PREFS.bracketColors);
   document.getElementById('set-wrap').classList.toggle('on', !!PREFS.lineWrapping);
 }
 
@@ -2986,6 +3166,73 @@ function haHintSource(cm) {
 
   return null;
 }
+
+// ═══════════════════════════════════════════════════════════════
+// DIFF VIEW — compare the active document against git HEAD (or
+// against the on-disk content). Uses CodeMirror's built-in merge
+// addon (diff_match_patch for the LCS).
+// ═══════════════════════════════════════════════════════════════
+let _diffMV = null;
+
+async function openDiffAgainstHead() {
+  if (!API.available) { showToast('Demo mode — no backend'); return; }
+  if (!activeTabId) { showToast('Open a file first'); return; }
+  const tab = tabs.find(t => t.id === activeTabId);
+  if (!tab) return;
+  try {
+    const r = await fetch(API.url('/api/git/show?path=' + encodeURIComponent(tab.path)));
+    const data = await r.json();
+    if (!data.ok) { showToast('Diff unavailable: ' + (data.error || 'error')); return; }
+    _openDiff(tab.path + ' · current ↔ git HEAD', editor.getValue(), data.content, tab.mode);
+  } catch (e) { showToast('Diff failed: ' + e.message); }
+}
+
+async function openDiffAgainstDisk() {
+  if (!API.available) { showToast('Demo mode — no backend'); return; }
+  if (!activeTabId) { showToast('Open a file first'); return; }
+  const tab = tabs.find(t => t.id === activeTabId);
+  if (!tab) return;
+  try {
+    const { content } = await API.read(tab.path);
+    _openDiff(tab.path + ' · current ↔ on disk', editor.getValue(), content, tab.mode);
+  } catch (e) { showToast('Diff failed: ' + e.message); }
+}
+
+function _openDiff(subtitle, current, other, mode) {
+  const modal = document.getElementById('diff-modal');
+  const body  = document.getElementById('diff-body');
+  document.getElementById('diff-subtitle').textContent = subtitle;
+  body.innerHTML = '';
+  modal.classList.add('show');
+  // Merge view — left = current (editable), right = other (read-only)
+  _diffMV = CodeMirror.MergeView(body, {
+    value: current,
+    orig:  other,
+    lineNumbers: true,
+    mode,
+    theme: 'ha',
+    highlightDifferences: true,
+    connect: 'align',
+    collapseIdentical: 20,
+    readOnly: true,
+  });
+  // Resize after paint so the inner CMs fill the container
+  setTimeout(() => {
+    if (!_diffMV) return;
+    _diffMV.editor().refresh();
+    _diffMV.rightOriginal() && _diffMV.rightOriginal().refresh();
+  }, 50);
+}
+
+function closeDiff() {
+  document.getElementById('diff-modal').classList.remove('show');
+  document.getElementById('diff-body').innerHTML = '';
+  _diffMV = null;
+}
+
+document.getElementById('diff-modal').addEventListener('click', e => {
+  if (e.target.id === 'diff-modal') closeDiff();
+});
 
 // ═══════════════════════════════════════════════════════════════
 // OUTLINE PANEL — walks the active YAML document and lists its
@@ -3382,6 +3629,7 @@ const COMMANDS = [
   { cat: 'View',   title: 'Indent: Colored level bars',                         run: () => setIndentStyle('bars') },
   { cat: 'View',   title: 'Indent: Gradient ramp',                              run: () => setIndentStyle('gradient') },
   { cat: 'View',   title: 'Toggle visible whitespace (dots)',                   run: () => toggleWhitespace() },
+  { cat: 'View',   title: 'Toggle rainbow brackets',                             run: () => toggleBracketColors() },
   { cat: 'View',   title: 'Toggle line wrap',                                    run: () => toggleLineWrap() },
   { cat: 'View',   title: 'Font size: 11',                                       run: () => setFontSize(11) },
   { cat: 'View',   title: 'Font size: 13',                                       run: () => setFontSize(13) },
@@ -3400,6 +3648,8 @@ const COMMANDS = [
   { cat: 'Git',    title: 'Push',                                              run: () => gitPush() },
   { cat: 'Git',    title: 'Commit (focus message)',                            run: () => { switchPanel('git'); document.getElementById('git-commit-msg').focus(); } },
   { cat: 'Git',    title: 'Refresh status',                                    run: () => refreshGit() },
+  { cat: 'Git',    title: 'Diff current file vs HEAD',                         run: () => openDiffAgainstHead() },
+  { cat: 'File',   title: 'Diff current file vs on disk',                      run: () => openDiffAgainstDisk() },
   { cat: 'HA',     title: 'Check Configuration',                               run: () => haCheckConfig() },
   { cat: 'HA',     title: 'Restart Home Assistant',                            run: () => haRestart() },
   { cat: 'HA',     title: 'Reload core config',                                run: () => haReload('homeassistant') },

@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.8.0 — Multi-cursor, sticky scroll, diff view, rainbow brackets
+
+- **Multi-cursor** (VS Code-style keybindings):
+  - `Ctrl+D` — select the next occurrence of the selection (or the word at cursor if nothing is selected).
+  - `Ctrl+Alt+Down` / `Ctrl+Alt+Up` — add a cursor on the line below / above.
+  - `Alt+Click` — add a cursor at the click position (CodeMirror default).
+  - `Ctrl+Shift+D` — duplicate line (moved from `Ctrl+D`).
+- **Sticky scroll**: as you scroll into a nested YAML block, a pinned row at the top of the editor shows the current parent-key path (e.g. `automation › trigger › platform`). Rebuilds on every scroll; auto-hides at the top of a file.
+- **Diff view** (vs git HEAD or vs on-disk content): command palette → `Git: Diff current file vs HEAD` or `File: Diff current file vs on disk`. Opens a side-by-side CodeMirror merge modal with aligned gutters and identical-line collapsing. New backend endpoint `/api/git/show?path=...`.
+- **Rainbow brackets** (opt-in): color `()` `[]` `{}` by nesting depth, 6 cycling colors. Useful in YAML flow style (`[1, 2, 3]`, `{a: 1}`) and in Jinja templates. Settings → Appearance → Rainbow brackets.
+
 ## 1.7.0 — Multi-root access, Outline panel, Quick open
 
 - **Multi-root access**: the editor now exposes `/config`, `/ssl`, `/share`, `/addons`, `/media`, `/backup` as browsable top-level folders in the file tree (when HA has mounted them — `/ssl` and `/backup` are read-only). The backend walks a `ROOTS` dict, API paths are root-prefixed (e.g. `ssl/cert.pem`), and unknown prefixes fall back to `/config` for backward compatibility. Cross-file search also spans all roots.
