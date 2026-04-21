@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.3.8 — Defensive Settings, crisper gear icon
+
+- `openSettings()` now shows the modal *first* and wraps the inner setup (`buildSettingsUI` / `refreshSettingsUI`) in try/catch, so an error in one of them can't silently prevent the modal from appearing. Errors are logged to the browser console for diagnosis.
+- Swapped the Feather-style compound-path gear for a simple 8-spoke gear SVG. Renders crisper at the 12 × 12 size used in the status bar.
+
 ## 1.3.7 — HA-aware YAML validation + inline error markers
 
 - **HA YAML tags recognised**: `!include`, `!include_dir_list`, `!include_dir_merge_list`, `!include_dir_named`, `!include_dir_merge_named`, `!secret`, `!env_var`, `!input` now parse without error. Previously every `configuration.yaml` showed a spurious "YAML Error" because `js-yaml` doesn't know those tags by default.
