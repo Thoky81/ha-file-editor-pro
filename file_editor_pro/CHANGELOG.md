@@ -2,7 +2,7 @@
 
 ## 1.3.1 — Whitespace dots on by default + sidebar icon match
 
-- **Whitespace rendering now defaults to ON** so spaces show as `·` and tabs as `→`, matching the look of the original HA File Editor out of the box. Still toggleable in Settings → Appearance → Show whitespace.
+- **Whitespace rendering now defaults to ON** so spaces show as `·` and tabs as `→`. Still toggleable in Settings → Appearance → Show whitespace.
 - Rendering fix: each whitespace span is now an `inline-block` so the pseudo-element reliably centers over the character, fixing a flaky-layout case on some browsers.
 - **Sidebar icon** changed from `mdi:file-code` to `mdi:format-list-bulleted` to visually match the add-on's YAML-list logo mark. (HA only accepts MDI icon names for `panel_icon`, not PNG files — `icon.png` is still used for the store tile.)
 
@@ -16,9 +16,9 @@
 - **Editor font size** (10–22 px) with a slider + numeric input in Settings; `View: Font size:` shortcuts in the palette.
 - **Visible Save button** in the tab-bar action area, with a highlighted amber state when the active file has unsaved changes (`Save*`).
 - **Pencil FAB** at bottom-right of the editor with a menu: undo / redo / toggle comment / indent / outdent / fold (at cursor / all / unfold all) / find / replace.
-- **Visible whitespace** option (dots for spaces, arrows for tabs) — matches the original HA File Editor's look.
-- **Indent guides default OFF** per user feedback; when on, they're now subtler and tint-aware via the theme's muted color.
-- All CSS colors reference a single set of per-theme variables (`--bg-*`, `--text-*`, `--accent*`, `--syn-*`). CodeMirror tokens use `--syn-*` so syntax highlighting re-theme instantly.
+- **Visible whitespace** option (dots for spaces, arrows for tabs).
+- **Indent guides default OFF**; when on, they're now subtler and tint-aware via the theme's muted color.
+- All CSS colors reference a single set of per-theme variables (`--bg-*`, `--text-*`, `--accent*`, `--syn-*`). CodeMirror tokens use `--syn-*` so syntax highlighting re-themes instantly.
 - Early theme apply: reads the saved theme from `localStorage` before the editor mounts to avoid a flash of the default theme.
 
 ## 1.2.2 — Store-ready branding & docs
@@ -32,7 +32,7 @@
 - **Configurable tab size** (2 / 4 / 8) and **indent style** (spaces / tabs), accessible via the command palette under `View:`.
 - Preferences persist in `localStorage` and apply across all open tabs.
 
-## 1.2.0 — Sprint 2: the differentiator
+## 1.2.0 — Autocomplete, command palette, snippets, Jinja preview
 
 - **HA-aware autocomplete**: entity IDs and service names complete as you type. Auto-triggers after `service:` / `entity_id:` and when typing a domain-prefixed identifier; Ctrl+Space anywhere to force. Cache pulled from `/api/states` and `/api/services` on load, refreshable via command palette.
 - **Command palette** (Ctrl+Shift+P): fuzzy-filter across file ops, view panels, git, HA actions, snippets, and every open file.
@@ -40,7 +40,7 @@
 - **Jinja template preview** (Ctrl+Alt+J): split-pane modal that renders via HA's `/api/template`. Ctrl+Enter to render, seeds from the current editor selection.
 - Backend: new `/api/ha/states`, `/api/ha/services`, `/api/ha/template` endpoints.
 
-## 1.1.0 — Sprint 1: parity with File Editor
+## 1.1.0 — Git, uploads, HA actions, tree ops
 
 - **Real git integration**: status, diff, commit, pull, push via backend subprocess. Sidebar git panel now reflects the real `/config` repo; file tree shows live M/A/U/D badges.
 - **Upload / download**: drag-and-drop upload button in the explorer header; right-click → Download on any file.
