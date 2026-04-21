@@ -1,6 +1,6 @@
 # File Editor Pro
 
-A modern, multi-tab editor for your Home Assistant configuration. Drop-in upgrade for the official "File editor" add-on.
+A modern, multi-tab editor for your Home Assistant configuration.
 
 ## Features
 

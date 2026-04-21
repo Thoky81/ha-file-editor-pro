@@ -2632,53 +2632,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 
-// ═══════════════════════════════════════════════════════════════
-// HA INTEGRATION STUBS — replace mock calls with these
-// ═══════════════════════════════════════════════════════════════
-/*
-  DEPLOYMENT:
-    1. Place this file in /config/www/ha-editor/index.html
-    2. In configuration.yaml add:
-         panel_custom:
-           - name: ha-file-editor
-             url_path: editor
-             sidebar_title: File Editor
-             sidebar_icon: mdi:file-code
-             module_url: /local/ha-editor/panel.js
-    3. Create panel.js as a thin wrapper that loads this page in an iframe
-       or build a proper custom element (see below)
-
-  FILE API (File Editor addon):
-    The official File Editor addon exposes a simple REST API via ingress:
-    GET  /api/hassio/ingress/{slug}/api/?path=/config/automations.yaml
-    POST /api/hassio/ingress/{slug}/api/  body: { file, content }
-
-  WEBSOCKET APPROACH (no addon dependency):
-    async function haReadFile(hass, path) {
-      return hass.callApi('GET', `config/core/check_config`);
-      // or use hassio supervisor API:
-      const r = await fetch(`/api/hassio/core/api/config/core/check_config`, {
-        headers: { Authorization: `Bearer ${hass.auth.accessToken}` }
-      });
-      return r.json();
-    }
-
-  Replace saveCurrentFile() body with:
-    await fetch('/api/hassio/ingress/SLUG/api/', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${window.__ha_access_token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ file: tab.path, content }),
-    });
-
-  GIT:
-    Real git requires either:
-    - SSH addon + REST calls to a thin script
-    - A custom Docker sidecar exposing a git HTTP API
-    - Writing files then using HA's built-in backup/snapshot
-*/
 </script>
 </body>
 </html>

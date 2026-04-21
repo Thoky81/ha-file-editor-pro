@@ -1,6 +1,6 @@
 # File Editor Pro — Documentation
 
-A modern, multi-tab editor for your Home Assistant configuration, served via Ingress. Drop-in upgrade for the official "File editor" add-on.
+A modern, multi-tab editor for your Home Assistant configuration, served via Ingress.
 
 ---
 
