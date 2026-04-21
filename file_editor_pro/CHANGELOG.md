@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.0 — Indent rainbow, open-file highlight, mark-only logo
+
+- **Indent rainbow** (opt-in): each indent level tinted with a different faint background color, cycling on `level % 6`. Toggle in Settings → Appearance or via the command palette.
+- **Open files highlighted in the tree**: any file currently open in a tab gets its name rendered in a brighter weight plus a small accent dot next to it. The active tab still gets the full highlighted background + accent edge. Tree re-renders automatically on open/close/switch.
+- **Info-page banner** (`logo.png`): removed the wordmark so the HA add-on Info tab shows just the logo mark on a dark tile, with no repeated "File Editor Pro" text.
+
 ## 1.3.8 — Defensive Settings, crisper gear icon
 
 - `openSettings()` now shows the modal *first* and wraps the inner setup (`buildSettingsUI` / `refreshSettingsUI`) in try/catch, so an error in one of them can't silently prevent the modal from appearing. Errors are logged to the browser console for diagnosis.

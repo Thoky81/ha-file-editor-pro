@@ -185,6 +185,12 @@
     .tree-item:hover{background:var(--bg-hover);color:var(--text-primary)}
     .tree-item.active{background:var(--bg-active);color:var(--text-primary)}
     .tree-item.active::before{content:'';position:absolute;left:0;width:2px;height:100%;background:var(--accent);border-radius:0 2px 2px 0}
+    /* Files that are currently open in a tab — brighter name, tiny
+       dot next to the name. The active one still wins visually via
+       .active above. */
+    .tree-item.open .tree-name{color:var(--text-primary);font-weight:500}
+    .tree-item.open .tree-open-dot{display:inline-block}
+    .tree-open-dot{display:none;width:6px;height:6px;border-radius:50%;background:var(--accent);margin-left:6px;flex-shrink:0;opacity:.85}
     .tree-arrow{width:16px;height:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:transform .15s}
     .tree-arrow.open{transform:rotate(90deg)}
     .tree-arrow svg{width:10px;height:10px;stroke-width:2}
@@ -422,6 +428,18 @@
       background-repeat:no-repeat;
       background-position:left center;
     }
+
+    /* ── INDENT RAINBOW ──
+       Opt-in. Each indent step gets a subtle different tint so it's
+       easier to eyeball nesting depth in long YAML. Colors cycle on
+       level % 6. Kept at low alpha (~0.06) so they're background
+       hints, not foreground colors. */
+    .cm-s-ha .cm-ir-0{background:rgba(255, 92, 92, .07)}
+    .cm-s-ha .cm-ir-1{background:rgba(255,165, 80, .07)}
+    .cm-s-ha .cm-ir-2{background:rgba(230,200, 70, .08)}
+    .cm-s-ha .cm-ir-3{background:rgba( 90,200,120, .07)}
+    .cm-s-ha .cm-ir-4{background:rgba( 90,160,255, .07)}
+    .cm-s-ha .cm-ir-5{background:rgba(180,110,230, .07)}
 
     /* ── INDENT GUIDES ── */
     /* Opt-in: apply the .indent-guides class to the CodeMirror wrapper.
@@ -718,6 +736,14 @@
           </div>
           <div class="settings-control">
             <div class="settings-toggle" id="set-ws" onclick="toggleWhitespace(); refreshSettingsUI()"></div>
+          </div>
+        </div>
+        <div class="settings-row">
+          <div class="settings-label">Indent rainbow
+            <span class="settings-help">Tint each indent level a different subtle color.</span>
+          </div>
+          <div class="settings-control">
+            <div class="settings-toggle" id="set-rainbow" onclick="toggleIndentRainbow(); refreshSettingsUI()"></div>
           </div>
         </div>
       </div>
@@ -1256,10 +1282,15 @@ function renderNodes(nodes, container, depth) {
     } else {
       const gs  = FILES[node.path]?.gitStatus;
       const col = fileColor(node.name);
+      const isOpen = !!(node.path && tabs.find(t => t.path === node.path));
+      const isActive = !!(node.path && activeTabId && tabs.find(t => t.id === activeTabId && t.path === node.path));
+      if (isOpen) item.classList.add('open');
+      if (isActive) item.classList.add('active');
       item.innerHTML = `
         <div class="tree-arrow" style="opacity:0"></div>
         <div class="tree-icon" style="color:${col}">${fileIcon()}</div>
         <span class="tree-name">${node.name}</span>
+        <span class="tree-open-dot"></span>
         ${gs ? `<span class="tree-git-badge git-${gs}">${gs}</span>` : ''}`;
       if (node.path) item.onclick = () => openFile(node.path, item);
     }
@@ -1326,6 +1357,7 @@ function openFile(path, treeItem) {
   tabs.push(tab);
   renderTabs();
   switchTab(tab.id);
+  renderFileTree();
 }
 
 function switchTab(id) {
@@ -1343,9 +1375,7 @@ function switchTab(id) {
   setTimeout(() => { editor.refresh(); editor.focus(); }, 10);
   renderTabs();
   validateYAML();
-
-  // Highlight in tree
-  document.querySelectorAll('.tree-item').forEach(el => el.classList.remove('active'));
+  renderFileTree();
 }
 
 function closeTab(id, e) {
@@ -1364,6 +1394,7 @@ function closeTab(id, e) {
     }
   }
   renderTabs();
+  renderFileTree();
 }
 
 function renderTabs() {
@@ -2043,6 +2074,7 @@ const PREFS = {
   tabSize: 2,
   indentWithTabs: false,
   indentGuides: false,
+  indentRainbow: false,
   lineWrapping: false,
   showWhitespace: true,
 };
@@ -2072,6 +2104,7 @@ function applyPrefs() {
   const wrap = editor.getWrapperElement();
   wrap.classList.toggle('indent-guides', !!PREFS.indentGuides);
   applyWhitespace();
+  applyIndentRainbow();
   editor.refresh();
 }
 
@@ -2165,6 +2198,7 @@ function refreshSettingsUI() {
   document.getElementById('set-indent').value = PREFS.indentWithTabs ? 'tabs' : 'spaces';
   document.getElementById('set-guides').classList.toggle('on', !!PREFS.indentGuides);
   document.getElementById('set-ws').classList.toggle('on', !!PREFS.showWhitespace);
+  document.getElementById('set-rainbow').classList.toggle('on', !!PREFS.indentRainbow);
   document.getElementById('set-wrap').classList.toggle('on', !!PREFS.lineWrapping);
 }
 
@@ -2234,6 +2268,36 @@ function toggleWhitespace() {
   PREFS.showWhitespace = !PREFS.showWhitespace;
   savePrefs(); applyWhitespace();
   showToast(`Whitespace: ${PREFS.showWhitespace ? 'visible' : 'hidden'}`);
+}
+
+// Indent-rainbow overlay: tags each space in the leading whitespace
+// with cm-ir-N where N = floor(column / tabSize) % 6, so every indent
+// step picks up a different faint tint.
+const _irOverlay = {
+  token(stream) {
+    const m = stream.string.match(/^[ \t]*/);
+    const leadingLen = m ? m[0].length : 0;
+    if (stream.pos < leadingLen) {
+      const startCol = stream.pos;
+      stream.next();
+      const tabSize = Math.max(1, PREFS.tabSize || 2);
+      const level = Math.floor(startCol / tabSize);
+      return 'ir-' + (level % 6);
+    }
+    stream.skipToEnd();
+    return null;
+  }
+};
+let _irActive = false;
+function applyIndentRainbow() {
+  if (!editor) return;
+  if (PREFS.indentRainbow && !_irActive) { editor.addOverlay(_irOverlay); _irActive = true; }
+  else if (!PREFS.indentRainbow && _irActive) { editor.removeOverlay(_irOverlay); _irActive = false; }
+}
+function toggleIndentRainbow() {
+  PREFS.indentRainbow = !PREFS.indentRainbow;
+  savePrefs(); applyIndentRainbow();
+  showToast(`Indent rainbow: ${PREFS.indentRainbow ? 'on' : 'off'}`);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -2451,6 +2515,7 @@ const COMMANDS = [
   { cat: 'View',   title: 'Indent with tabs',                                   run: () => setIndentStyle(true) },
   { cat: 'View',   title: 'Toggle indent guides',                               run: () => toggleIndentGuides() },
   { cat: 'View',   title: 'Toggle visible whitespace',                           run: () => toggleWhitespace() },
+  { cat: 'View',   title: 'Toggle indent rainbow',                                run: () => toggleIndentRainbow() },
   { cat: 'View',   title: 'Toggle line wrap',                                    run: () => toggleLineWrap() },
   { cat: 'View',   title: 'Font size: 11',                                       run: () => setFontSize(11) },
   { cat: 'View',   title: 'Font size: 13',                                       run: () => setFontSize(13) },
