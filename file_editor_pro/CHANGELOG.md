@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.9.8 — No indent markers on comment lines
+
+- Rainbow, gradient, colored-bars and indent-guides overlays now skip lines whose first non-whitespace character is `#`. Comments render clean with just their own color — no background tint, no vertical guide, no bar.
+
 ## 1.9.7 — Sidebar resizer no longer overlaps terminal + nano available
 
 - Sidebar resize handle no longer shows a vertical line through the terminal panel when it's open. Root cause: the terminal panel had `z-index:40` and the resizer had `z-index:50`, so the resizer rendered on top. Terminal panel lifted to `z-index:60`.

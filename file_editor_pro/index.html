@@ -3108,11 +3108,25 @@ function toggleWhitespace() {
   showToast(`Whitespace: ${PREFS.showWhitespace ? 'visible' : 'hidden'}`);
 }
 
+// Comment lines get no indent-level decoration. This covers both
+// YAML `#` comments and Python `#` comments, which is the common
+// case. The check inspects the first non-whitespace character of
+// the current line.
+function _isCommentLine(line) {
+  const i = line.search(/\S/);
+  return i >= 0 && line.charCodeAt(i) === 35 /* '#' */;
+}
+
+function _leadingLen(line) {
+  const m = line.match(/^[ \t]*/);
+  return m ? m[0].length : 0;
+}
+
 // Rainbow: tag each leading-whitespace space with cm-ir-N (level%6).
 const _irOverlay = {
   token(stream) {
-    const m = stream.string.match(/^[ \t]*/);
-    const leadingLen = m ? m[0].length : 0;
+    if (_isCommentLine(stream.string)) { stream.skipToEnd(); return null; }
+    const leadingLen = _leadingLen(stream.string);
     if (stream.pos < leadingLen) {
       const startCol = stream.pos;
       stream.next();
@@ -3129,8 +3143,8 @@ const _irOverlay = {
 // coloured 2px bar appears at each indent step.
 const _ibOverlay = {
   token(stream) {
-    const m = stream.string.match(/^[ \t]*/);
-    const leadingLen = m ? m[0].length : 0;
+    if (_isCommentLine(stream.string)) { stream.skipToEnd(); return null; }
+    const leadingLen = _leadingLen(stream.string);
     if (stream.pos < leadingLen) {
       const startCol = stream.pos;
       stream.next();
@@ -3151,8 +3165,8 @@ const _ibOverlay = {
 // character, unlike the old CSS-gradient approach).
 const _guidesOverlay = {
   token(stream) {
-    const m = stream.string.match(/^[ \t]*/);
-    const leadingLen = m ? m[0].length : 0;
+    if (_isCommentLine(stream.string)) { stream.skipToEnd(); return null; }
+    const leadingLen = _leadingLen(stream.string);
     if (stream.pos < leadingLen) {
       const startCol = stream.pos;
       stream.next();
@@ -3171,8 +3185,8 @@ const _guidesOverlay = {
 // at 8 — the deeper the level, the stronger the tint.
 const _igOverlay = {
   token(stream) {
-    const m = stream.string.match(/^[ \t]*/);
-    const leadingLen = m ? m[0].length : 0;
+    if (_isCommentLine(stream.string)) { stream.skipToEnd(); return null; }
+    const leadingLen = _leadingLen(stream.string);
     if (stream.pos < leadingLen) {
       const startCol = stream.pos;
       stream.next();
