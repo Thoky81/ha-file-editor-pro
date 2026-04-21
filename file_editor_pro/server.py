@@ -179,6 +179,48 @@ async def mkdir(body: PathBody):
     return {"ok": True, "path": body.path}
 
 
+@app.get("/api/files/search")
+async def search_files(q: str, max_files: int = 100, max_per_file: int = 10):
+    """Cross-file case-insensitive substring search under /config.
+    Skips SKIP_DIRS and binary files. Returns matches with surrounding
+    line context so the sidebar can highlight them."""
+    if not q:
+        return {"results": []}
+    q_lower = q.lower()
+    results = []
+    for p in CONFIG_ROOT.rglob("*"):
+        if not p.is_file():
+            continue
+        if any(part in SKIP_DIRS or (part.startswith(".") and not SHOW_HIDDEN)
+               for part in p.relative_to(CONFIG_ROOT).parts):
+            continue
+        if p.stat().st_size > MAX_READ_BYTES:
+            continue
+        try:
+            text = p.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            continue
+        matches = []
+        for i, line in enumerate(text.splitlines(), 1):
+            low = line.lower()
+            idx = low.find(q_lower)
+            if idx >= 0:
+                matches.append({
+                    "line": i,
+                    "before": line[:idx],
+                    "match":  line[idx:idx + len(q)],
+                    "after":  line[idx + len(q):],
+                })
+                if len(matches) >= max_per_file:
+                    break
+        if matches:
+            rel = p.relative_to(CONFIG_ROOT).as_posix()
+            results.append({"path": rel, "matches": matches})
+            if len(results) >= max_files:
+                break
+    return {"results": results}
+
+
 @app.get("/api/files/download")
 async def download_file(path: str):
     target = resolve_safe(path)

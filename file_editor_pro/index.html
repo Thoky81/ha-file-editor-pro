@@ -375,6 +375,19 @@
     .fab-menu-shortcut{margin-left:auto;font-family:var(--font-mono);font-size:10px;color:var(--text-muted)}
     .fab-menu-divider{height:1px;background:var(--border);margin:4px 2px}
 
+    /* ── INSERT PANEL ── */
+    .insert-tabs{display:flex;gap:2px;margin-bottom:8px;border-bottom:1px solid var(--border);padding-bottom:6px}
+    .insert-tab{padding:4px 8px;border-radius:4px;cursor:pointer;font-size:11px;color:var(--text-muted);transition:all .1s;font-family:var(--font-ui)}
+    .insert-tab:hover{background:var(--bg-hover);color:var(--text-secondary)}
+    .insert-tab.active{background:var(--accent-dim);color:var(--accent)}
+    .insert-search{width:100%;background:var(--bg-mid);border:1px solid var(--border-light);border-radius:5px;padding:6px 10px;color:var(--text-primary);font-family:var(--font-mono);font-size:11px;outline:none;margin-bottom:6px}
+    .insert-list{overflow-y:auto;display:flex;flex-direction:column;gap:1px;padding-right:2px}
+    .insert-item{padding:6px 8px;border-radius:4px;cursor:pointer;color:var(--text-secondary);transition:background .1s;display:flex;flex-direction:column;gap:1px}
+    .insert-item:hover{background:var(--bg-hover);color:var(--text-primary)}
+    .insert-item-name{font-family:var(--font-mono);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .insert-item-desc{font-family:var(--font-ui);font-size:10px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .insert-empty{padding:20px;text-align:center;color:var(--text-muted);font-size:11px}
+
     /* ── UNSAVED-CHANGES CONFIRM DIALOG ── */
     .confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2100;display:none;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
     .confirm-overlay.show{display:flex}
@@ -540,6 +553,9 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>
       <div class="activity-badge" id="git-badge"></div>
     </div>
+    <div class="activity-item" id="act-insert" onclick="switchPanel('insert')" title="Insert HA object">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+    </div>
     <div class="activity-spacer"></div>
     <div class="activity-item" id="act-theme-toggle" onclick="toggleThemeMode()" title="Toggle light / dark theme">
       <!-- Content set dynamically by updateThemeToggleIcon() -->
@@ -580,6 +596,8 @@
         </div>
       </div>
       <div class="sidebar-content">
+        <input type="text" class="insert-search" id="tree-filter" placeholder="Filter files…" spellcheck="false"
+               oninput="filterFileTree(this.value)" style="margin:6px 8px 4px;width:calc(100% - 16px)">
         <div class="file-tree" id="file-tree"></div>
       </div>
     </div>
@@ -629,6 +647,29 @@
             </button>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- INSERT PANEL -->
+    <div class="panel-content" id="panel-insert">
+      <div class="sidebar-header">
+        <span>Insert</span>
+        <div class="sidebar-header-actions">
+          <button class="icon-btn" title="Refresh HA data" onclick="refreshInsertData()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.82"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="sidebar-content" style="padding:8px;display:flex;flex-direction:column;min-height:0">
+        <div class="insert-tabs">
+          <div class="insert-tab active" data-kind="entity"    onclick="setInsertKind('entity')">Entities</div>
+          <div class="insert-tab"        data-kind="service"   onclick="setInsertKind('service')">Services</div>
+          <div class="insert-tab"        data-kind="trigger"   onclick="setInsertKind('trigger')">Triggers</div>
+          <div class="insert-tab"        data-kind="condition" onclick="setInsertKind('condition')">Conditions</div>
+          <div class="insert-tab"        data-kind="event"     onclick="setInsertKind('event')">Events</div>
+        </div>
+        <input type="text" class="insert-search" id="insert-search" placeholder="Filter…" oninput="renderInsertList()" spellcheck="false">
+        <div class="insert-list" id="insert-list" style="flex:1;min-height:0"></div>
       </div>
     </div>
 
@@ -1360,6 +1401,58 @@ function duplicateLine(cm) {
 // ═══════════════════════════════════════════════════════════════
 // FILE TREE
 // ═══════════════════════════════════════════════════════════════
+// Inline tree filter. Walks the rendered tree, hides rows whose
+// filename doesn't match. Directories remain visible when a
+// descendant matches (so the user can see the path). Empty query
+// shows everything.
+function filterFileTree(q) {
+  const query = (q || '').trim().toLowerCase();
+  const container = document.getElementById('file-tree');
+  if (!container) return;
+  if (!query) {
+    // Re-render cleanly to reset any visibility tweaks
+    renderFileTree();
+    return;
+  }
+  // Render the full tree first so we can walk it
+  renderFileTree();
+  // Walk every item and hide non-matches, reveal ancestors of matches
+  const items = Array.from(container.querySelectorAll('.tree-item'));
+  const dirs = items.filter(el => el.dataset.type === 'dir');
+  const files = items.filter(el => el.dataset.type === 'file');
+  // First mark files: visible if filename matches query
+  const visibleDirs = new Set();
+  for (const el of files) {
+    const name = el.querySelector('.tree-name')?.textContent || '';
+    const match = name.toLowerCase().includes(query);
+    el.style.display = match ? '' : 'none';
+    if (match) {
+      // Mark every ancestor directory as visible. Path = dataset.path
+      const path = el.dataset.path || '';
+      const parts = path.split('/').slice(0, -1);
+      let acc = '';
+      for (const p of parts) {
+        acc = acc ? acc + '/' + p : p;
+        visibleDirs.add(acc);
+      }
+    }
+  }
+  for (const el of dirs) {
+    const path = el.dataset.path || '';
+    // Top-level "config" synthetic dir has empty path → always show
+    const show = path === '' || visibleDirs.has(path);
+    el.style.display = show ? '' : 'none';
+    // Also show/hide the children wrapper
+    const wrapId = 'ch-' + (el.querySelector('.tree-name')?.textContent || '').replace(/\W/g,'-');
+    const wrap = document.getElementById(wrapId);
+    if (wrap) {
+      wrap.style.display = show ? '' : 'none';
+      // Auto-expand dirs containing matches
+      if (show && path !== '') wrap.classList.add('open');
+    }
+  }
+}
+
 function renderFileTree() {
   const c = document.getElementById('file-tree');
   c.innerHTML = '';
@@ -1696,8 +1789,9 @@ function validateYAML() {
 // ═══════════════════════════════════════════════════════════════
 function switchPanel(panel) {
   activePanel = panel;
-  ['files','search','git'].forEach(p => {
-    document.getElementById('panel-' + p).classList.remove('active');
+  ['files','search','git','insert'].forEach(p => {
+    const el = document.getElementById('panel-' + p);
+    if (el) el.classList.remove('active');
     const act = document.getElementById('act-' + p);
     if (act) act.classList.remove('active');
   });
@@ -1705,18 +1799,65 @@ function switchPanel(panel) {
   const actEl = document.getElementById('act-' + panel);
   if (actEl) actEl.classList.add('active');
   if (panel === 'search') setTimeout(() => document.getElementById('global-search').focus(), 50);
+  if (panel === 'insert') {
+    renderInsertList();
+    setTimeout(() => document.getElementById('insert-search')?.focus(), 50);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
 // GLOBAL SEARCH
 // ═══════════════════════════════════════════════════════════════
+let _searchTimer = null;
 function performSearch(query) {
+  clearTimeout(_searchTimer);
+  _searchTimer = setTimeout(() => _performSearchNow(query), 220);
+}
+
+async function _performSearchNow(query) {
   const results = document.getElementById('search-results');
   if (!query.trim()) { results.innerHTML=''; return; }
+  // Live-server search when the backend is reachable — covers files
+  // that haven't been opened yet.
+  if (API.available) {
+    results.innerHTML = '<div class="search-match" style="color:var(--text-muted)">Searching…</div>';
+    try {
+      const r = await fetch(API.url('/api/files/search?q=' + encodeURIComponent(query)));
+      if (!r.ok) throw new Error('search ' + r.status);
+      const data = await r.json();
+      renderSearchResults(data.results || []);
+      return;
+    } catch (e) {
+      console.warn('backend search failed, falling back to local cache', e);
+    }
+  }
+  // Fallback: scan whatever files are already loaded in FILES.
+  _localSearch(query);
+}
+
+function renderSearchResults(results) {
+  const box = document.getElementById('search-results');
+  if (!results.length) { box.innerHTML = '<div class="search-match" style="color:var(--text-muted)">No matches</div>'; return; }
+  let html = '';
+  for (const r of results) {
+    html += `<div class="search-file" onclick="openFile('${r.path}')">${escapeHtml(r.path)}</div>`;
+    for (const m of r.matches.slice(0, 4)) {
+      html += `<div class="search-match" onclick="openFileAtLine('${r.path}',${m.line})">
+        <span class="search-match-line">${m.line}</span>${escapeHtml(m.before)}<span class="search-match-highlight">${escapeHtml(m.match)}</span>${escapeHtml(m.after)}
+      </div>`;
+    }
+    if (r.matches.length > 4) html += `<div class="search-match" style="color:var(--text-muted)">  +${r.matches.length-4} more matches</div>`;
+  }
+  box.innerHTML = html;
+}
+
+function _localSearch(query) {
+  const results = document.getElementById('search-results');
   const q = query.toLowerCase();
   let html = '';
 
   Object.entries(FILES).forEach(([path, file]) => {
+    if (!file.content) return;
     const lines = file.content.split('\n');
     const matches = [];
     lines.forEach((line, i) => {
@@ -2803,6 +2944,212 @@ function haHintSource(cm) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// INSERT PANEL — browse and insert HA objects (entity/service/
+// trigger/condition/event) from the sidebar.
+// ═══════════════════════════════════════════════════════════════
+let _insertKind = 'entity';
+
+const TRIGGER_TEMPLATES = [
+  { name:'state',          desc:'React to a state change',
+    tpl:`- platform: state
+  entity_id: sensor.example
+  to: 'on'
+  for: '00:05:00'` },
+  { name:'numeric_state',  desc:'Threshold on a numeric value',
+    tpl:`- platform: numeric_state
+  entity_id: sensor.temperature
+  above: 25` },
+  { name:'time',           desc:'Fire at a specific time',
+    tpl:`- platform: time
+  at: '09:00:00'` },
+  { name:'time_pattern',   desc:'Recurring time pattern',
+    tpl:`- platform: time_pattern
+  minutes: '/15'` },
+  { name:'sun',            desc:'Sunrise / sunset offset',
+    tpl:`- platform: sun
+  event: sunset
+  offset: '-00:30:00'` },
+  { name:'template',       desc:'Fire when a Jinja template becomes true',
+    tpl:`- platform: template
+  value_template: "{{ states('sensor.foo') | float(0) > 10 }}"` },
+  { name:'event',          desc:'Listen to an HA event',
+    tpl:`- platform: event
+  event_type: call_service
+  event_data:
+    domain: notify` },
+  { name:'zone',           desc:'Enter / leave a zone',
+    tpl:`- platform: zone
+  entity_id: person.you
+  zone: zone.home
+  event: enter` },
+  { name:'webhook',        desc:'Incoming webhook',
+    tpl:`- platform: webhook
+  webhook_id: my_webhook` },
+  { name:'device',         desc:'Device-specific trigger',
+    tpl:`- platform: device
+  domain: binary_sensor
+  entity_id: binary_sensor.motion
+  type: turned_on` },
+  { name:'homeassistant',  desc:'HA startup or shutdown',
+    tpl:`- platform: homeassistant
+  event: start` },
+  { name:'mqtt',           desc:'MQTT topic message',
+    tpl:`- platform: mqtt
+  topic: some/topic
+  payload: 'on'` },
+];
+
+const CONDITION_TEMPLATES = [
+  { name:'state',          desc:'Entity is in a specific state',
+    tpl:`- condition: state
+  entity_id: input_boolean.vacation_mode
+  state: 'off'` },
+  { name:'numeric_state',  desc:'Numeric threshold check',
+    tpl:`- condition: numeric_state
+  entity_id: sensor.temperature
+  above: 20
+  below: 25` },
+  { name:'time',           desc:'Within a time window',
+    tpl:`- condition: time
+  after: '08:00:00'
+  before: '22:00:00'
+  weekday: [mon, tue, wed, thu, fri]` },
+  { name:'template',       desc:'Jinja condition',
+    tpl:`- condition: template
+  value_template: "{{ is_state('sun.sun', 'above_horizon') }}"` },
+  { name:'and',            desc:'Combine with AND',
+    tpl:`- condition: and
+  conditions:
+    - condition: state
+      entity_id: input_boolean.a
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.b
+      state: 'on'` },
+  { name:'or',             desc:'Combine with OR',
+    tpl:`- condition: or
+  conditions:
+    - condition: state
+      entity_id: input_boolean.a
+      state: 'on'
+    - condition: state
+      entity_id: input_boolean.b
+      state: 'on'` },
+  { name:'not',            desc:'Negate a condition',
+    tpl:`- condition: not
+  conditions:
+    - condition: state
+      entity_id: input_boolean.a
+      state: 'on'` },
+  { name:'trigger',        desc:'True when triggered by a specific id',
+    tpl:`- condition: trigger
+  id: morning` },
+  { name:'sun',            desc:'Sun is above / below horizon',
+    tpl:`- condition: sun
+  before: sunrise
+  after: sunset` },
+  { name:'zone',           desc:'Entity is in a zone',
+    tpl:`- condition: zone
+  entity_id: person.you
+  zone: zone.home` },
+  { name:'device',         desc:'Device-specific condition',
+    tpl:`- condition: device
+  domain: binary_sensor
+  entity_id: binary_sensor.motion
+  type: is_on` },
+];
+
+const COMMON_EVENTS = [
+  { name:'call_service',        desc:'A service is called' },
+  { name:'state_changed',       desc:'Any entity state change' },
+  { name:'script_started',      desc:'A script begins executing' },
+  { name:'automation_triggered',desc:'An automation fires' },
+  { name:'homeassistant_start', desc:'HA has started up' },
+  { name:'homeassistant_stop',  desc:'HA is shutting down' },
+  { name:'homeassistant_final_write', desc:'Final DB write on shutdown' },
+  { name:'zha_event',           desc:'Zigbee (ZHA) device event' },
+  { name:'deconz_event',        desc:'deCONZ device event' },
+  { name:'mobile_app_notification_action', desc:'User tapped a mobile notification action' },
+];
+
+function setInsertKind(kind) {
+  _insertKind = kind;
+  document.querySelectorAll('.insert-tab').forEach(el =>
+    el.classList.toggle('active', el.dataset.kind === kind));
+  renderInsertList();
+}
+
+function refreshInsertData() {
+  loadHAData(true).then(() => { renderInsertList(); showToast('HA cache refreshed'); });
+}
+
+function insertAtCursor(text) {
+  if (!editor) return;
+  editor.focus();
+  const cur = editor.getCursor();
+  const line = editor.getLine(cur.line);
+  const prefix = (line.length && cur.ch > 0) ? '\n' : '';
+  editor.replaceRange(prefix + text + '\n', cur);
+}
+
+function renderInsertList() {
+  const list = document.getElementById('insert-list');
+  if (!list) return;
+  const q = (document.getElementById('insert-search')?.value || '').trim().toLowerCase();
+  let items = [];
+
+  if (_insertKind === 'entity') {
+    items = HA_CACHE.entities.map(e => ({
+      name: e.entity_id,
+      desc: e.name && e.name !== e.entity_id ? e.name : e.domain,
+      insert: `entity_id: ${e.entity_id}`,
+    }));
+  } else if (_insertKind === 'service') {
+    items = HA_CACHE.services.map(s => ({
+      name: s.full,
+      desc: s.description || s.name,
+      insert: `service: ${s.full}`,
+    }));
+  } else if (_insertKind === 'trigger') {
+    items = TRIGGER_TEMPLATES.map(t => ({ name: t.name, desc: t.desc, insert: t.tpl }));
+  } else if (_insertKind === 'condition') {
+    items = CONDITION_TEMPLATES.map(t => ({ name: t.name, desc: t.desc, insert: t.tpl }));
+  } else if (_insertKind === 'event') {
+    items = COMMON_EVENTS.map(e => ({
+      name: e.name, desc: e.desc,
+      insert: `- platform: event\n  event_type: ${e.name}`,
+    }));
+  }
+
+  if (q) {
+    items = items.filter(i =>
+      (i.name  || '').toLowerCase().includes(q) ||
+      (i.desc  || '').toLowerCase().includes(q));
+  }
+
+  if (!items.length) {
+    const hint = (_insertKind === 'entity' || _insertKind === 'service')
+      ? (API.available ? 'No matches. Try refreshing the HA cache.' :
+                         'Run inside the HA add-on to load live entities/services.')
+      : 'No matches.';
+    list.innerHTML = `<div class="insert-empty">${escapeHtml(hint)}</div>`;
+    return;
+  }
+
+  list.innerHTML = items.slice(0, 400).map((i, idx) => `
+    <div class="insert-item" data-idx="${idx}" title="Click to insert at cursor">
+      <div class="insert-item-name">${escapeHtml(i.name)}</div>
+      ${i.desc ? `<div class="insert-item-desc">${escapeHtml(i.desc)}</div>` : ''}
+    </div>`).join('');
+  const filtered = items;
+  list.querySelectorAll('.insert-item').forEach(el => {
+    el.addEventListener('click', () => {
+      insertAtCursor(filtered[Number(el.dataset.idx)].insert);
+    });
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
 // SNIPPETS
 // ═══════════════════════════════════════════════════════════════
 const SNIPPETS = {
@@ -2906,6 +3253,7 @@ const COMMANDS = [
   { cat: 'View',   title: 'Show Explorer',           shortcut: 'Ctrl+Shift+E', run: () => switchPanel('files') },
   { cat: 'View',   title: 'Show Search',             shortcut: 'Ctrl+Shift+F', run: () => switchPanel('search') },
   { cat: 'View',   title: 'Show Source Control',                               run: () => switchPanel('git') },
+  { cat: 'View',   title: 'Show Insert panel',                                  run: () => switchPanel('insert') },
   { cat: 'View',   title: 'Tab size: 2',                                        run: () => setTabSize(2) },
   { cat: 'View',   title: 'Tab size: 4',                                        run: () => setTabSize(4) },
   { cat: 'View',   title: 'Tab size: 8',                                        run: () => setTabSize(8) },

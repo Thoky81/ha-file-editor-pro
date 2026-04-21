@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.6.0 — Insert panel, Explorer filter, backend cross-file search
+
+- **Insert panel** (new activity-bar entry, lightning icon). Tabs for **Entities · Services · Triggers · Conditions · Events**, each with a filter search. Entities and services draw from the same live `/api/ha/states` and `/api/ha/services` cache used by autocomplete. Click an item → a ready-made YAML snippet inserts at the cursor. Triggers include state / numeric_state / time / time_pattern / sun / template / event / zone / webhook / device / homeassistant / mqtt; Conditions include state / numeric_state / time / template / and / or / not / trigger / sun / zone / device.
+- **Explorer inline filter**: a "Filter files…" input at the top of the tree filters by filename in real time, auto-expanding parent directories whose descendants match. No need to switch to the Search tab for a simple name lookup.
+- **Cross-file search now hits the backend**: `/api/files/search?q=` endpoint walks `/config` server-side and returns matches with surrounding line context. Live results now work for files that haven't been opened (previously the panel only searched the in-memory cache, so fresh installs showed no results until a file was opened). Falls back to the local cache when the backend isn't available.
+
 ## 1.5.3 — Resizable sidebar, close-confirm, Settings gear, continuous rainbow bands
 
 - **Drag-resizable sidebar**: grab the right edge to resize between 180 and 600 px, double-click to reset to 260 px. Width persists in `localStorage`.
