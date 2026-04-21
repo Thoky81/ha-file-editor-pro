@@ -404,7 +404,7 @@
     .cm-s-ha .cm-ws-space{
       background-image:radial-gradient(
         circle,
-        color-mix(in srgb, var(--text-muted) 15%, transparent) 1px,
+        color-mix(in srgb, var(--text-muted) 25%, transparent) 1px,
         transparent 1.4px
       );
       background-size:1ch 1em;
@@ -415,8 +415,8 @@
       background-image:linear-gradient(
         to right,
         transparent 2px,
-        color-mix(in srgb, var(--text-muted) 15%, transparent) 2px,
-        color-mix(in srgb, var(--text-muted) 15%, transparent) 4px,
+        color-mix(in srgb, var(--text-muted) 25%, transparent) 2px,
+        color-mix(in srgb, var(--text-muted) 25%, transparent) 4px,
         transparent 4px
       );
       background-repeat:no-repeat;
@@ -853,6 +853,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/comment/comment.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/anyword-hint.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/lint/lint.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
 
 <script>
@@ -1166,7 +1167,8 @@ function initEditor() {
     matchBrackets: true,
     styleActiveLine: true,
     foldGutter: true,
-    gutters: ['CodeMirror-linenumbers', 'CodeMirror-foldgutter'],
+    gutters: ['CodeMirror-linenumbers', 'CodeMirror-foldgutter', 'CodeMirror-lint-markers'],
+    lint: true,
     foldOptions: { rangeFinder: CodeMirror.fold.indent },
     extraKeys: {
       'Ctrl-S':  saveCurrentFile,
@@ -1431,18 +1433,80 @@ function promptNewFile() {
 // ═══════════════════════════════════════════════════════════════
 // YAML VALIDATION
 // ═══════════════════════════════════════════════════════════════
+// Home Assistant uses custom YAML tags. js-yaml doesn't know them
+// out of the box, so every !include, !secret, etc. would be flagged
+// as an "unknown tag" error on real HA configs. Register them as
+// no-op scalars — we're validating syntax, not resolving references.
+const HA_TAG_NAMES = [
+  '!include',
+  '!include_dir_list',
+  '!include_dir_merge_list',
+  '!include_dir_named',
+  '!include_dir_merge_named',
+  '!secret',
+  '!env_var',
+  '!input',
+];
+const HA_TYPES = HA_TAG_NAMES.flatMap(tag => [
+  new jsyaml.Type(tag, { kind: 'scalar',   construct: d => d }),
+  new jsyaml.Type(tag, { kind: 'mapping',  construct: d => d }),
+  new jsyaml.Type(tag, { kind: 'sequence', construct: d => d }),
+]);
+const HA_SCHEMA = jsyaml.DEFAULT_SCHEMA.extend(HA_TYPES);
+
+function parseYAMLwithHA(text) {
+  return jsyaml.loadAll(text, undefined, { schema: HA_SCHEMA });
+}
+
+// CodeMirror lint source — returns [{from,to,message,severity}].
+// Hover the marker in the gutter to see the message; the status
+// bar mirrors the first error.
+CodeMirror.registerHelper('lint', 'yaml', function (text) {
+  const found = [];
+  try {
+    parseYAMLwithHA(text);
+  } catch (e) {
+    const mark = e.mark || {};
+    const line = mark.line ?? 0;
+    const col  = mark.column ?? 0;
+    found.push({
+      from: CodeMirror.Pos(line, Math.max(0, col - 1)),
+      to:   CodeMirror.Pos(line, col + 1),
+      message: e.reason ? `${e.reason}` : (e.message || 'YAML error'),
+      severity: 'error',
+    });
+  }
+  return found;
+});
+
 function validateYAML() {
   const errEl = document.getElementById('status-errors');
   const errTxt = document.getElementById('status-errors-text');
   const tab = tabs.find(t => t.id === activeTabId);
-  if (!tab || tab.mode !== 'yaml') { errTxt.textContent = '–'; errEl.className='status-item'; return; }
+  if (!tab || tab.mode !== 'yaml') {
+    errTxt.textContent = '–';
+    errEl.className = 'status-item';
+    errEl.title = '';
+    return;
+  }
   try {
-    jsyaml.loadAll(editor.getValue());
+    parseYAMLwithHA(editor.getValue());
     errTxt.textContent = 'Valid YAML';
     errEl.className = 'status-item status-ok-state';
+    errEl.title = '';
   } catch (e) {
-    errTxt.textContent = 'YAML Error';
-    errEl.className = 'status-item status-error-state';
+    const mark = e.mark || {};
+    const line = (mark.line ?? 0) + 1;
+    const msg  = e.reason || e.message || 'YAML error';
+    errTxt.textContent = `Line ${line}: ${msg.slice(0, 60)}${msg.length > 60 ? '…' : ''}`;
+    errEl.className = 'status-item status-error-state status-clickable';
+    errEl.title = `${msg}\n\nClick to jump to line ${line}.`;
+    errEl.onclick = () => {
+      if (editor) {
+        editor.focus();
+        editor.setCursor(line - 1, mark.column ?? 0);
+      }
+    };
   }
 }
 

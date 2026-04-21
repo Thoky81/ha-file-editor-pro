@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.7 — HA-aware YAML validation + inline error markers
+
+- **HA YAML tags recognised**: `!include`, `!include_dir_list`, `!include_dir_merge_list`, `!include_dir_named`, `!include_dir_merge_named`, `!secret`, `!env_var`, `!input` now parse without error. Previously every `configuration.yaml` showed a spurious "YAML Error" because `js-yaml` doesn't know those tags by default.
+- **Inline error markers**: CodeMirror's lint addon is wired, so a real syntax error now shows a red marker in the gutter at the failing line; hover it for the parser's message.
+- **Status bar shows the error message**: the YAML indicator now reads `Line 47: mapping values are not allowed here` instead of just "YAML Error". Click it to jump to the bad line.
+- Whitespace dot intensity raised from 15% → 25%.
+
 ## 1.3.6 — Restore dark icon and logo
 
 - Reverted `icon.png` and `logo.png` to the original dark ha-palette look (navy tile, amber dashes, light-grey rows) while keeping the 320 px-wide logo canvas from 1.3.4 so the "Pro" wordmark still fits on HA's Info tab.
