@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>HA File Editor</title>
+  <title>File Editor Pro</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -295,7 +295,7 @@
 
     /* ── STATUS BAR ── */
     .status-bar{height:var(--status-height);background:var(--accent);display:flex;align-items:center;padding:0 12px;gap:16px;flex-shrink:0}
-    .status-item{display:flex;align-items:center;gap:5px;color:#0a0e18;font-family:var(--font-mono);font-size:11px;font-weight:500;cursor:default;opacity:.85;transition:opacity .1s;white-space:nowrap}
+    .status-item{display:flex;align-items:center;gap:5px;color:var(--status-text);font-family:var(--font-mono);font-size:11px;font-weight:500;cursor:default;opacity:.95;transition:opacity .1s;white-space:nowrap}
     .status-item:hover{opacity:1}
     .status-item svg{width:12px;height:12px;stroke-width:2}
     .status-clickable{cursor:pointer;padding:0 6px;border-radius:4px;transition:background .1s}
@@ -393,21 +393,23 @@
        (and .cm-ws-tab for tabs) via the overlay we register in JS.
        We render a dot/arrow centered over the space character so
        the layout doesn't shift. */
-    /* Use an inline-block + absolute child so the dot centers in the
-       1ch space without affecting layout. Inline pseudo-elements on
-       plain inline spans are flaky across browsers. */
-    .cm-s-ha .cm-ws-space{position:relative;display:inline-block;width:1ch}
+    /* Space = centered middle-dot, light grey so it guides the eye
+       without fighting the content. The pseudo fills the full line
+       box (inset:0) and uses flex centering for perfect middle
+       alignment regardless of font metrics. */
+    .cm-s-ha .cm-ws-space{position:relative;display:inline-block;width:1ch;height:1.7em;vertical-align:bottom}
     .cm-s-ha .cm-ws-space::before{
-      content:'·';color:var(--text-muted);opacity:.6;
-      position:absolute;left:0;right:0;top:0;
-      text-align:center;pointer-events:none;
-      font-weight:400
+      content:'·';color:var(--text-muted);opacity:.42;
+      position:absolute;inset:0;
+      display:flex;align-items:center;justify-content:center;
+      pointer-events:none;font-weight:normal;line-height:1
     }
-    .cm-s-ha .cm-ws-tab{position:relative;display:inline-block}
+    .cm-s-ha .cm-ws-tab{position:relative;display:inline-block;height:1.7em;vertical-align:bottom}
     .cm-s-ha .cm-ws-tab::before{
-      content:'→';color:var(--text-muted);opacity:.5;
-      position:absolute;left:1px;top:0;
-      pointer-events:none
+      content:'→';color:var(--text-muted);opacity:.4;
+      position:absolute;inset:0;
+      display:flex;align-items:center;justify-content:flex-start;
+      padding-left:1px;pointer-events:none
     }
 
     /* ── INDENT GUIDES ── */
@@ -701,7 +703,7 @@
         </div>
         <div class="settings-row">
           <div class="settings-label">Show whitespace
-            <span class="settings-help">Render spaces as · and tabs as → (matches HA File Editor).</span>
+            <span class="settings-help">Render spaces as · and tabs as →.</span>
           </div>
           <div class="settings-control">
             <div class="settings-toggle" id="set-ws" onclick="toggleWhitespace(); refreshSettingsUI()"></div>

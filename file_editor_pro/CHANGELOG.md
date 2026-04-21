@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.2 — Status bar readability, centered whitespace dots, window title
+
+- **Status bar readability**: fixed a CSS regression where all status-bar text (Check Config, Restart HA, Settings, Reload, Ln/Col, UTF-8, theme env) rendered with a hardcoded dark color that looked disabled on light themes. Now uses the theme's `--status-text` variable, so text is always high-contrast against the bar.
+- **Whitespace dots** are now vertically centered in the line box (previously sat near the baseline) and rendered in a lighter grey so they guide the eye without fighting the content.
+- **Browser tab title** updated to "File Editor Pro".
+
 ## 1.3.1 — Whitespace dots on by default + sidebar icon match
 
 - **Whitespace rendering now defaults to ON** so spaces show as `·` and tabs as `→`. Still toggleable in Settings → Appearance → Show whitespace.
