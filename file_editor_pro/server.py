@@ -12,7 +12,6 @@ from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 
-CONFIG_ROOT = Path(os.environ.get("CONFIG_DIR", "/config")).resolve()
 APP_DIR = Path(__file__).parent
 INDEX_HTML = APP_DIR / "index.html"
 PORT = int(os.environ.get("PORT", "8099"))
@@ -25,6 +24,24 @@ MAX_READ_BYTES = 2 * 1024 * 1024
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 
 OPTIONS_FILE = Path("/data/options.json")
+
+# Multi-root: each name corresponds to an HA folder that the add-on
+# may have mapped in config.yaml. Only roots that actually exist at
+# start-up are exposed. "config" is primary (editor also operates on
+# paths without a root prefix for backward compat).
+_ROOT_CANDIDATES = {
+    "config":  Path(os.environ.get("CONFIG_DIR", "/config")),
+    "ssl":     Path("/ssl"),
+    "share":   Path("/share"),
+    "addons":  Path("/addons"),
+    "media":   Path("/media"),
+    "backup":  Path("/backup"),
+}
+ROOTS = {name: p.resolve() for name, p in _ROOT_CANDIDATES.items() if p.exists()}
+# Ensure config is always present (even for local dev without HA mounts)
+if "config" not in ROOTS:
+    ROOTS["config"] = _ROOT_CANDIDATES["config"].resolve()
+CONFIG_ROOT = ROOTS["config"]
 
 
 def load_options() -> dict:
@@ -43,16 +60,28 @@ app = FastAPI(title="File Editor Pro", docs_url=None, redoc_url=None)
 # ─────────────────────────────── Paths ────────────────────────────────
 
 def resolve_safe(relpath: str) -> Path:
+    """Resolve a client-supplied path to an absolute filesystem path.
+    Paths may be prefixed with a root name ("config/foo.yaml",
+    "ssl/cert.pem"). Paths without a known root prefix fall back to
+    CONFIG_ROOT for backward compatibility."""
     relpath = (relpath or "").lstrip("/\\")
-    target = (CONFIG_ROOT / relpath).resolve()
+    first, sep, rest = relpath.partition("/")
+    if first in ROOTS:
+        root = ROOTS[first]
+        target = (root / rest).resolve()
+    else:
+        root = CONFIG_ROOT
+        target = (root / relpath).resolve()
     try:
-        target.relative_to(CONFIG_ROOT)
+        target.relative_to(root)
     except ValueError:
-        raise HTTPException(400, "Path escapes config directory")
+        raise HTTPException(400, "Path escapes root directory")
     return target
 
 
-def build_tree(root: Path) -> list[dict]:
+def build_tree(root: Path, prefix: str = "") -> list[dict]:
+    """Walk `root`, returning nodes whose `path` includes `prefix` so
+    the client sends us back the same path and we can resolve it."""
     def walk(dirpath: Path, relbase: str) -> list[dict]:
         out: list[dict] = []
         try:
@@ -68,18 +97,19 @@ def build_tree(root: Path) -> list[dict]:
             if not SHOW_HIDDEN and p.name.startswith("."):
                 continue
             rel = f"{relbase}/{p.name}" if relbase else p.name
+            full = f"{prefix}/{rel}" if prefix else rel
             if p.is_dir():
                 out.append({
                     "name": p.name,
                     "type": "dir",
-                    "path": rel,
+                    "path": full,
                     "children": walk(p, rel),
                 })
             elif p.is_file():
                 out.append({
                     "name": p.name,
                     "type": "file",
-                    "path": rel,
+                    "path": full,
                     "size": p.stat().st_size,
                 })
         return out
@@ -106,9 +136,25 @@ async def health():
 
 # ──────────────────────────── File ops ────────────────────────────────
 
+@app.get("/api/roots")
+async def list_roots():
+    return {"roots": [{"name": name, "path": str(p)} for name, p in ROOTS.items()]}
+
+
 @app.get("/api/files/tree")
 async def tree():
-    return {"root": str(CONFIG_ROOT), "tree": build_tree(CONFIG_ROOT)}
+    """Top-level nodes are one per mapped root; children are that
+    root's contents. The `path` on every node is root-prefixed so
+    all /api/files/* calls resolve unambiguously."""
+    nodes = []
+    for name, root in ROOTS.items():
+        nodes.append({
+            "name": name,
+            "type": "dir",
+            "path": name,
+            "children": build_tree(root, prefix=name),
+        })
+    return {"tree": nodes, "root": str(CONFIG_ROOT), "roots": list(ROOTS.keys())}
 
 
 @app.get("/api/files/read")
@@ -188,36 +234,41 @@ async def search_files(q: str, max_files: int = 100, max_per_file: int = 10):
         return {"results": []}
     q_lower = q.lower()
     results = []
-    for p in CONFIG_ROOT.rglob("*"):
-        if not p.is_file():
-            continue
-        if any(part in SKIP_DIRS or (part.startswith(".") and not SHOW_HIDDEN)
-               for part in p.relative_to(CONFIG_ROOT).parts):
-            continue
-        if p.stat().st_size > MAX_READ_BYTES:
-            continue
-        try:
-            text = p.read_text(encoding="utf-8")
-        except (UnicodeDecodeError, OSError):
-            continue
-        matches = []
-        for i, line in enumerate(text.splitlines(), 1):
-            low = line.lower()
-            idx = low.find(q_lower)
-            if idx >= 0:
-                matches.append({
-                    "line": i,
-                    "before": line[:idx],
-                    "match":  line[idx:idx + len(q)],
-                    "after":  line[idx + len(q):],
-                })
-                if len(matches) >= max_per_file:
-                    break
-        if matches:
-            rel = p.relative_to(CONFIG_ROOT).as_posix()
-            results.append({"path": rel, "matches": matches})
-            if len(results) >= max_files:
-                break
+    for root_name, root in ROOTS.items():
+        for p in root.rglob("*"):
+            if not p.is_file():
+                continue
+            rel_parts = p.relative_to(root).parts
+            if any(part in SKIP_DIRS or (part.startswith(".") and not SHOW_HIDDEN)
+                   for part in rel_parts):
+                continue
+            try:
+                if p.stat().st_size > MAX_READ_BYTES:
+                    continue
+            except OSError:
+                continue
+            try:
+                text = p.read_text(encoding="utf-8")
+            except (UnicodeDecodeError, OSError):
+                continue
+            matches = []
+            for i, line in enumerate(text.splitlines(), 1):
+                low = line.lower()
+                idx = low.find(q_lower)
+                if idx >= 0:
+                    matches.append({
+                        "line": i,
+                        "before": line[:idx],
+                        "match":  line[idx:idx + len(q)],
+                        "after":  line[idx + len(q):],
+                    })
+                    if len(matches) >= max_per_file:
+                        break
+            if matches:
+                rel = f"{root_name}/{p.relative_to(root).as_posix()}"
+                results.append({"path": rel, "matches": matches})
+                if len(results) >= max_files:
+                    return {"results": results}
     return {"results": results}
 
 

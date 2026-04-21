@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.7.0 — Multi-root access, Outline panel, Quick open
+
+- **Multi-root access**: the editor now exposes `/config`, `/ssl`, `/share`, `/addons`, `/media`, `/backup` as browsable top-level folders in the file tree (when HA has mounted them — `/ssl` and `/backup` are read-only). The backend walks a `ROOTS` dict, API paths are root-prefixed (e.g. `ssl/cert.pem`), and unknown prefixes fall back to `/config` for backward compatibility. Cross-file search also spans all roots.
+- **Outline panel** (new sidebar activity-bar entry, three-bullet icon): lists top-level keys and notable list items (YAML entries with `alias`/`name`/`id`/`platform`/`service`) from the active document. Click any entry to jump the cursor to that line. Refreshes automatically as you edit (debounced).
+- **Quick open** (`Ctrl+P`): a fuzzy file picker that searches every file in the tree. Under the hood it opens the command palette pre-filtered to `Open ` entries, so every file (not just the ones currently loaded) is reachable with a few keystrokes.
+
 ## 1.6.0 — Insert panel, Explorer filter, backend cross-file search
 
 - **Insert panel** (new activity-bar entry, lightning icon). Tabs for **Entities · Services · Triggers · Conditions · Events**, each with a filter search. Entities and services draw from the same live `/api/ha/states` and `/api/ha/services` cache used by autocomplete. Click an item → a ready-made YAML snippet inserts at the cursor. Triggers include state / numeric_state / time / time_pattern / sun / template / event / zone / webhook / device / homeassistant / mqtt; Conditions include state / numeric_state / time / template / and / or / not / trigger / sun / zone / device.

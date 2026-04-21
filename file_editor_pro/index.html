@@ -375,6 +375,16 @@
     .fab-menu-shortcut{margin-left:auto;font-family:var(--font-mono);font-size:10px;color:var(--text-muted)}
     .fab-menu-divider{height:1px;background:var(--border);margin:4px 2px}
 
+    /* ── OUTLINE PANEL ── */
+    .outline-list{overflow-y:auto;display:flex;flex-direction:column;gap:1px;padding:6px 8px}
+    .outline-item{padding:4px 8px;border-radius:4px;cursor:pointer;color:var(--text-secondary);display:flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:12px}
+    .outline-item:hover{background:var(--bg-hover);color:var(--text-primary)}
+    .outline-item.lvl-1{padding-left:18px}
+    .outline-item.lvl-2{padding-left:32px}
+    .outline-item.lvl-3{padding-left:46px}
+    .outline-line{margin-left:auto;color:var(--text-muted);font-size:10px}
+    .outline-empty{padding:20px;text-align:center;color:var(--text-muted);font-size:11px}
+
     /* ── INSERT PANEL ── */
     .insert-tabs{display:flex;gap:2px;margin-bottom:8px;border-bottom:1px solid var(--border);padding-bottom:6px}
     .insert-tab{padding:4px 8px;border-radius:4px;cursor:pointer;font-size:11px;color:var(--text-muted);transition:all .1s;font-family:var(--font-ui)}
@@ -556,6 +566,9 @@
     <div class="activity-item" id="act-insert" onclick="switchPanel('insert')" title="Insert HA object">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
     </div>
+    <div class="activity-item" id="act-outline" onclick="switchPanel('outline')" title="Outline">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg>
+    </div>
     <div class="activity-spacer"></div>
     <div class="activity-item" id="act-theme-toggle" onclick="toggleThemeMode()" title="Toggle light / dark theme">
       <!-- Content set dynamically by updateThemeToggleIcon() -->
@@ -647,6 +660,21 @@
             </button>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- OUTLINE PANEL -->
+    <div class="panel-content" id="panel-outline">
+      <div class="sidebar-header">
+        <span>Outline</span>
+        <div class="sidebar-header-actions">
+          <button class="icon-btn" title="Refresh" onclick="renderOutline()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.82"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="sidebar-content" style="padding:0">
+        <div class="outline-list" id="outline-list"></div>
       </div>
     </div>
 
@@ -1373,11 +1401,16 @@ function initEditor() {
     document.getElementById('status-pos').textContent = `Ln ${cur.line+1}, Col ${cur.ch+1}`;
   });
 
+  let _outlineDebounce = null;
   editor.on('change', () => {
     if (!activeTabId) return;
     const tab = tabs.find(t => t.id === activeTabId);
     if (tab && !tab.modified) { tab.modified = true; renderTabs(); }
     validateYAML();
+    if (activePanel === 'outline') {
+      clearTimeout(_outlineDebounce);
+      _outlineDebounce = setTimeout(renderOutline, 400);
+    }
   });
 
   editor.getWrapperElement().addEventListener('contextmenu', e => {
@@ -1789,7 +1822,7 @@ function validateYAML() {
 // ═══════════════════════════════════════════════════════════════
 function switchPanel(panel) {
   activePanel = panel;
-  ['files','search','git','insert'].forEach(p => {
+  ['files','search','git','insert','outline'].forEach(p => {
     const el = document.getElementById('panel-' + p);
     if (el) el.classList.remove('active');
     const act = document.getElementById('act-' + p);
@@ -1803,6 +1836,7 @@ function switchPanel(panel) {
     renderInsertList();
     setTimeout(() => document.getElementById('insert-search')?.focus(), 50);
   }
+  if (panel === 'outline') renderOutline();
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -2008,6 +2042,9 @@ function modeForPath(name) {
 }
 
 function ingestBackendTree(nodes) {
+  // Backend now returns a list of root nodes (config / ssl / share /
+  // addons / media / backup). Each root's path is prefixed with its
+  // name so we can resolve every request unambiguously.
   for (const key of Object.keys(FILES)) delete FILES[key];
   function walk(list) {
     return list.map(n => {
@@ -2019,7 +2056,14 @@ function ingestBackendTree(nodes) {
     });
   }
   TREE.length = 0;
-  TREE.push({ name: 'config', type: 'dir', open: true, path: '', children: walk(nodes) });
+  // Expand the primary root (config) so the user lands on something
+  // familiar; the other roots start collapsed.
+  const walked = nodes.map(n => {
+    const open = n.name === 'config';
+    return { name: n.name, type: 'dir', open, path: n.path,
+             children: walk(n.children || []).map(c => ({ ...c })) };
+  });
+  for (const r of walked) TREE.push(r);
 }
 
 const __origOpenFile = openFile;
@@ -2944,6 +2988,77 @@ function haHintSource(cm) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// OUTLINE PANEL — walks the active YAML document and lists its
+// top-level keys (plus entries in list-at-top-level files like
+// automations.yaml / scripts.yaml). Click an entry → jump to its
+// line in the editor.
+// ═══════════════════════════════════════════════════════════════
+function buildOutline(text) {
+  // Lightweight text scan (not a full YAML parser) so it works even
+  // when the document is mid-edit and wouldn't round-trip through
+  // js-yaml. We detect:
+  //   - top-level keys    ("foo:" at column 0)
+  //   - second-level keys ("  foo:" indent tabSize)
+  //   - list-item labels  ("- alias: X" or "- name: X" etc.)
+  const out = [];
+  const lines = text.split('\n');
+  const tabSize = Math.max(1, PREFS.tabSize || 2);
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line.trim() || line.trim().startsWith('#')) continue;
+    const indent = line.length - line.trimStart().length;
+    const rest = line.trimStart();
+    // List item with a name-ish key
+    const listMatch = /^-\s+(alias|name|id|unique_id|platform|service)\s*:\s*(.+?)\s*$/.exec(rest);
+    if (listMatch) {
+      out.push({ level: Math.floor(indent / tabSize), name: listMatch[2].replace(/^['"]|['"]$/g,''), line: i + 1, kind: listMatch[1] });
+      continue;
+    }
+    // Plain key  "foo:"  or  "foo: value"
+    const keyMatch = /^([A-Za-z_][\w.-]*)\s*:/.exec(rest);
+    if (!keyMatch) continue;
+    const level = Math.floor(indent / tabSize);
+    if (level > 2) continue;   // keep outline tight — only top 3 levels
+    out.push({ level, name: keyMatch[1], line: i + 1, kind: 'key' });
+  }
+  return out;
+}
+
+function renderOutline() {
+  const list = document.getElementById('outline-list');
+  if (!list) return;
+  if (!editor || !activeTabId) {
+    list.innerHTML = '<div class="outline-empty">Open a file to see its outline.</div>';
+    return;
+  }
+  const tab = tabs.find(t => t.id === activeTabId);
+  if (!tab || tab.mode !== 'yaml') {
+    list.innerHTML = '<div class="outline-empty">Outline only supports YAML files.</div>';
+    return;
+  }
+  const items = buildOutline(editor.getValue());
+  if (!items.length) {
+    list.innerHTML = '<div class="outline-empty">No top-level keys found.</div>';
+    return;
+  }
+  list.innerHTML = items.slice(0, 500).map(it => `
+    <div class="outline-item lvl-${it.level}" data-line="${it.line}" title="Line ${it.line}">
+      <span>${escapeHtml(it.name)}</span>
+      <span class="outline-line">${it.line}</span>
+    </div>`).join('');
+  list.querySelectorAll('.outline-item').forEach(el => {
+    el.addEventListener('click', () => {
+      const line = Number(el.dataset.line) - 1;
+      if (editor) {
+        editor.focus();
+        editor.setCursor(line, 0);
+        editor.scrollIntoView({ line, ch: 0 }, 120);
+      }
+    });
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
 // INSERT PANEL — browse and insert HA objects (entity/service/
 // trigger/condition/event) from the sidebar.
 // ═══════════════════════════════════════════════════════════════
@@ -3254,6 +3369,8 @@ const COMMANDS = [
   { cat: 'View',   title: 'Show Search',             shortcut: 'Ctrl+Shift+F', run: () => switchPanel('search') },
   { cat: 'View',   title: 'Show Source Control',                               run: () => switchPanel('git') },
   { cat: 'View',   title: 'Show Insert panel',                                  run: () => switchPanel('insert') },
+  { cat: 'View',   title: 'Show Outline panel',                                 run: () => switchPanel('outline') },
+  { cat: 'File',   title: 'Quick open…',               shortcut: 'Ctrl+P',      run: () => openQuickOpen() },
   { cat: 'View',   title: 'Tab size: 2',                                        run: () => setTabSize(2) },
   { cat: 'View',   title: 'Tab size: 4',                                        run: () => setTabSize(4) },
   { cat: 'View',   title: 'Tab size: 8',                                        run: () => setTabSize(8) },
@@ -3309,14 +3426,17 @@ const COMMANDS = [
 let _cmdpalIdx = 0;
 let _cmdpalFiltered = [];
 
-function openCmdPal() {
+function openCmdPal(prefill) {
   const ov = document.getElementById('cmdpal');
   const input = document.getElementById('cmdpal-input');
-  input.value = '';
-  renderCmdPal('');
+  input.value = prefill || '';
+  renderCmdPal(prefill || '');
   ov.classList.add('show');
-  setTimeout(() => input.focus(), 10);
+  setTimeout(() => { input.focus(); input.select(); }, 10);
 }
+// Quick-open = command palette pre-filtered to "Open" entries, which
+// are synthesized from every path in FILES.
+function openQuickOpen() { openCmdPal('Open '); }
 
 function closeCmdPal() {
   document.getElementById('cmdpal').classList.remove('show');
@@ -3435,6 +3555,12 @@ document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'P' || e.key === 'p')) {
     e.preventDefault();
     openCmdPal();
+    return;
+  }
+  // Ctrl/Cmd+P → quick-open (file picker via palette with "Open " filter)
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (e.key === 'P' || e.key === 'p')) {
+    e.preventDefault();
+    openQuickOpen();
     return;
   }
   // Ctrl/Cmd+Alt+J → Jinja preview
