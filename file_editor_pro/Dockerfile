@@ -1,7 +1,7 @@
 ARG BUILD_FROM
 FROM $BUILD_FROM
 
-RUN apk add --no-cache python3 py3-pip git openssh-client bash
+RUN apk add --no-cache python3 py3-pip git openssh-client bash nano
 
 WORKDIR /app
 

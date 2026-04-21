@@ -1,29 +1,33 @@
 # Changelog
 
-## 1.9.6 — Comment color matches Ace "chrome"
+## 1.9.7 — Sidebar resizer no longer overlaps terminal + nano available
 
-- `--syn-comment` switched from olive `#6a7c3a` to `#236e25` — the exact green used by Ace's "chrome" theme, which is the default editor theme shipped by the standard HA File Editor add-on.
+- Sidebar resize handle no longer shows a vertical line through the terminal panel when it's open. Root cause: the terminal panel had `z-index:40` and the resizer had `z-index:50`, so the resizer rendered on top. Terminal panel lifted to `z-index:60`.
+- **`nano`** added to the add-on image, so you can run `nano somefile.yaml` inside the integrated terminal.
 
-## 1.9.5 — GitHub Light: greener comments
+## 1.9.6 — Greener comments in GitHub Light
 
-- GitHub Light's `--syn-comment` nudged from gray `#59636e` to olive `#6a7c3a`, matching the muted green used by the standard HA File Editor's Ace theme. Comments remain italic.
+- `--syn-comment` switched from olive `#6a7c3a` to `#236e25`. Deeper, more saturated green; italic styling unchanged.
 
-## 1.9.4 — Revert the "File Editor (classic)" theme
+## 1.9.5 — Olive comments in GitHub Light
 
-- Removed the "File Editor (classic)" theme added in 1.9.2. The user only wanted to know how the original add-on maps YAML tokens to colors; they didn't ask for a new theme entry. Theme selector is back to the eight originally shipped themes.
+- GitHub Light's `--syn-comment` nudged from gray `#59636e` to olive `#6a7c3a`. Comments remain italic.
+
+## 1.9.4 — Revert the "classic" theme
+
+- Removed the "classic" theme added in 1.9.2. Theme selector is back to the eight originally shipped themes.
 
 ## 1.9.3 — Terminal fixed (bundled xterm), defensive settings refresh
 
 - **Terminal was crashing with `ReferenceError: Can't find variable: Terminal`** because the xterm.js CDN URLs I used (cdnjs) 404'd, so the global never loaded. Bundled `xterm.min.js`, `xterm.min.css`, and `xterm-addon-fit.min.js` into `file_editor_pro/vendor/` and served them as static files from the FastAPI backend. CDN dependency removed; terminal now works in ingress with strict CSP.
 - **Settings toggles not switching visually** (e.g. Rainbow brackets): `refreshSettingsUI` was doing `document.getElementById(id).classList.toggle(...)` directly — a single missing or renamed id earlier in the function would throw and halt updates to every toggle after it. Rewrote with `_setVal` / `_setText` / `_setToggle` helpers that silently no-op if the element is missing, so every control refreshes independently.
 
-## 1.9.2 — Indent guides in indent area only, rainbow brackets, File Editor theme
+## 1.9.2 — Indent guides in indent area only, rainbow brackets
 
 - **Indent guides no longer paint across whole lines.** Old CSS used a line-width background-gradient that drew vertical lines across every row from top to bottom. Now guides come from an overlay (`_guidesOverlay`) that tags each tab-stop position inside the actual leading whitespace with `cm-ig-line`. CSS renders a 1 px `box-shadow` on those spans only — zero paint on blank lines or the content area.
 - **Rainbow style** now combines the indent colors with the new in-indent guide lines (previously it added the whole-line guides class).
 - **Rainbow brackets fixed**. The `.cm-s-ha.bp-on .cm-bp-N` CSS gate was too brittle. Removed the `.bp-on` class; color rules now apply as soon as the overlay starts tagging brackets with `cm-bp-N` — and the overlay is added/removed based on `PREFS.bracketColors`.
 - **Rainbow/gradient/bars indent levels**: removed the `width: 1ch` clip on marker spans. CodeMirror merges consecutive same-class tokens into one span, so a single `ir-0` span may cover 2+ spaces. The old rule was shrinking it to one character and the visible level looked wrong.
-- **New theme: "File Editor (classic)"**. Ace-textmate-style palette matching the default HA File Editor add-on — cream bg, navy keys/identifiers, dark-red strings/numbers, italic gray comments. Pick it under Settings → Theme.
 - **Terminal diagnostics**: pre-connect health check against `/api/terminal/available` so failures show an actionable error instead of hanging; logs the WS URL and close codes. `bash` added to the add-on image so the PTY prefers it over `/bin/sh`.
 
 ## 1.9.1 — Bug sweep: icons, filter, opacity, indent switch, rainbow gaps
@@ -46,7 +50,7 @@
 
 ## 1.8.0 — Multi-cursor, sticky scroll, diff view, rainbow brackets
 
-- **Multi-cursor** (VS Code-style keybindings):
+- **Multi-cursor**:
   - `Ctrl+D` — select the next occurrence of the selection (or the word at cursor if nothing is selected).
   - `Ctrl+Alt+Down` / `Ctrl+Alt+Up` — add a cursor on the line below / above.
   - `Alt+Click` — add a cursor at the click position (CodeMirror default).
@@ -72,14 +76,14 @@
 - **Drag-resizable sidebar**: grab the right edge to resize between 180 and 600 px, double-click to reset to 260 px. Width persists in `localStorage`.
 - **Unsaved-changes close dialog**: closing a modified tab now opens a three-button confirm — Save / Don't save / Cancel — instead of discarding silently. Save saves the file first, then closes.
 - **Settings modal gear icon** matches the sidebar gear (same 6-tooth cog — was still the old 8-spoke icon).
-- **Rainbow bands now fill the row vertically**: marker spans switched to `inline-block` with full line-height so the colored backgrounds connect across rows with no white gaps between lines, matching the VS Code Indent Rainbow look.
+- **Rainbow bands now fill the row vertically**: marker spans switched to `inline-block` with full line-height so the colored backgrounds connect across rows with no white gaps between lines.
 
 ## 1.5.2 — Indent transparency actually works, dots under colored styles, rainbow + guides
 
 - **Indent style transparency** now works. Two fixes:
   - The `[class^="cm-ir-"]` opacity selector didn't match spans that also carried `cm-ws-space` (dots), because `^=` only looks at the first class in the attribute. Dropped the blanket-opacity approach in favour of multiplying each marker's alpha directly via `calc(base * var(--indent-opacity))`, which scales cleanly and leaves the dots untouched.
   - Background rules for rainbow / gradient switched from `background:` (shorthand) to `background-color:` so the whitespace-dot `background-image` layer paints on top. **Dots now remain visible under rainbow, gradient, and bars.**
-- **Rainbow + grey guide lines** combined: the Indent rainbow style now also draws the faint vertical guide lines at each tab stop, matching the look of the VS Code Indent Rainbow extension.
+- **Rainbow + grey guide lines** combined: the Indent rainbow style now also draws the faint vertical guide lines at each tab stop.
 - Removed a duplicate `.indent-guides` CSS rule that was still using the old 45% alpha.
 
 ## 1.5.1 — Theme toggle, proper gear, default light/dark, indent opacity, sidebar font size
