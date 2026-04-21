@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.1 — Whitespace dots on by default + sidebar icon match
+
+- **Whitespace rendering now defaults to ON** so spaces show as `·` and tabs as `→`, matching the look of the original HA File Editor out of the box. Still toggleable in Settings → Appearance → Show whitespace.
+- Rendering fix: each whitespace span is now an `inline-block` so the pseudo-element reliably centers over the character, fixing a flaky-layout case on some browsers.
+- **Sidebar icon** changed from `mdi:file-code` to `mdi:format-list-bulleted` to visually match the add-on's YAML-list logo mark. (HA only accepts MDI icon names for `panel_icon`, not PNG files — `icon.png` is still used for the store tile.)
+
 ## 1.3.0 — Themes, Settings, FAB, visible save
 
 - **Settings modal** (gear in the status bar). Groups: Appearance (theme, font size, indent guides, whitespace), Editor (tab size, indent style, line wrapping). All preferences persist in `localStorage`.

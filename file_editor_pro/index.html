@@ -393,18 +393,20 @@
        (and .cm-ws-tab for tabs) via the overlay we register in JS.
        We render a dot/arrow centered over the space character so
        the layout doesn't shift. */
-    .cm-s-ha .cm-ws-space{position:relative}
+    /* Use an inline-block + absolute child so the dot centers in the
+       1ch space without affecting layout. Inline pseudo-elements on
+       plain inline spans are flaky across browsers. */
+    .cm-s-ha .cm-ws-space{position:relative;display:inline-block;width:1ch}
     .cm-s-ha .cm-ws-space::before{
-      content:'·';color:var(--text-muted);opacity:.55;
-      position:absolute;left:0;right:0;top:0;bottom:0;
-      display:flex;align-items:center;justify-content:center;
-      pointer-events:none;font-weight:400
+      content:'·';color:var(--text-muted);opacity:.6;
+      position:absolute;left:0;right:0;top:0;
+      text-align:center;pointer-events:none;
+      font-weight:400
     }
-    .cm-s-ha .cm-ws-tab{position:relative}
+    .cm-s-ha .cm-ws-tab{position:relative;display:inline-block}
     .cm-s-ha .cm-ws-tab::before{
-      content:'→';color:var(--text-muted);opacity:.45;
-      position:absolute;left:0;right:0;top:0;bottom:0;
-      display:flex;align-items:center;justify-content:flex-start;
+      content:'→';color:var(--text-muted);opacity:.5;
+      position:absolute;left:1px;top:0;
       pointer-events:none
     }
 
@@ -1965,7 +1967,7 @@ const PREFS = {
   indentWithTabs: false,
   indentGuides: false,
   lineWrapping: false,
-  showWhitespace: false,
+  showWhitespace: true,
 };
 
 function loadPrefs() {
