@@ -429,11 +429,7 @@
       background-position:left center;
     }
 
-    /* ── INDENT RAINBOW ──
-       Opt-in. Each indent step gets a subtle different tint so it's
-       easier to eyeball nesting depth in long YAML. Colors cycle on
-       level % 6. Kept at low alpha (~0.06) so they're background
-       hints, not foreground colors. */
+    /* ── INDENT RAINBOW ── (cm-ir-X on every space) */
     .cm-s-ha .cm-ir-0{background:rgba(255, 92, 92, .07)}
     .cm-s-ha .cm-ir-1{background:rgba(255,165, 80, .07)}
     .cm-s-ha .cm-ir-2{background:rgba(230,200, 70, .08)}
@@ -441,12 +437,31 @@
     .cm-s-ha .cm-ir-4{background:rgba( 90,160,255, .07)}
     .cm-s-ha .cm-ir-5{background:rgba(180,110,230, .07)}
 
+    /* ── COLORED LEVEL BARS ── (cm-ib-X on the first space of each tab-stop) */
+    .cm-s-ha .cm-ib-0{box-shadow:inset 2px 0 0 rgba(255, 92, 92, .7)}
+    .cm-s-ha .cm-ib-1{box-shadow:inset 2px 0 0 rgba(255,165, 80, .7)}
+    .cm-s-ha .cm-ib-2{box-shadow:inset 2px 0 0 rgba(230,200, 70, .75)}
+    .cm-s-ha .cm-ib-3{box-shadow:inset 2px 0 0 rgba( 90,200,120, .7)}
+    .cm-s-ha .cm-ib-4{box-shadow:inset 2px 0 0 rgba( 90,160,255, .7)}
+    .cm-s-ha .cm-ib-5{box-shadow:inset 2px 0 0 rgba(180,110,230, .7)}
+
+    /* ── GRADIENT RAMP ── (cm-ig-X on every space, deepens per level) */
+    .cm-s-ha .cm-ig-0{background:color-mix(in srgb, var(--accent) 3%, transparent)}
+    .cm-s-ha .cm-ig-1{background:color-mix(in srgb, var(--accent) 6%, transparent)}
+    .cm-s-ha .cm-ig-2{background:color-mix(in srgb, var(--accent) 9%, transparent)}
+    .cm-s-ha .cm-ig-3{background:color-mix(in srgb, var(--accent) 12%, transparent)}
+    .cm-s-ha .cm-ig-4{background:color-mix(in srgb, var(--accent) 15%, transparent)}
+    .cm-s-ha .cm-ig-5{background:color-mix(in srgb, var(--accent) 18%, transparent)}
+    .cm-s-ha .cm-ig-6{background:color-mix(in srgb, var(--accent) 21%, transparent)}
+    .cm-s-ha .cm-ig-7{background:color-mix(in srgb, var(--accent) 24%, transparent)}
+    .cm-s-ha .cm-ig-8{background:color-mix(in srgb, var(--accent) 27%, transparent)}
+
     /* ── INDENT GUIDES ── */
     /* Opt-in: apply the .indent-guides class to the CodeMirror wrapper.
        OFF by default — subtle when on. */
     .CodeMirror.indent-guides .CodeMirror-line{
       background-image: linear-gradient(to right,
-        color-mix(in srgb, var(--text-muted) 45%, transparent) 1px,
+        color-mix(in srgb, var(--text-muted) 20%, transparent) 1px,
         transparent 1px);
       background-size: var(--indent-ch, 2ch) 100%;
       background-repeat: repeat-x;
@@ -481,8 +496,8 @@
       <div class="activity-badge" id="git-badge"></div>
     </div>
     <div class="activity-spacer"></div>
-    <div class="activity-item" title="Settings (disabled)" style="opacity:.25;cursor:default">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93A10 10 0 0 0 6.99 3.34L8.5 6.16A7 7 0 0 1 17.5 7.5l2.57-2.57zM4.93 19.07A10 10 0 0 0 17.01 20.66L15.5 17.84A7 7 0 0 1 6.5 16.5l-1.57 2.57zM20.66 17.01A10 10 0 0 0 22 12h-3a7 7 0 0 1-1.5 4.33l2.16 1.5 1-.82zM2 12a10 10 0 0 0 1.34 5.01l2.16-1.5A7 7 0 0 1 5 12H2z"/></svg>
+    <div class="activity-item" id="act-settings" onclick="openSettings()" title="Settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 10v6M4.22 4.22l4.24 4.24m7.08 7.08l4.24 4.24M1 12h6m10 0h6M4.22 19.78l4.24-4.24m7.08-7.08l4.24-4.24"/></svg>
     </div>
   </div>
 
@@ -723,27 +738,19 @@
           </div>
         </div>
         <div class="settings-row">
-          <div class="settings-label">Indent guides
-            <span class="settings-help">Faint vertical lines at each tab stop.</span>
+          <div class="settings-label">Indent style
+            <span class="settings-help">How indentation levels are visualised in the editor.</span>
           </div>
           <div class="settings-control">
-            <div class="settings-toggle" id="set-guides" onclick="toggleIndentGuides(); refreshSettingsUI()"></div>
+            <select id="set-indentstyle" onchange="setIndentStyle(this.value)"></select>
           </div>
         </div>
         <div class="settings-row">
           <div class="settings-label">Show whitespace
-            <span class="settings-help">Render spaces as · and tabs as →.</span>
+            <span class="settings-help">Render spaces as · (independent of indent style).</span>
           </div>
           <div class="settings-control">
             <div class="settings-toggle" id="set-ws" onclick="toggleWhitespace(); refreshSettingsUI()"></div>
-          </div>
-        </div>
-        <div class="settings-row">
-          <div class="settings-label">Indent rainbow
-            <span class="settings-help">Tint each indent level a different subtle color.</span>
-          </div>
-          <div class="settings-control">
-            <div class="settings-toggle" id="set-rainbow" onclick="toggleIndentRainbow(); refreshSettingsUI()"></div>
           </div>
         </div>
       </div>
@@ -2068,13 +2075,20 @@ const THEMES = [
   { id: 'ha-muted',         name: 'HA Muted (dark)',  kind: 'dark' },
   { id: 'ha-dark',          name: 'HA Dark',          kind: 'dark' },
 ];
+// indentStyle ∈ 'none' | 'guides' | 'rainbow' | 'bars' | 'gradient'
+const INDENT_STYLES = [
+  { id: 'none',     name: 'None — plain (no level markers)' },
+  { id: 'guides',   name: 'Indent guides (vertical lines)' },
+  { id: 'rainbow',  name: 'Indent rainbow (tint per level)' },
+  { id: 'bars',     name: 'Colored level bars' },
+  { id: 'gradient', name: 'Gradient ramp (deepens per level)' },
+];
 const PREFS = {
   theme: 'github-light',
   fontSize: 13,
   tabSize: 2,
   indentWithTabs: false,
-  indentGuides: false,
-  indentRainbow: false,
+  indentStyle: 'none',     // replaces indentGuides + indentRainbow
   lineWrapping: false,
   showWhitespace: true,
 };
@@ -2082,6 +2096,14 @@ const PREFS = {
 function loadPrefs() {
   try { Object.assign(PREFS, JSON.parse(localStorage.getItem(PREFS_KEY) || '{}')); }
   catch {}
+  // Migration from pre-1.5 boolean flags to the single indentStyle pref
+  if (typeof PREFS.indentGuides  !== 'undefined' || typeof PREFS.indentRainbow !== 'undefined') {
+    if (PREFS.indentRainbow) PREFS.indentStyle = 'rainbow';
+    else if (PREFS.indentGuides) PREFS.indentStyle = 'guides';
+    else if (!PREFS.indentStyle) PREFS.indentStyle = 'none';
+    delete PREFS.indentGuides;
+    delete PREFS.indentRainbow;
+  }
 }
 function savePrefs() {
   try { localStorage.setItem(PREFS_KEY, JSON.stringify(PREFS)); } catch {}
@@ -2101,10 +2123,8 @@ function applyPrefs() {
   editor.setOption('indentWithTabs', PREFS.indentWithTabs);
   editor.setOption('lineWrapping', !!PREFS.lineWrapping);
   document.documentElement.style.setProperty('--indent-ch', PREFS.tabSize + 'ch');
-  const wrap = editor.getWrapperElement();
-  wrap.classList.toggle('indent-guides', !!PREFS.indentGuides);
   applyWhitespace();
-  applyIndentRainbow();
+  applyIndentStyle();
   editor.refresh();
 }
 
@@ -2128,10 +2148,11 @@ function setIndentStyle(useTabs) {
   savePrefs(); applyPrefs();
   showToast(useTabs ? 'Indent: tabs' : 'Indent: spaces');
 }
-function toggleIndentGuides() {
-  PREFS.indentGuides = !PREFS.indentGuides;
+function setIndentStyle(id) {
+  if (!INDENT_STYLES.some(s => s.id === id)) return;
+  PREFS.indentStyle = id;
   savePrefs(); applyPrefs();
-  showToast(`Indent guides: ${PREFS.indentGuides ? 'on' : 'off'}`);
+  showToast(`Indent style: ${INDENT_STYLES.find(s => s.id === id).name}`);
 }
 function toggleLineWrap() {
   PREFS.lineWrapping = !PREFS.lineWrapping;
@@ -2159,7 +2180,6 @@ function buildSettingsUI() {
   // Theme dropdown — build once
   const sel = document.getElementById('set-theme');
   if (!sel.options.length) {
-    // Group by kind
     const mkOption = t => {
       const o = document.createElement('option');
       o.value = t.id;
@@ -2171,6 +2191,17 @@ function buildSettingsUI() {
     for (const t of THEMES) (t.kind === 'light' ? gLight : gDark).appendChild(mkOption(t));
     sel.appendChild(gLight);
     sel.appendChild(gDark);
+  }
+
+  // Indent-style dropdown — build once
+  const ind = document.getElementById('set-indentstyle');
+  if (ind && !ind.options.length) {
+    for (const s of INDENT_STYLES) {
+      const o = document.createElement('option');
+      o.value = s.id;
+      o.textContent = s.name;
+      ind.appendChild(o);
+    }
   }
 
   // Font size slider — bind once
@@ -2196,9 +2227,9 @@ function refreshSettingsUI() {
   document.getElementById('set-fontsize-label').textContent = PREFS.fontSize + ' px';
   document.getElementById('set-tabsize').value = String(PREFS.tabSize);
   document.getElementById('set-indent').value = PREFS.indentWithTabs ? 'tabs' : 'spaces';
-  document.getElementById('set-guides').classList.toggle('on', !!PREFS.indentGuides);
+  const styleSel = document.getElementById('set-indentstyle');
+  if (styleSel) styleSel.value = PREFS.indentStyle || 'none';
   document.getElementById('set-ws').classList.toggle('on', !!PREFS.showWhitespace);
-  document.getElementById('set-rainbow').classList.toggle('on', !!PREFS.indentRainbow);
   document.getElementById('set-wrap').classList.toggle('on', !!PREFS.lineWrapping);
 }
 
@@ -2270,9 +2301,7 @@ function toggleWhitespace() {
   showToast(`Whitespace: ${PREFS.showWhitespace ? 'visible' : 'hidden'}`);
 }
 
-// Indent-rainbow overlay: tags each space in the leading whitespace
-// with cm-ir-N where N = floor(column / tabSize) % 6, so every indent
-// step picks up a different faint tint.
+// Rainbow: tag each leading-whitespace space with cm-ir-N (level%6).
 const _irOverlay = {
   token(stream) {
     const m = stream.string.match(/^[ \t]*/);
@@ -2288,16 +2317,67 @@ const _irOverlay = {
     return null;
   }
 };
-let _irActive = false;
-function applyIndentRainbow() {
+
+// Bars: only the first space of each tab-stop gets cm-ib-N, so a
+// coloured 2px bar appears at each indent step.
+const _ibOverlay = {
+  token(stream) {
+    const m = stream.string.match(/^[ \t]*/);
+    const leadingLen = m ? m[0].length : 0;
+    if (stream.pos < leadingLen) {
+      const startCol = stream.pos;
+      stream.next();
+      const tabSize = Math.max(1, PREFS.tabSize || 2);
+      if (startCol > 0 && (startCol % tabSize) === 0) {
+        const level = Math.floor(startCol / tabSize) - 1;
+        return 'ib-' + (Math.max(0, level) % 6);
+      }
+    } else {
+      stream.skipToEnd();
+    }
+    return null;
+  }
+};
+
+// Gradient: every leading-whitespace space gets cm-ig-N with N capped
+// at 8 — the deeper the level, the stronger the tint.
+const _igOverlay = {
+  token(stream) {
+    const m = stream.string.match(/^[ \t]*/);
+    const leadingLen = m ? m[0].length : 0;
+    if (stream.pos < leadingLen) {
+      const startCol = stream.pos;
+      stream.next();
+      const tabSize = Math.max(1, PREFS.tabSize || 2);
+      const level = Math.floor(startCol / tabSize);
+      return 'ig-' + Math.min(8, level);
+    }
+    stream.skipToEnd();
+    return null;
+  }
+};
+
+let _currentStyleOverlay = null;   // whichever overlay is active
+
+function applyIndentStyle() {
   if (!editor) return;
-  if (PREFS.indentRainbow && !_irActive) { editor.addOverlay(_irOverlay); _irActive = true; }
-  else if (!PREFS.indentRainbow && _irActive) { editor.removeOverlay(_irOverlay); _irActive = false; }
-}
-function toggleIndentRainbow() {
-  PREFS.indentRainbow = !PREFS.indentRainbow;
-  savePrefs(); applyIndentRainbow();
-  showToast(`Indent rainbow: ${PREFS.indentRainbow ? 'on' : 'off'}`);
+  // Remove any currently-active style overlay
+  if (_currentStyleOverlay) {
+    editor.removeOverlay(_currentStyleOverlay);
+    _currentStyleOverlay = null;
+  }
+  // Remove guides-class (CSS mechanism, not an overlay)
+  const wrap = editor.getWrapperElement();
+  wrap.classList.remove('indent-guides');
+
+  switch (PREFS.indentStyle) {
+    case 'guides':   wrap.classList.add('indent-guides'); break;
+    case 'rainbow':  _currentStyleOverlay = _irOverlay; editor.addOverlay(_irOverlay); break;
+    case 'bars':     _currentStyleOverlay = _ibOverlay; editor.addOverlay(_ibOverlay); break;
+    case 'gradient': _currentStyleOverlay = _igOverlay; editor.addOverlay(_igOverlay); break;
+    case 'none':
+    default: /* nothing */ break;
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -2513,9 +2593,12 @@ const COMMANDS = [
   { cat: 'View',   title: 'Tab size: 8',                                        run: () => setTabSize(8) },
   { cat: 'View',   title: 'Indent with spaces',                                 run: () => setIndentStyle(false) },
   { cat: 'View',   title: 'Indent with tabs',                                   run: () => setIndentStyle(true) },
-  { cat: 'View',   title: 'Toggle indent guides',                               run: () => toggleIndentGuides() },
-  { cat: 'View',   title: 'Toggle visible whitespace',                           run: () => toggleWhitespace() },
-  { cat: 'View',   title: 'Toggle indent rainbow',                                run: () => toggleIndentRainbow() },
+  { cat: 'View',   title: 'Indent: Plain (none)',                               run: () => setIndentStyle('none') },
+  { cat: 'View',   title: 'Indent: Guides',                                     run: () => setIndentStyle('guides') },
+  { cat: 'View',   title: 'Indent: Rainbow',                                    run: () => setIndentStyle('rainbow') },
+  { cat: 'View',   title: 'Indent: Colored level bars',                         run: () => setIndentStyle('bars') },
+  { cat: 'View',   title: 'Indent: Gradient ramp',                              run: () => setIndentStyle('gradient') },
+  { cat: 'View',   title: 'Toggle visible whitespace (dots)',                   run: () => toggleWhitespace() },
   { cat: 'View',   title: 'Toggle line wrap',                                    run: () => toggleLineWrap() },
   { cat: 'View',   title: 'Font size: 11',                                       run: () => setFontSize(11) },
   { cat: 'View',   title: 'Font size: 13',                                       run: () => setFontSize(13) },

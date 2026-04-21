@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.5.0 — Indent-style picker, sidebar Settings button, softer guides
+
+- **Indent style** pref consolidated into a single dropdown with 5 options:
+  - **None** — plain (no level markers)
+  - **Indent guides** — faint vertical lines at each tab stop
+  - **Indent rainbow** — tint per level, cycles 6 colors
+  - **Colored level bars** — 2 px solid colored bars per indent step
+  - **Gradient ramp** — accent tint deepens progressively per level
+  Selectable in Settings → Appearance → Indent style, or via `Indent:` entries in the command palette.
+- **Sidebar Settings button** (the gear at the bottom of the activity bar) was hardcoded as disabled in the original design. Wired to `openSettings()` and enabled.
+- **Indent-guides lines** softened from 45 % → 20 % of `--text-muted` so they read as hints, not strokes.
+- Migration: old `indentGuides` / `indentRainbow` bools in `localStorage` are mapped onto the new `indentStyle` pref automatically.
+
 ## 1.4.0 — Indent rainbow, open-file highlight, mark-only logo
 
 - **Indent rainbow** (opt-in): each indent level tinted with a different faint background color, cycling on `level % 6`. Toggle in Settings → Appearance or via the command palette.
