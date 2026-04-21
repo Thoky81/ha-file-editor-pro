@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.5 — Softer indent dots
+
+- Whitespace dots toned down from 55 % → 15 % of `--text-muted` so they sit quietly in the background and read as faint guides instead of strokes of their own. Same intensity applied to the tab arrow.
+
 ## 1.3.4 — Whitespace dots only on indentation + lighter icon/logo
 
 - Whitespace dots now render for **leading whitespace only** (indentation). Inline spaces between tokens — for example the mandatory space after a YAML list dash in `- value` — are no longer dotted, so the indent count stays easy to read without visual noise in the content area.
