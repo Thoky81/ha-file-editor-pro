@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.5.2 — Indent transparency actually works, dots under colored styles, rainbow + guides
+
+- **Indent style transparency** now works. Two fixes:
+  - The `[class^="cm-ir-"]` opacity selector didn't match spans that also carried `cm-ws-space` (dots), because `^=` only looks at the first class in the attribute. Dropped the blanket-opacity approach in favour of multiplying each marker's alpha directly via `calc(base * var(--indent-opacity))`, which scales cleanly and leaves the dots untouched.
+  - Background rules for rainbow / gradient switched from `background:` (shorthand) to `background-color:` so the whitespace-dot `background-image` layer paints on top. **Dots now remain visible under rainbow, gradient, and bars.**
+- **Rainbow + grey guide lines** combined: the Indent rainbow style now also draws the faint vertical guide lines at each tab stop, matching the look of the VS Code Indent Rainbow extension.
+- Removed a duplicate `.indent-guides` CSS rule that was still using the old 45% alpha.
+
 ## 1.5.1 — Theme toggle, proper gear, default light/dark, indent opacity, sidebar font size
 
 - **Sidebar gear** now uses a proper 6-tooth cog icon.
