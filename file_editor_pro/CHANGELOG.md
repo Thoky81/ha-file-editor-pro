@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.5.1 — Theme toggle, proper gear, default light/dark, indent opacity, sidebar font size
+
+- **Sidebar gear** now uses a proper 6-tooth cog icon.
+- **Theme toggle** button added above the gear — click to swap between your default light and default dark themes. Icon flips between sun (currently dark) and moon (currently light).
+- **Default light theme** and **Default dark theme** added to Settings — pick which themes the sun/moon toggle swaps to. Defaults: GitHub Light and HA Dark.
+- **Indent style transparency** — 0–150 % slider under Indent style; multiplies opacity of all level markers (guides, rainbow, bars, gradient).
+- **Sidebar font size** — independent 10–18 px slider for the file-tree font; the editor font size stays in its own control.
+
 ## 1.5.0 — Indent-style picker, sidebar Settings button, softer guides
 
 - **Indent style** pref consolidated into a single dropdown with 5 options:

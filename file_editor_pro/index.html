@@ -196,7 +196,7 @@
     .tree-arrow svg{width:10px;height:10px;stroke-width:2}
     .tree-icon{width:16px;height:16px;margin-right:5px;flex-shrink:0;display:flex;align-items:center;justify-content:center}
     .tree-icon svg{width:14px;height:14px}
-    .tree-name{font-family:var(--font-mono);font-size:12px;overflow:hidden;text-overflow:ellipsis}
+    .tree-name{font-family:var(--font-mono);font-size:var(--sidebar-font-size,12px);overflow:hidden;text-overflow:ellipsis}
     .tree-git-badge{margin-left:auto;font-size:10px;font-family:var(--font-mono);flex-shrink:0;padding-left:8px;font-weight:600}
     .git-M{color:var(--accent)}
     .git-A{color:var(--accent-green)}
@@ -437,7 +437,7 @@
     .cm-s-ha .cm-ir-4{background:rgba( 90,160,255, .07)}
     .cm-s-ha .cm-ir-5{background:rgba(180,110,230, .07)}
 
-    /* ── COLORED LEVEL BARS ── (cm-ib-X on the first space of each tab-stop) */
+    /* ── COLORED LEVEL BARS ── */
     .cm-s-ha .cm-ib-0{box-shadow:inset 2px 0 0 rgba(255, 92, 92, .7)}
     .cm-s-ha .cm-ib-1{box-shadow:inset 2px 0 0 rgba(255,165, 80, .7)}
     .cm-s-ha .cm-ib-2{box-shadow:inset 2px 0 0 rgba(230,200, 70, .75)}
@@ -445,7 +445,7 @@
     .cm-s-ha .cm-ib-4{box-shadow:inset 2px 0 0 rgba( 90,160,255, .7)}
     .cm-s-ha .cm-ib-5{box-shadow:inset 2px 0 0 rgba(180,110,230, .7)}
 
-    /* ── GRADIENT RAMP ── (cm-ig-X on every space, deepens per level) */
+    /* ── GRADIENT RAMP ── */
     .cm-s-ha .cm-ig-0{background:color-mix(in srgb, var(--accent) 3%, transparent)}
     .cm-s-ha .cm-ig-1{background:color-mix(in srgb, var(--accent) 6%, transparent)}
     .cm-s-ha .cm-ig-2{background:color-mix(in srgb, var(--accent) 9%, transparent)}
@@ -455,6 +455,33 @@
     .cm-s-ha .cm-ig-6{background:color-mix(in srgb, var(--accent) 21%, transparent)}
     .cm-s-ha .cm-ig-7{background:color-mix(in srgb, var(--accent) 24%, transparent)}
     .cm-s-ha .cm-ig-8{background:color-mix(in srgb, var(--accent) 27%, transparent)}
+
+    /* Single knob: all four indent-style marker classes share
+       opacity, scaled by --indent-opacity set from PREFS. */
+    .cm-s-ha [class^="cm-ir-"],
+    .cm-s-ha [class^="cm-ib-"],
+    .cm-s-ha [class^="cm-ig-"]{
+      opacity: var(--indent-opacity, 1);
+    }
+
+    /* Indent guides (CSS-gradient background) — multiply line-image
+       alpha by --indent-opacity. */
+    .CodeMirror.indent-guides .CodeMirror-line{
+      opacity: initial;    /* don't dim the line itself */
+    }
+    .CodeMirror.indent-guides .CodeMirror-line::before{
+      content:''; position:absolute; inset:0; pointer-events:none;
+      background-image: linear-gradient(to right,
+        color-mix(in srgb, var(--text-muted) 20%, transparent) 1px,
+        transparent 1px);
+      background-size: var(--indent-ch, 2ch) 100%;
+      background-repeat: repeat-x;
+      background-position-x: calc(-1 * var(--indent-ch, 2ch));
+      opacity: var(--indent-opacity, 1);
+    }
+    .CodeMirror.indent-guides .CodeMirror-line{
+      position: relative;
+    }
 
     /* ── INDENT GUIDES ── */
     /* Opt-in: apply the .indent-guides class to the CodeMirror wrapper.
@@ -496,8 +523,15 @@
       <div class="activity-badge" id="git-badge"></div>
     </div>
     <div class="activity-spacer"></div>
+    <div class="activity-item" id="act-theme-toggle" onclick="toggleThemeMode()" title="Toggle light / dark theme">
+      <!-- Content set dynamically by updateThemeToggleIcon() -->
+    </div>
     <div class="activity-item" id="act-settings" onclick="openSettings()" title="Settings">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 10v6M4.22 4.22l4.24 4.24m7.08 7.08l4.24 4.24M1 12h6m10 0h6M4.22 19.78l4.24-4.24m7.08-7.08l4.24-4.24"/></svg>
+      <!-- Classic cog-6-tooth gear icon -->
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 0 0-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 0 0-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 0 0-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 0 0-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 0 0 1.066-2.573c-.94-1.543.826-3.31 2.37-2.37 1 .608 2.296.07 2.572-1.065z"/>
+        <circle cx="12" cy="12" r="3"/>
+      </svg>
     </div>
   </div>
 
@@ -729,6 +763,22 @@
           </div>
         </div>
         <div class="settings-row">
+          <div class="settings-label">Default light theme
+            <span class="settings-help">Used when the sun/moon button switches to light.</span>
+          </div>
+          <div class="settings-control">
+            <select id="set-default-light" onchange="setDefaultLight(this.value)"></select>
+          </div>
+        </div>
+        <div class="settings-row">
+          <div class="settings-label">Default dark theme
+            <span class="settings-help">Used when the sun/moon button switches to dark.</span>
+          </div>
+          <div class="settings-control">
+            <select id="set-default-dark" onchange="setDefaultDark(this.value)"></select>
+          </div>
+        </div>
+        <div class="settings-row">
           <div class="settings-label">Editor font size
             <span class="settings-help" id="set-fontsize-label">13 px</span>
           </div>
@@ -738,11 +788,29 @@
           </div>
         </div>
         <div class="settings-row">
+          <div class="settings-label">Sidebar font size
+            <span class="settings-help" id="set-sidebar-fontsize-label">12 px</span>
+          </div>
+          <div class="settings-control">
+            <input type="range" id="set-sidebar-fontsize" min="10" max="18" step="1">
+            <input type="number" id="set-sidebar-fontsize-num" min="10" max="18" step="1">
+          </div>
+        </div>
+        <div class="settings-row">
           <div class="settings-label">Indent style
             <span class="settings-help">How indentation levels are visualised in the editor.</span>
           </div>
           <div class="settings-control">
             <select id="set-indentstyle" onchange="setIndentStyle(this.value)"></select>
+          </div>
+        </div>
+        <div class="settings-row">
+          <div class="settings-label">Indent style transparency
+            <span class="settings-help" id="set-indent-opacity-label">100 %</span>
+          </div>
+          <div class="settings-control">
+            <input type="range" id="set-indent-opacity" min="0" max="150" step="5">
+            <input type="number" id="set-indent-opacity-num" min="0" max="150" step="5">
           </div>
         </div>
         <div class="settings-row">
@@ -2085,10 +2153,14 @@ const INDENT_STYLES = [
 ];
 const PREFS = {
   theme: 'github-light',
+  defaultLight: 'github-light',  // picked when the sun/moon toggle goes light
+  defaultDark:  'ha-dark',       // picked when the sun/moon toggle goes dark
   fontSize: 13,
+  sidebarFontSize: 12,           // file tree + sidebar panels
   tabSize: 2,
   indentWithTabs: false,
-  indentStyle: 'none',     // replaces indentGuides + indentRainbow
+  indentStyle: 'none',           // none | guides | rainbow | bars | gradient
+  indentOpacity: 100,            // 0..150, % multiplier on indent-style alpha
   lineWrapping: false,
   showWhitespace: true,
 };
@@ -2117,6 +2189,14 @@ function applyPrefs() {
   const fs = Math.max(10, Math.min(24, Number(PREFS.fontSize) || 13));
   document.documentElement.style.setProperty('--editor-font-size', fs + 'px');
 
+  // Indent-style opacity (0..150 %)
+  const iop = Math.max(0, Math.min(150, Number(PREFS.indentOpacity) || 100)) / 100;
+  document.documentElement.style.setProperty('--indent-opacity', iop);
+
+  // Sidebar font size
+  const sfs = Math.max(10, Math.min(18, Number(PREFS.sidebarFontSize) || 12));
+  document.documentElement.style.setProperty('--sidebar-font-size', sfs + 'px');
+
   if (!editor) return;
   editor.setOption('tabSize', PREFS.tabSize);
   editor.setOption('indentUnit', PREFS.tabSize);
@@ -2129,13 +2209,60 @@ function applyPrefs() {
 }
 
 function setTheme(id) {
-  if (!THEMES.some(t => t.id === id)) return;
+  const t = THEMES.find(x => x.id === id);
+  if (!t) return;
   PREFS.theme = id;
+  if (t.kind === 'light') PREFS.defaultLight = id; else PREFS.defaultDark = id;
   savePrefs(); applyPrefs();
-  showToast(`Theme: ${THEMES.find(t => t.id === id).name}`);
+  updateThemeToggleIcon();
+  showToast(`Theme: ${t.name}`);
+}
+
+// Sun / moon SVGs for the theme-toggle button
+const _SUN_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>';
+const _MOON_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+
+function currentThemeKind() {
+  const t = THEMES.find(x => x.id === PREFS.theme);
+  return t ? t.kind : 'light';
+}
+
+function toggleThemeMode() {
+  const kind = currentThemeKind();
+  const next = kind === 'light' ? (PREFS.defaultDark  || 'ha-dark')
+                                : (PREFS.defaultLight || 'github-light');
+  setTheme(next);
+}
+function setDefaultLight(id) {
+  if (!THEMES.some(t => t.id === id && t.kind === 'light')) return;
+  PREFS.defaultLight = id;
+  savePrefs();
+}
+function setDefaultDark(id) {
+  if (!THEMES.some(t => t.id === id && t.kind === 'dark')) return;
+  PREFS.defaultDark = id;
+  savePrefs();
+}
+function setIndentOpacity(v) {
+  PREFS.indentOpacity = Math.max(0, Math.min(150, Number(v) || 100));
+  savePrefs(); applyPrefs();
+}
+
+function updateThemeToggleIcon() {
+  const el = document.getElementById('act-theme-toggle');
+  if (!el) return;
+  const isDark = currentThemeKind() === 'dark';
+  // Show the SUN when we're currently dark (click → go light);
+  // show the MOON when we're currently light (click → go dark).
+  el.innerHTML = isDark ? _SUN_SVG : _MOON_SVG;
+  el.title = isDark ? 'Switch to light theme' : 'Switch to dark theme';
 }
 function setFontSize(n) {
   PREFS.fontSize = Number(n) || 13;
+  savePrefs(); applyPrefs();
+}
+function setSidebarFontSize(n) {
+  PREFS.sidebarFontSize = Math.max(10, Math.min(18, Number(n) || 12));
   savePrefs(); applyPrefs();
 }
 function setTabSize(n) {
@@ -2193,6 +2320,24 @@ function buildSettingsUI() {
     sel.appendChild(gDark);
   }
 
+  // Default-light / default-dark dropdowns — build once
+  const dl = document.getElementById('set-default-light');
+  if (dl && !dl.options.length) {
+    for (const t of THEMES.filter(x => x.kind === 'light')) {
+      const o = document.createElement('option');
+      o.value = t.id; o.textContent = t.name;
+      dl.appendChild(o);
+    }
+  }
+  const dd = document.getElementById('set-default-dark');
+  if (dd && !dd.options.length) {
+    for (const t of THEMES.filter(x => x.kind === 'dark')) {
+      const o = document.createElement('option');
+      o.value = t.id; o.textContent = t.name;
+      dd.appendChild(o);
+    }
+  }
+
   // Indent-style dropdown — build once
   const ind = document.getElementById('set-indentstyle');
   if (ind && !ind.options.length) {
@@ -2202,6 +2347,36 @@ function buildSettingsUI() {
       o.textContent = s.name;
       ind.appendChild(o);
     }
+  }
+
+  // Sidebar font-size slider — bind once
+  const sbs = document.getElementById('set-sidebar-fontsize');
+  const sbsn = document.getElementById('set-sidebar-fontsize-num');
+  if (sbs && !sbs.dataset.bound) {
+    const apply = v => {
+      const n = Math.max(10, Math.min(18, Number(v) || 12));
+      sbs.value = n; sbsn.value = n;
+      document.getElementById('set-sidebar-fontsize-label').textContent = n + ' px';
+      setSidebarFontSize(n);
+    };
+    sbs.addEventListener('input',  e => apply(e.target.value));
+    sbsn.addEventListener('input', e => apply(e.target.value));
+    sbs.dataset.bound = '1';
+  }
+
+  // Indent-opacity slider — bind once
+  const io = document.getElementById('set-indent-opacity');
+  const ion = document.getElementById('set-indent-opacity-num');
+  if (io && !io.dataset.bound) {
+    const apply = v => {
+      const n = Math.max(0, Math.min(150, Number(v) || 100));
+      io.value = n; ion.value = n;
+      document.getElementById('set-indent-opacity-label').textContent = n + ' %';
+      setIndentOpacity(n);
+    };
+    io.addEventListener('input',  e => apply(e.target.value));
+    ion.addEventListener('input', e => apply(e.target.value));
+    io.dataset.bound = '1';
   }
 
   // Font size slider — bind once
@@ -2229,6 +2404,22 @@ function refreshSettingsUI() {
   document.getElementById('set-indent').value = PREFS.indentWithTabs ? 'tabs' : 'spaces';
   const styleSel = document.getElementById('set-indentstyle');
   if (styleSel) styleSel.value = PREFS.indentStyle || 'none';
+  const dl = document.getElementById('set-default-light');
+  if (dl) dl.value = PREFS.defaultLight || 'github-light';
+  const dd = document.getElementById('set-default-dark');
+  if (dd) dd.value = PREFS.defaultDark || 'ha-dark';
+  const sbs  = document.getElementById('set-sidebar-fontsize');
+  const sbsn = document.getElementById('set-sidebar-fontsize-num');
+  if (sbs)  sbs.value  = PREFS.sidebarFontSize;
+  if (sbsn) sbsn.value = PREFS.sidebarFontSize;
+  const sbsl = document.getElementById('set-sidebar-fontsize-label');
+  if (sbsl) sbsl.textContent = PREFS.sidebarFontSize + ' px';
+  const io  = document.getElementById('set-indent-opacity');
+  const ion = document.getElementById('set-indent-opacity-num');
+  if (io)  io.value  = PREFS.indentOpacity;
+  if (ion) ion.value = PREFS.indentOpacity;
+  const iol = document.getElementById('set-indent-opacity-label');
+  if (iol) iol.textContent = PREFS.indentOpacity + ' %';
   document.getElementById('set-ws').classList.toggle('on', !!PREFS.showWhitespace);
   document.getElementById('set-wrap').classList.toggle('on', !!PREFS.lineWrapping);
 }
@@ -2810,6 +3001,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   loadPrefs();
   applyPrefs();
+  updateThemeToggleIcon();
 
   // Wire show-hint with our HA-aware source
   editor.setOption('hintOptions', { hint: haHintSource, completeSingle: false });
