@@ -393,23 +393,34 @@
        (and .cm-ws-tab for tabs) via the overlay we register in JS.
        We render a dot/arrow centered over the space character so
        the layout doesn't shift. */
-    /* Space = centered middle-dot, light grey so it guides the eye
-       without fighting the content. The pseudo fills the full line
-       box (inset:0) and uses flex centering for perfect middle
-       alignment regardless of font metrics. */
-    .cm-s-ha .cm-ws-space{position:relative;display:inline-block;width:1ch;height:1.7em;vertical-align:bottom}
-    .cm-s-ha .cm-ws-space::before{
-      content:'·';color:var(--text-muted);opacity:.42;
-      position:absolute;inset:0;
-      display:flex;align-items:center;justify-content:center;
-      pointer-events:none;font-weight:normal;line-height:1
+    /* Whitespace markers painted as tiled backgrounds. CodeMirror's
+       overlay merges consecutive same-class tokens into one span,
+       so a pseudo-element would render the dot only once per run of
+       spaces. A tiled radial-gradient background guarantees ONE dot
+       per 1ch of span width, regardless of how many spaces the span
+       actually wraps — and stays vertically centered at any line
+       height via background-position. Light grey + low alpha so it
+       guides the eye without fighting the code. */
+    .cm-s-ha .cm-ws-space{
+      background-image:radial-gradient(
+        circle,
+        color-mix(in srgb, var(--text-muted) 55%, transparent) 1px,
+        transparent 1.4px
+      );
+      background-size:1ch 1em;
+      background-repeat:repeat-x;
+      background-position:0 center;
     }
-    .cm-s-ha .cm-ws-tab{position:relative;display:inline-block;height:1.7em;vertical-align:bottom}
-    .cm-s-ha .cm-ws-tab::before{
-      content:'→';color:var(--text-muted);opacity:.4;
-      position:absolute;inset:0;
-      display:flex;align-items:center;justify-content:flex-start;
-      padding-left:1px;pointer-events:none
+    .cm-s-ha .cm-ws-tab{
+      background-image:linear-gradient(
+        to right,
+        transparent 2px,
+        color-mix(in srgb, var(--text-muted) 50%, transparent) 2px,
+        color-mix(in srgb, var(--text-muted) 50%, transparent) 4px,
+        transparent 4px
+      );
+      background-repeat:no-repeat;
+      background-position:left center;
     }
 
     /* ── INDENT GUIDES ── */

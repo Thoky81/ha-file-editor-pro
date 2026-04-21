@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.3 — One dot per space
+
+- Whitespace indicator now paints **one dot per space**. The editor overlay merges consecutive space tokens into one `span`, so a pseudo-element `::before` was rendering the dot only once per run. Switched to a tiled background (radial-gradient, `background-size: 1ch 1em`) that repeats one dot for every 1ch of span width, independent of how many characters the span wraps. Tabs use a similar 4px background tile for the arrow.
+
 ## 1.3.2 — Status bar readability, centered whitespace dots, window title
 
 - **Status bar readability**: fixed a CSS regression where all status-bar text (Check Config, Restart HA, Settings, Reload, Ln/Col, UTF-8, theme env) rendered with a hardcoded dark color that looked disabled on light themes. Now uses the theme's `--status-text` variable, so text is always high-contrast against the bar.
