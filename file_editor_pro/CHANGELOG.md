@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.5.3 — Resizable sidebar, close-confirm, Settings gear, continuous rainbow bands
+
+- **Drag-resizable sidebar**: grab the right edge to resize between 180 and 600 px, double-click to reset to 260 px. Width persists in `localStorage`.
+- **Unsaved-changes close dialog**: closing a modified tab now opens a three-button confirm — Save / Don't save / Cancel — instead of discarding silently. Save saves the file first, then closes.
+- **Settings modal gear icon** matches the sidebar gear (same 6-tooth cog — was still the old 8-spoke icon).
+- **Rainbow bands now fill the row vertically**: marker spans switched to `inline-block` with full line-height so the colored backgrounds connect across rows with no white gaps between lines, matching the VS Code Indent Rainbow look.
+
 ## 1.5.2 — Indent transparency actually works, dots under colored styles, rainbow + guides
 
 - **Indent style transparency** now works. Two fixes:

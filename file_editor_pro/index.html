@@ -169,7 +169,13 @@
     .activity-spacer{flex:1}
 
     /* ── SIDEBAR ── */
-    .sidebar{width:var(--sidebar-width);background:var(--bg-dark);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden}
+    .sidebar{width:var(--sidebar-width);background:var(--bg-dark);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden;position:relative}
+    /* Resize handle: 4 px draggable strip on the right edge of the
+       sidebar. Widens to 6 px on hover to make it easier to grab. */
+    .sidebar-resizer{position:absolute;top:0;bottom:0;right:-2px;width:4px;cursor:col-resize;z-index:50;background:transparent;transition:background .1s}
+    .sidebar-resizer:hover,.sidebar-resizer.dragging{background:var(--accent);opacity:.6}
+    body.resizing{user-select:none;cursor:col-resize}
+    body.resizing *{cursor:col-resize !important}
     .sidebar-header{padding:10px 12px 8px;font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
     .sidebar-header-actions{display:flex;gap:4px}
     .icon-btn{width:22px;height:22px;display:flex;align-items:center;justify-content:center;border-radius:4px;cursor:pointer;color:var(--text-muted);transition:all .1s;background:none;border:none}
@@ -369,6 +375,22 @@
     .fab-menu-shortcut{margin-left:auto;font-family:var(--font-mono);font-size:10px;color:var(--text-muted)}
     .fab-menu-divider{height:1px;background:var(--border);margin:4px 2px}
 
+    /* ── UNSAVED-CHANGES CONFIRM DIALOG ── */
+    .confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2100;display:none;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
+    .confirm-overlay.show{display:flex}
+    .confirm-modal{width:min(420px,94vw);background:var(--bg-light);border:1px solid var(--border-light);border-radius:10px;box-shadow:0 20px 60px rgba(0,0,0,.5);overflow:hidden}
+    .confirm-body{padding:18px 20px}
+    .confirm-title{font-size:14px;font-weight:600;color:var(--text-primary);margin-bottom:6px}
+    .confirm-message{font-size:12.5px;color:var(--text-secondary);line-height:1.5}
+    .confirm-filename{font-family:var(--font-mono);color:var(--accent);word-break:break-all}
+    .confirm-footer{display:flex;gap:8px;padding:12px 20px;background:var(--bg-mid);border-top:1px solid var(--border);justify-content:flex-end}
+    .confirm-btn{padding:7px 14px;border-radius:5px;font-family:var(--font-ui);font-size:12px;font-weight:500;cursor:pointer;border:1px solid var(--border-light);background:transparent;color:var(--text-primary);transition:all .1s}
+    .confirm-btn:hover{background:var(--bg-hover)}
+    .confirm-btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+    .confirm-btn.primary:hover{opacity:.9}
+    .confirm-btn.danger{color:var(--accent-red);border-color:var(--accent-red)}
+    .confirm-btn.danger:hover{background:var(--accent-red);color:#fff}
+
     /* ── SETTINGS MODAL ── */
     .settings-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1950;display:none;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
     .settings-overlay.show{display:flex}
@@ -434,6 +456,19 @@
        NOT the whitespace dots which live on the same span.
        Using background-color (not the background shorthand) so the
        .cm-ws-space background-image layer still shows through. */
+
+    /* Marker spans render as inline-block with full line-height so
+       the coloured background paints edge-to-edge vertically — no
+       sliver of blank space between rows. */
+    .cm-s-ha [class*="cm-ir-"],
+    .cm-s-ha [class*="cm-ib-"],
+    .cm-s-ha [class*="cm-ig-"]{
+      display: inline-block;
+      width: 1ch;
+      height: 1.7em;
+      vertical-align: bottom;
+      position: relative;
+    }
 
     /* ── INDENT RAINBOW ── */
     .cm-s-ha .cm-ir-0{background-color:rgba(255, 92, 92, calc(.07 * var(--indent-opacity, 1)))}
@@ -519,7 +554,8 @@
   </div>
 
   <!-- Sidebar -->
-  <div class="sidebar">
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-resizer" id="sidebar-resizer" title="Drag to resize"></div>
 
     <!-- FILES PANEL -->
     <div class="panel-content active" id="panel-files">
@@ -726,11 +762,31 @@
   </div>
 </div>
 
+<!-- Unsaved-changes confirm dialog -->
+<div class="confirm-overlay" id="confirm-modal">
+  <div class="confirm-modal">
+    <div class="confirm-body">
+      <div class="confirm-title">Unsaved changes</div>
+      <div class="confirm-message" id="confirm-message">
+        <span class="confirm-filename" id="confirm-filename"></span> has unsaved changes.
+      </div>
+    </div>
+    <div class="confirm-footer">
+      <button class="confirm-btn"        onclick="_confirmClose('cancel')">Cancel</button>
+      <button class="confirm-btn danger" onclick="_confirmClose('discard')">Don't save</button>
+      <button class="confirm-btn primary" onclick="_confirmClose('save')">Save</button>
+    </div>
+  </div>
+</div>
+
 <!-- Settings Modal -->
 <div class="settings-overlay" id="settings-modal">
   <div class="settings-modal">
     <div class="settings-header">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:16px;height:16px"><circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 10v6M4.22 4.22l4.24 4.24m7.08 7.08l4.24 4.24M1 12h6m10 0h6M4.22 19.78l4.24-4.24m7.08-7.08l4.24-4.24"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px">
+        <path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 0 0-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 0 0-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 0 0-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 0 0-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 0 0 1.066-2.573c-.94-1.543.826-3.31 2.37-2.37 1 .608 2.296.07 2.572-1.065z"/>
+        <circle cx="12" cy="12" r="3"/>
+      </svg>
       <div class="settings-title">Settings</div>
       <button class="settings-close" onclick="closeSettings()">×</button>
     </div>
@@ -1440,6 +1496,23 @@ function closeTab(id, e) {
   e?.stopPropagation();
   const idx = tabs.findIndex(t => t.id === id);
   if (idx < 0) return;
+  const tab = tabs[idx];
+  if (tab.modified) {
+    confirmUnsaved(tab, async (action) => {
+      if (action === 'cancel') return;
+      if (action === 'save') {
+        // Save requires the tab to be active (saveCurrentFile reads activeTabId)
+        if (activeTabId !== id) switchTab(id);
+        await Promise.resolve(saveCurrentFile());
+      }
+      _doCloseTab(idx, id);
+    });
+    return;
+  }
+  _doCloseTab(idx, id);
+}
+
+function _doCloseTab(idx, id) {
   tabs.splice(idx, 1);
   if (activeTabId === id) {
     if (!tabs.length) {
@@ -1454,6 +1527,25 @@ function closeTab(id, e) {
   renderTabs();
   renderFileTree();
 }
+
+// ═══════════════════════════════════════════════════════════════
+// UNSAVED-CHANGES CONFIRM DIALOG
+// ═══════════════════════════════════════════════════════════════
+let _confirmCallback = null;
+function confirmUnsaved(tab, cb) {
+  _confirmCallback = cb;
+  document.getElementById('confirm-filename').textContent = tab.name;
+  document.getElementById('confirm-modal').classList.add('show');
+}
+function _confirmClose(action) {
+  document.getElementById('confirm-modal').classList.remove('show');
+  const cb = _confirmCallback;
+  _confirmCallback = null;
+  if (cb) cb(action);
+}
+document.getElementById('confirm-modal').addEventListener('click', e => {
+  if (e.target.id === 'confirm-modal') _confirmClose('cancel');
+});
 
 function renderTabs() {
   const bar = document.getElementById('tab-bar');
@@ -2140,6 +2232,7 @@ const PREFS = {
   defaultDark:  'ha-dark',       // picked when the sun/moon toggle goes dark
   fontSize: 13,
   sidebarFontSize: 12,           // file tree + sidebar panels
+  sidebarWidth: 260,             // px, user-resizable
   tabSize: 2,
   indentWithTabs: false,
   indentStyle: 'none',           // none | guides | rainbow | bars | gradient
@@ -2179,6 +2272,10 @@ function applyPrefs() {
   // Sidebar font size
   const sfs = Math.max(10, Math.min(18, Number(PREFS.sidebarFontSize) || 12));
   document.documentElement.style.setProperty('--sidebar-font-size', sfs + 'px');
+
+  // Sidebar width (drag-resizable)
+  const sw = Math.max(180, Math.min(600, Number(PREFS.sidebarWidth) || 260));
+  document.documentElement.style.setProperty('--sidebar-width', sw + 'px');
 
   if (!editor) return;
   editor.setOption('tabSize', PREFS.tabSize);
@@ -2247,6 +2344,44 @@ function setFontSize(n) {
 function setSidebarFontSize(n) {
   PREFS.sidebarFontSize = Math.max(10, Math.min(18, Number(n) || 12));
   savePrefs(); applyPrefs();
+}
+function setSidebarWidth(n) {
+  PREFS.sidebarWidth = Math.max(180, Math.min(600, Number(n) || 260));
+  savePrefs(); applyPrefs();
+}
+
+// Drag-to-resize for the sidebar. Sets --sidebar-width live while
+// dragging, then commits to PREFS on mouseup.
+function attachSidebarResizer() {
+  const r = document.getElementById('sidebar-resizer');
+  if (!r) return;
+  let startX = 0, startW = 0;
+  const move = e => {
+    const nx = e.clientX - startX + startW;
+    const w = Math.max(180, Math.min(600, nx));
+    document.documentElement.style.setProperty('--sidebar-width', w + 'px');
+  };
+  const up = e => {
+    document.removeEventListener('mousemove', move);
+    document.removeEventListener('mouseup', up);
+    document.body.classList.remove('resizing');
+    r.classList.remove('dragging');
+    const cssw = document.documentElement.style.getPropertyValue('--sidebar-width');
+    const px = parseInt(cssw, 10) || PREFS.sidebarWidth;
+    setSidebarWidth(px);
+    if (editor) editor.refresh();
+  };
+  r.addEventListener('mousedown', e => {
+    e.preventDefault();
+    startX = e.clientX;
+    startW = document.getElementById('sidebar').getBoundingClientRect().width;
+    r.classList.add('dragging');
+    document.body.classList.add('resizing');
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseup', up);
+  });
+  // Double-click to reset to default 260
+  r.addEventListener('dblclick', () => setSidebarWidth(260));
 }
 function setTabSize(n) {
   PREFS.tabSize = n;
@@ -2994,6 +3129,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   loadPrefs();
   applyPrefs();
   updateThemeToggleIcon();
+  attachSidebarResizer();
 
   // Wire show-hint with our HA-aware source
   editor.setOption('hintOptions', { hint: haHintSource, completeSingle: false });
