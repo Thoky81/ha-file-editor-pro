@@ -525,19 +525,6 @@
        Using background-color (not the background shorthand) so the
        .cm-ws-space background-image layer still shows through. */
 
-    /* Marker spans render as inline-block with full line-height so
-       the coloured background paints edge-to-edge vertically — no
-       sliver of blank space between rows. */
-    .cm-s-ha [class*="cm-ir-"],
-    .cm-s-ha [class*="cm-ib-"],
-    .cm-s-ha [class*="cm-ig-"]{
-      display: inline-block;
-      width: 1ch;
-      height: 1.7em;
-      vertical-align: bottom;
-      position: relative;
-    }
-
     /* ── BRACKET PAIR COLORIZATION ── (opt-in via PREFS.bracketColors) */
     .cm-s-ha.bp-on .cm-bp-0{color:#e06c75 !important}
     .cm-s-ha.bp-on .cm-bp-1{color:#d19a66 !important}
@@ -546,33 +533,51 @@
     .cm-s-ha.bp-on .cm-bp-4{color:#61afef !important}
     .cm-s-ha.bp-on .cm-bp-5{color:#c678dd !important}
 
+    /* Marker spans render as inline-block with exactly the editor
+       line-height so the coloured background paints edge-to-edge
+       vertically and row-to-row — no white sliver between lines.
+       vertical-align:top kills the default baseline gap; opacity
+       from --indent-opacity scales the whole rendered layer so the
+       Settings transparency slider works in every browser without
+       relying on calc() inside rgba(). */
+    .cm-s-ha [class*="cm-ir-"],
+    .cm-s-ha [class*="cm-ib-"],
+    .cm-s-ha [class*="cm-ig-"]{
+      display: inline-block;
+      width: 1ch;
+      line-height: inherit;
+      vertical-align: top;
+      margin: 0;
+      padding: 0;
+      opacity: var(--indent-opacity, 1);
+    }
+
     /* ── INDENT RAINBOW ── */
-    .cm-s-ha .cm-ir-0{background-color:rgba(255, 92, 92, calc(.07 * var(--indent-opacity, 1)))}
-    .cm-s-ha .cm-ir-1{background-color:rgba(255,165, 80, calc(.07 * var(--indent-opacity, 1)))}
-    .cm-s-ha .cm-ir-2{background-color:rgba(230,200, 70, calc(.08 * var(--indent-opacity, 1)))}
-    .cm-s-ha .cm-ir-3{background-color:rgba( 90,200,120, calc(.07 * var(--indent-opacity, 1)))}
-    .cm-s-ha .cm-ir-4{background-color:rgba( 90,160,255, calc(.07 * var(--indent-opacity, 1)))}
-    .cm-s-ha .cm-ir-5{background-color:rgba(180,110,230, calc(.07 * var(--indent-opacity, 1)))}
+    .cm-s-ha .cm-ir-0{background-color:rgba(255, 92, 92, .14)}
+    .cm-s-ha .cm-ir-1{background-color:rgba(255,165, 80, .14)}
+    .cm-s-ha .cm-ir-2{background-color:rgba(230,200, 70, .16)}
+    .cm-s-ha .cm-ir-3{background-color:rgba( 90,200,120, .14)}
+    .cm-s-ha .cm-ir-4{background-color:rgba( 90,160,255, .14)}
+    .cm-s-ha .cm-ir-5{background-color:rgba(180,110,230, .14)}
 
     /* ── COLORED LEVEL BARS ── */
-    .cm-s-ha .cm-ib-0{box-shadow:inset 2px 0 0 rgba(255, 92, 92, calc(.7 * var(--indent-opacity, 1)))}
-    .cm-s-ha .cm-ib-1{box-shadow:inset 2px 0 0 rgba(255,165, 80, calc(.7 * var(--indent-opacity, 1)))}
-    .cm-s-ha .cm-ib-2{box-shadow:inset 2px 0 0 rgba(230,200, 70, calc(.75 * var(--indent-opacity, 1)))}
-    .cm-s-ha .cm-ib-3{box-shadow:inset 2px 0 0 rgba( 90,200,120, calc(.7 * var(--indent-opacity, 1)))}
-    .cm-s-ha .cm-ib-4{box-shadow:inset 2px 0 0 rgba( 90,160,255, calc(.7 * var(--indent-opacity, 1)))}
-    .cm-s-ha .cm-ib-5{box-shadow:inset 2px 0 0 rgba(180,110,230, calc(.7 * var(--indent-opacity, 1)))}
+    .cm-s-ha .cm-ib-0{box-shadow:inset 2px 0 0 rgba(255, 92, 92, .75)}
+    .cm-s-ha .cm-ib-1{box-shadow:inset 2px 0 0 rgba(255,165, 80, .75)}
+    .cm-s-ha .cm-ib-2{box-shadow:inset 2px 0 0 rgba(230,200, 70, .8)}
+    .cm-s-ha .cm-ib-3{box-shadow:inset 2px 0 0 rgba( 90,200,120, .75)}
+    .cm-s-ha .cm-ib-4{box-shadow:inset 2px 0 0 rgba( 90,160,255, .75)}
+    .cm-s-ha .cm-ib-5{box-shadow:inset 2px 0 0 rgba(180,110,230, .75)}
 
-    /* ── GRADIENT RAMP ── (color-mix supports calc() on its
-       percentage argument in modern browsers). */
-    .cm-s-ha .cm-ig-0{background-color:color-mix(in srgb, var(--accent) calc(3%  * var(--indent-opacity, 1)), transparent)}
-    .cm-s-ha .cm-ig-1{background-color:color-mix(in srgb, var(--accent) calc(6%  * var(--indent-opacity, 1)), transparent)}
-    .cm-s-ha .cm-ig-2{background-color:color-mix(in srgb, var(--accent) calc(9%  * var(--indent-opacity, 1)), transparent)}
-    .cm-s-ha .cm-ig-3{background-color:color-mix(in srgb, var(--accent) calc(12% * var(--indent-opacity, 1)), transparent)}
-    .cm-s-ha .cm-ig-4{background-color:color-mix(in srgb, var(--accent) calc(15% * var(--indent-opacity, 1)), transparent)}
-    .cm-s-ha .cm-ig-5{background-color:color-mix(in srgb, var(--accent) calc(18% * var(--indent-opacity, 1)), transparent)}
-    .cm-s-ha .cm-ig-6{background-color:color-mix(in srgb, var(--accent) calc(21% * var(--indent-opacity, 1)), transparent)}
-    .cm-s-ha .cm-ig-7{background-color:color-mix(in srgb, var(--accent) calc(24% * var(--indent-opacity, 1)), transparent)}
-    .cm-s-ha .cm-ig-8{background-color:color-mix(in srgb, var(--accent) calc(27% * var(--indent-opacity, 1)), transparent)}
+    /* ── GRADIENT RAMP ── */
+    .cm-s-ha .cm-ig-0{background-color:color-mix(in srgb, var(--accent) 5%,  transparent)}
+    .cm-s-ha .cm-ig-1{background-color:color-mix(in srgb, var(--accent) 9%,  transparent)}
+    .cm-s-ha .cm-ig-2{background-color:color-mix(in srgb, var(--accent) 13%, transparent)}
+    .cm-s-ha .cm-ig-3{background-color:color-mix(in srgb, var(--accent) 17%, transparent)}
+    .cm-s-ha .cm-ig-4{background-color:color-mix(in srgb, var(--accent) 21%, transparent)}
+    .cm-s-ha .cm-ig-5{background-color:color-mix(in srgb, var(--accent) 25%, transparent)}
+    .cm-s-ha .cm-ig-6{background-color:color-mix(in srgb, var(--accent) 29%, transparent)}
+    .cm-s-ha .cm-ig-7{background-color:color-mix(in srgb, var(--accent) 33%, transparent)}
+    .cm-s-ha .cm-ig-8{background-color:color-mix(in srgb, var(--accent) 37%, transparent)}
 
     /* Indent guides (CSS-gradient background) — alpha scales with
        --indent-opacity so the single slider governs this style too. */
@@ -1057,7 +1062,7 @@
             <span class="settings-help">Whether new indents use spaces or a tab character.</span>
           </div>
           <div class="settings-control">
-            <select id="set-indent" onchange="setIndentStyle(this.value==='tabs')">
+            <select id="set-indent" onchange="setIndentChar(this.value==='tabs')">
               <option value="spaces">Spaces</option><option value="tabs">Tabs</option>
             </select>
           </div>
@@ -1639,51 +1644,50 @@ function addCursorVertically(cm, dir) {
 // filename doesn't match. Directories remain visible when a
 // descendant matches (so the user can see the path). Empty query
 // shows everything.
+// Live Explorer filter. Walks the full TREE data (not just rendered
+// DOM) so matches inside collapsed directories also show up.
+// When the query is empty, restores the normal nested tree.
 function filterFileTree(q) {
   const query = (q || '').trim().toLowerCase();
   const container = document.getElementById('file-tree');
   if (!container) return;
-  if (!query) {
-    // Re-render cleanly to reset any visibility tweaks
-    renderFileTree();
-    return;
-  }
-  // Render the full tree first so we can walk it
-  renderFileTree();
-  // Walk every item and hide non-matches, reveal ancestors of matches
-  const items = Array.from(container.querySelectorAll('.tree-item'));
-  const dirs = items.filter(el => el.dataset.type === 'dir');
-  const files = items.filter(el => el.dataset.type === 'file');
-  // First mark files: visible if filename matches query
-  const visibleDirs = new Set();
-  for (const el of files) {
-    const name = el.querySelector('.tree-name')?.textContent || '';
-    const match = name.toLowerCase().includes(query);
-    el.style.display = match ? '' : 'none';
-    if (match) {
-      // Mark every ancestor directory as visible. Path = dataset.path
-      const path = el.dataset.path || '';
-      const parts = path.split('/').slice(0, -1);
-      let acc = '';
-      for (const p of parts) {
-        acc = acc ? acc + '/' + p : p;
-        visibleDirs.add(acc);
+  if (!query) { renderFileTree(); return; }
+
+  const hits = [];
+  (function walk(list) {
+    for (const n of list) {
+      if (n.type === 'dir') { walk(n.children || []); continue; }
+      if (!n.path) continue;
+      if (n.name.toLowerCase().includes(query) ||
+          n.path.toLowerCase().includes(query)) {
+        hits.push(n);
       }
     }
+  })(TREE);
+
+  container.innerHTML = '';
+  if (!hits.length) {
+    container.innerHTML = '<div style="padding:12px;color:var(--text-muted);font-size:11px;text-align:center">No files match.</div>';
+    return;
   }
-  for (const el of dirs) {
-    const path = el.dataset.path || '';
-    // Top-level "config" synthetic dir has empty path → always show
-    const show = path === '' || visibleDirs.has(path);
-    el.style.display = show ? '' : 'none';
-    // Also show/hide the children wrapper
-    const wrapId = 'ch-' + (el.querySelector('.tree-name')?.textContent || '').replace(/\W/g,'-');
-    const wrap = document.getElementById(wrapId);
-    if (wrap) {
-      wrap.style.display = show ? '' : 'none';
-      // Auto-expand dirs containing matches
-      if (show && path !== '') wrap.classList.add('open');
-    }
+  for (const n of hits.slice(0, 400)) {
+    const item = document.createElement('div');
+    item.className = 'tree-item';
+    item.style.paddingLeft = '8px';
+    item.dataset.type = 'file';
+    item.dataset.path = n.path;
+    const col = fileColor(n.name);
+    const gs = FILES[n.path]?.gitStatus;
+    const isOpen = tabs.some(t => t.path === n.path);
+    if (isOpen) item.classList.add('open');
+    item.innerHTML = `
+      <div class="tree-arrow" style="opacity:0"></div>
+      <div class="tree-icon" style="color:${col}">${fileIcon()}</div>
+      <span class="tree-name" title="${escapeHtml(n.path)}">${escapeHtml(n.path)}</span>
+      <span class="tree-open-dot"></span>
+      ${gs ? `<span class="tree-git-badge git-${gs}">${gs}</span>` : ''}`;
+    item.onclick = () => openFile(n.path, item);
+    container.appendChild(item);
   }
 }
 
@@ -1715,8 +1719,8 @@ function renderNodes(nodes, container, depth) {
         <div class="tree-arrow ${node.open?'open':''}" id="${arrowId}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="9 18 15 12 9 6"/></svg>
         </div>
-        <div class="tree-icon" style="color:#f0a500">
-          <svg viewBox="0 0 24 24" fill="${node.open?'rgba(240,165,0,.2)':'none'}" stroke="currentColor" stroke-width="1.5"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+        <div class="tree-icon tree-icon-dir" style="color:#f0a500">
+          <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
         </div>
         <span class="tree-name">${node.name}</span>`;
       item.onclick = () => toggleDir(node, item, container, depth);
@@ -1765,11 +1769,15 @@ function collapseAll() {
   renderFileTree();
 }
 
+// File tint by extension. Avoid amber (reserved for folders) so
+// directories and yaml files are visually distinct at a glance.
 function fileColor(name) {
-  if (/\.ya?ml$/.test(name)) return '#f0a500';
-  if (/\.py$/.test(name))    return '#4d9ef8';
-  if (/\.json$/.test(name))  return '#4ec994';
-  if (/\.js$/.test(name))    return '#f0d060';
+  if (/\.ya?ml$/.test(name)) return '#e06c75';  // red/pink — YAML
+  if (/\.py$/.test(name))    return '#4d9ef8';  // blue     — Python
+  if (/\.json$/.test(name))  return '#4ec994';  // green    — JSON
+  if (/\.js$/.test(name))    return '#f0d060';  // yellow   — JS
+  if (/\.(md|markdown)$/.test(name)) return '#c792ea'; // purple — Markdown
+  if (/\.(sh|bash)$/.test(name))     return '#8896b3'; // grey   — shell
   return '#8896b3';
 }
 
@@ -2778,9 +2786,13 @@ function setTabSize(n) {
   savePrefs(); applyPrefs();
   showToast(`Tab size: ${n}`);
 }
-function setIndentStyle(useTabs) {
+// Spaces vs. tab character for indentation (separate from the
+// visual indent style). Kept under the old name as an alias so
+// the Settings dropdown still works.
+function setIndentChar(useTabs) {
   PREFS.indentWithTabs = !!useTabs;
   savePrefs(); applyPrefs();
+  if (editor) editor.refresh();
   showToast(useTabs ? 'Indent: tabs' : 'Indent: spaces');
 }
 function setIndentStyle(id) {

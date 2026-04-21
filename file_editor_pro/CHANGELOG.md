@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.9.1 — Bug sweep: icons, filter, opacity, indent switch, rainbow gaps
+
+- **Folder icons** now render **filled solid amber** so directories are instantly distinct from (outlined) file icons. YAML files recolored from amber → red/pink to avoid collision with the folder color.
+- **Explorer filter** now shows live results. Previous implementation walked the currently-rendered DOM, so files inside collapsed directories never appeared. Rewrote to walk the TREE data and render a flat list of full-path hits.
+- **Indent-style transparency** slider actually works now. Switched from per-rule `calc()` in `rgba()` alpha to a single `opacity:` on the marker spans, which is supported by every modern browser. Also bumped the default alpha values so the colored styles are visible even at 100%.
+- **Rainbow / gradient / bars** rows now paint edge-to-edge with **no vertical gap** between lines. Root cause: `vertical-align: bottom` introduced a baseline gap on inline-block marker spans. Switched to `vertical-align: top` + `line-height: inherit` + `margin/padding: 0`.
+- **Indent "with spaces vs tabs" now works.** Root cause: two functions were both named `setIndentStyle` — the newer visual-style one shadowed the older character-selection one, so the dropdown silently hit the wrong function. Renamed the character selector to `setIndentChar` and wired the dropdown accordingly. Editor refreshes after switch.
+- Clarified behaviour of three features in the tooltips/docs:
+  - **Line wrapping** — wraps long lines instead of horizontal scroll. Only visible on lines wider than the pane.
+  - **Show whitespace** — renders leading spaces as `·` and tabs as `→`.
+  - **YAML validation** — runs `js-yaml` (with HA tag extensions) on every keystroke; only flags parse-breaking issues, not stylistic ones like 2-vs-4-space indent.
+
 ## 1.9.0 — Integrated terminal, minimap, blueprint snippets
 
 - **Integrated terminal** (`Ctrl+` \` ) — xterm.js frontend over a WebSocket PTY. Spawns a shell in `/config`, respects the ingress URL base, and supports resize via the addon. Drag the top edge to resize. Clear / close buttons in the header. Backend dep: `ptyprocess`; `/api/terminal` WebSocket endpoint + `/api/terminal/available` health check.
