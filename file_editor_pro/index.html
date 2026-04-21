@@ -15,28 +15,142 @@
 
   <style>
     :root {
-      --bg-darkest: #060a10;
-      --bg-dark:    #0a0e18;
-      --bg-mid:     #0f1520;
-      --bg-light:   #161d2e;
-      --bg-hover:   #1c2538;
-      --bg-active:  #1e2a40;
-      --text-primary:   #c9d4e8;
-      --text-secondary: #8896b3;
-      --text-muted:     #506080;
-      --accent:        #f0a500;
-      --accent-dim:    rgba(240,165,0,.15);
-      --accent-blue:   #4d9ef8;
-      --accent-green:  #4ec994;
-      --accent-red:    #f07070;
-      --border:        #1e2a40;
-      --border-light:  #263350;
       --activity-width: 48px;
       --sidebar-width:  260px;
       --tab-height:     36px;
       --status-height:  22px;
       --font-mono: 'JetBrains Mono','Fira Code',monospace;
       --font-ui:   'Inter',system-ui,sans-serif;
+      --editor-font-size: 13px;
+      --indent-ch: 2ch;
+      color-scheme: light dark;
+    }
+
+    /* ──────────────────────────────────────────────────────
+       THEMES
+       Each sets: surface palette, text, accents, and syntax
+       tokens. Apply by setting [data-theme] on <html>.
+       Default = github-light.
+       ────────────────────────────────────────────────────── */
+
+    /* ── GitHub Light (default) ── */
+    :root, [data-theme="github-light"] {
+      --bg-darkest:#ffffff; --bg-dark:#f6f8fa; --bg-mid:#eef1f4;
+      --bg-light:#ffffff; --bg-hover:#eaeef2; --bg-active:#dbe4ea;
+      --text-primary:#1f2328; --text-secondary:#59636e; --text-muted:#8c959f;
+      --accent:#0969da; --accent-dim:rgba(9,105,218,.10);
+      --accent-blue:#0969da; --accent-green:#1a7f37; --accent-red:#cf222e;
+      --border:#d0d7de; --border-light:#d8dee4;
+      --selection:rgba(9,105,218,.18);
+      --syn-comment:#59636e; --syn-keyword:#cf222e; --syn-string:#0a3069;
+      --syn-number:#0550ae; --syn-def:#6639ba; --syn-tag:#116329;
+      --syn-builtin:#8250df; --syn-atom:#cf222e; --syn-meta:#6639ba;
+      --status-text:#ffffff;
+    }
+
+    /* ── ha-light (clean white + amber) ── */
+    [data-theme="ha-light"] {
+      --bg-darkest:#ffffff; --bg-dark:#f6f8fa; --bg-mid:#eef1f4;
+      --bg-light:#ffffff; --bg-hover:#e9eef5; --bg-active:#dce5ef;
+      --text-primary:#24292f; --text-secondary:#57606a; --text-muted:#8a93a1;
+      --accent:#c27c00; --accent-dim:rgba(194,124,0,.12);
+      --accent-blue:#0969da; --accent-green:#116329; --accent-red:#b31d28;
+      --border:#d6dae0; --border-light:#dfe4ea;
+      --selection:rgba(194,124,0,.18);
+      --syn-comment:#6e7781; --syn-keyword:#8250df; --syn-string:#0a6e3b;
+      --syn-number:#953800; --syn-def:#0969da; --syn-tag:#c27c00;
+      --syn-builtin:#116329; --syn-atom:#b31d28; --syn-meta:#c27c00;
+      --status-text:#ffffff;
+    }
+
+    /* ── solarized-light (warm cream) ── */
+    [data-theme="solarized-light"] {
+      --bg-darkest:#fdf6e3; --bg-dark:#eee8d5; --bg-mid:#e8e1c6;
+      --bg-light:#fdf6e3; --bg-hover:#e1dabf; --bg-active:#d5cdaf;
+      --text-primary:#586e75; --text-secondary:#657b83; --text-muted:#93a1a1;
+      --accent:#b58900; --accent-dim:rgba(181,137,0,.15);
+      --accent-blue:#268bd2; --accent-green:#859900; --accent-red:#dc322f;
+      --border:#d6cfb5; --border-light:#cfc8ac;
+      --selection:rgba(181,137,0,.20);
+      --syn-comment:#93a1a1; --syn-keyword:#859900; --syn-string:#2aa198;
+      --syn-number:#d33682; --syn-def:#268bd2; --syn-tag:#b58900;
+      --syn-builtin:#cb4b16; --syn-atom:#dc322f; --syn-meta:#b58900;
+      --status-text:#fdf6e3;
+    }
+
+    /* ── ha-cream (warm paper) ── */
+    [data-theme="ha-cream"] {
+      --bg-darkest:#f7efd9; --bg-dark:#ecdfb8; --bg-mid:#e4d6a8;
+      --bg-light:#f7efd9; --bg-hover:#d9caa0; --bg-active:#cebe8e;
+      --text-primary:#2a241b; --text-secondary:#5b513a; --text-muted:#8a7f66;
+      --accent:#b26a00; --accent-dim:rgba(178,106,0,.14);
+      --accent-blue:#285c99; --accent-green:#3a6e4b; --accent-red:#a33026;
+      --border:#d6c8a2; --border-light:#c9bb90;
+      --selection:rgba(178,106,0,.22);
+      --syn-comment:#8a7f66; --syn-keyword:#8a3a7a; --syn-string:#3d7332;
+      --syn-number:#b34d00; --syn-def:#285c99; --syn-tag:#b26a00;
+      --syn-builtin:#3a6e4b; --syn-atom:#a33026; --syn-meta:#b26a00;
+      --status-text:#f7efd9;
+    }
+
+    /* ── nord-light (cool pastel) ── */
+    [data-theme="nord-light"] {
+      --bg-darkest:#eceff4; --bg-dark:#e5e9f0; --bg-mid:#dfe3ec;
+      --bg-light:#eceff4; --bg-hover:#d8dee9; --bg-active:#c8d0df;
+      --text-primary:#2e3440; --text-secondary:#434c5e; --text-muted:#8693a8;
+      --accent:#5e81ac; --accent-dim:rgba(94,129,172,.14);
+      --accent-blue:#5e81ac; --accent-green:#a3be8c; --accent-red:#bf616a;
+      --border:#c3cad5; --border-light:#b9c1cf;
+      --selection:rgba(94,129,172,.22);
+      --syn-comment:#8fa1b3; --syn-keyword:#5e81ac; --syn-string:#a3be8c;
+      --syn-number:#d08770; --syn-def:#81a1c1; --syn-tag:#b48ead;
+      --syn-builtin:#88c0d0; --syn-atom:#bf616a; --syn-meta:#b48ead;
+      --status-text:#ffffff;
+    }
+
+    /* ── ha-dark (original) ── */
+    [data-theme="ha-dark"] {
+      --bg-darkest:#060a10; --bg-dark:#0a0e18; --bg-mid:#0f1520;
+      --bg-light:#161d2e; --bg-hover:#1c2538; --bg-active:#1e2a40;
+      --text-primary:#c9d4e8; --text-secondary:#8896b3; --text-muted:#506080;
+      --accent:#f0a500; --accent-dim:rgba(240,165,0,.15);
+      --accent-blue:#4d9ef8; --accent-green:#4ec994; --accent-red:#f07070;
+      --border:#1e2a40; --border-light:#263350;
+      --selection:rgba(240,165,0,.22);
+      --syn-comment:#546e7a; --syn-keyword:#c792ea; --syn-string:#c3e88d;
+      --syn-number:#f78c6c; --syn-def:#82aaff; --syn-tag:#f0a500;
+      --syn-builtin:#4ec994; --syn-atom:#f07070; --syn-meta:#f0a500;
+      --status-text:#0a0e18;
+    }
+
+    /* ── ha-soft (less intense dark) ── */
+    [data-theme="ha-soft"] {
+      --bg-darkest:#1a1f2c; --bg-dark:#222836; --bg-mid:#2a3042;
+      --bg-light:#2e3547; --bg-hover:#353c50; --bg-active:#3a4259;
+      --text-primary:#d8dfef; --text-secondary:#a8b2c7; --text-muted:#7a849a;
+      --accent:#e5b565; --accent-dim:rgba(229,181,101,.15);
+      --accent-blue:#95b9f0; --accent-green:#73c4a0; --accent-red:#e68a8a;
+      --border:#2f3648; --border-light:#3a4259;
+      --selection:rgba(229,181,101,.22);
+      --syn-comment:#6a7789; --syn-keyword:#c9a7eb; --syn-string:#a9d49c;
+      --syn-number:#e69b7a; --syn-def:#95b9f0; --syn-tag:#e5b565;
+      --syn-builtin:#73c4a0; --syn-atom:#e68a8a; --syn-meta:#e5b565;
+      --status-text:#1a1f2c;
+    }
+
+    /* ── ha-muted (washed slate) ── */
+    [data-theme="ha-muted"] {
+      --bg-darkest:#2b303b; --bg-dark:#343a47; --bg-mid:#3c4350;
+      --bg-light:#414857; --bg-hover:#474f60; --bg-active:#4e576a;
+      --text-primary:#dfe4ee; --text-secondary:#b0b9cb; --text-muted:#818b9e;
+      --accent:#d19a66; --accent-dim:rgba(209,154,102,.14);
+      --accent-blue:#61afef; --accent-green:#98c379; --accent-red:#e06c75;
+      --border:#3f4654; --border-light:#4a5363;
+      --selection:rgba(209,154,102,.22);
+      --syn-comment:#7b8494; --syn-keyword:#c578dd; --syn-string:#98c379;
+      --syn-number:#d19a66; --syn-def:#61afef; --syn-tag:#d19a66;
+      --syn-builtin:#56b6c2; --syn-atom:#e06c75; --syn-meta:#d19a66;
+      --status-text:#2b303b;
     }
     *{box-sizing:border-box;margin:0;padding:0}
     html,body{height:100%;overflow:hidden}
@@ -125,6 +239,13 @@
     .tab-close:hover{background:var(--bg-hover);color:var(--accent-red)}
     .tab-close svg{width:10px;height:10px;stroke-width:2.5}
     .tab-empty{flex:1;border-bottom:1px solid var(--border)}
+    .tab-actions{display:flex;align-items:center;padding:0 8px;gap:6px;border-bottom:1px solid var(--border);height:100%}
+    .tab-save-btn{display:inline-flex;align-items:center;gap:6px;background:transparent;border:1px solid var(--border-light);color:var(--text-secondary);padding:3px 10px;border-radius:5px;font-family:var(--font-ui);font-size:11px;cursor:pointer;transition:all .12s}
+    .tab-save-btn:hover{background:var(--bg-hover);color:var(--text-primary);border-color:var(--text-muted)}
+    .tab-save-btn.modified{border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
+    .tab-save-btn.modified:hover{background:var(--accent);color:#fff}
+    .tab-save-btn.disabled{opacity:.35;pointer-events:none}
+    .tab-save-btn svg{width:12px;height:12px;stroke-width:2}
     .breadcrumb{padding:5px 14px;font-family:var(--font-mono);font-size:11px;color:var(--text-muted);border-bottom:1px solid var(--border);background:var(--bg-dark);display:none;align-items:center;gap:4px;flex-shrink:0}
     .breadcrumb-part:last-child{color:var(--text-secondary)}
     .breadcrumb-sep{color:var(--border-light)}
@@ -134,7 +255,7 @@
     .no-file-open p{font-size:13px}
 
     /* ── CODEMIRROR ── */
-    .CodeMirror{height:100% !important;background:var(--bg-darkest) !important;color:var(--text-primary) !important;font-family:var(--font-mono) !important;font-size:13px !important;line-height:1.7 !important}
+    .CodeMirror{height:100% !important;background:var(--bg-darkest) !important;color:var(--text-primary) !important;font-family:var(--font-mono) !important;font-size:var(--editor-font-size,13px) !important;line-height:1.7 !important}
     .CodeMirror-gutters{background:var(--bg-darkest) !important;border-right:1px solid var(--border) !important}
     .CodeMirror-linenumber{color:var(--text-muted) !important;padding:0 12px 0 8px !important}
     .CodeMirror-cursor{border-left:2px solid var(--accent) !important}
@@ -149,22 +270,28 @@
     .CodeMirror-dialog input{background:var(--bg-mid) !important;border:1px solid var(--border-light) !important;color:var(--text-primary) !important;border-radius:4px !important;padding:2px 6px !important;font-family:var(--font-mono) !important;outline:none !important}
 
     /* ── HA-DARK THEME TOKENS ── */
-    .cm-s-ha-dark .cm-comment{color:#546e7a !important;font-style:italic !important}
-    .cm-s-ha-dark .cm-atom{color:#f07070 !important}
-    .cm-s-ha-dark .cm-number{color:#f78c6c !important}
-    .cm-s-ha-dark .cm-keyword{color:#c792ea !important}
-    .cm-s-ha-dark .cm-def{color:#82aaff !important}
-    .cm-s-ha-dark .cm-variable{color:var(--text-primary) !important}
-    .cm-s-ha-dark .cm-variable-2{color:#82aaff !important}
-    .cm-s-ha-dark .cm-string{color:#c3e88d !important}
-    .cm-s-ha-dark .cm-string-2{color:#a5d6ff !important}
-    .cm-s-ha-dark .cm-meta{color:var(--accent) !important}
-    .cm-s-ha-dark .cm-qualifier{color:#4ec994 !important}
-    .cm-s-ha-dark .cm-builtin{color:#4ec994 !important}
-    .cm-s-ha-dark .cm-tag{color:var(--accent) !important}
-    .cm-s-ha-dark .cm-attribute{color:#82aaff !important}
-    .cm-s-ha-dark .cm-header{color:var(--accent) !important;font-weight:bold !important}
-    .cm-s-ha-dark .cm-error{background:rgba(240,112,112,.15) !important;color:#f07070 !important}
+    .cm-s-ha .cm-comment{color:var(--syn-comment) !important;font-style:italic !important}
+    .cm-s-ha .cm-atom{color:var(--syn-atom) !important}
+    .cm-s-ha .cm-number{color:var(--syn-number) !important}
+    .cm-s-ha .cm-keyword{color:var(--syn-keyword) !important}
+    .cm-s-ha .cm-def{color:var(--syn-def) !important}
+    .cm-s-ha .cm-variable{color:var(--text-primary) !important}
+    .cm-s-ha .cm-variable-2{color:var(--syn-def) !important}
+    .cm-s-ha .cm-string{color:var(--syn-string) !important}
+    .cm-s-ha .cm-string-2{color:var(--syn-def) !important}
+    .cm-s-ha .cm-meta{color:var(--syn-meta) !important}
+    .cm-s-ha .cm-qualifier{color:var(--syn-builtin) !important}
+    .cm-s-ha .cm-builtin{color:var(--syn-builtin) !important}
+    .cm-s-ha .cm-tag{color:var(--syn-tag) !important}
+    .cm-s-ha .cm-attribute{color:var(--syn-def) !important}
+    .cm-s-ha .cm-header{color:var(--accent) !important;font-weight:bold !important}
+    .cm-s-ha .cm-error{background:var(--accent-dim) !important;color:var(--accent-red) !important}
+    .cm-s-ha .CodeMirror-selected,
+    .cm-s-ha .CodeMirror-focused .CodeMirror-selected{background:var(--selection) !important}
+    .cm-s-ha .CodeMirror-cursor{border-left-color:var(--text-primary) !important}
+    .cm-s-ha .CodeMirror-activeline-background{background:var(--accent-dim) !important}
+    .cm-s-ha .CodeMirror-linenumber{color:var(--text-muted) !important}
+    .cm-s-ha .CodeMirror-matchingbracket{color:var(--accent) !important;border-bottom:1px solid var(--accent)}
 
     /* ── STATUS BAR ── */
     .status-bar{height:var(--status-height);background:var(--accent);display:flex;align-items:center;padding:0 12px;gap:16px;flex-shrink:0}
@@ -224,28 +351,73 @@
     .jinja-btn{background:var(--accent);color:#0a0e18;border:none;border-radius:5px;padding:6px 14px;font-family:var(--font-ui);font-size:12px;font-weight:600;cursor:pointer}
     .jinja-btn:hover{opacity:.9}
 
+    /* ── PENCIL FAB (editor actions menu) ── */
+    .fab{position:fixed;bottom:40px;right:20px;width:40px;height:40px;border-radius:50%;background:var(--accent);color:#fff;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.3);z-index:900;transition:transform .15s,box-shadow .15s}
+    .fab:hover{transform:scale(1.06);box-shadow:0 6px 18px rgba(0,0,0,.4)}
+    .fab svg{width:18px;height:18px;stroke-width:2}
+    .fab-menu{position:fixed;bottom:88px;right:20px;background:var(--bg-light);border:1px solid var(--border-light);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.4);padding:4px;z-index:900;display:none;min-width:180px}
+    .fab-menu.show{display:block}
+    .fab-menu-item{display:flex;align-items:center;gap:10px;padding:7px 12px;border-radius:5px;cursor:pointer;font-size:12.5px;color:var(--text-secondary)}
+    .fab-menu-item:hover{background:var(--bg-hover);color:var(--text-primary)}
+    .fab-menu-item svg{width:13px;height:13px;stroke-width:1.8;flex-shrink:0}
+    .fab-menu-shortcut{margin-left:auto;font-family:var(--font-mono);font-size:10px;color:var(--text-muted)}
+    .fab-menu-divider{height:1px;background:var(--border);margin:4px 2px}
+
+    /* ── SETTINGS MODAL ── */
+    .settings-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1950;display:none;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
+    .settings-overlay.show{display:flex}
+    .settings-modal{width:min(640px,94vw);max-height:86vh;background:var(--bg-light);border:1px solid var(--border-light);border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.5);overflow:hidden;display:flex;flex-direction:column}
+    .settings-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+    .settings-title{font-weight:600;font-size:14px;color:var(--text-primary)}
+    .settings-close{margin-left:auto;background:none;border:none;color:var(--text-muted);font-size:22px;cursor:pointer;line-height:1;padding:0 6px;border-radius:4px}
+    .settings-close:hover{background:var(--bg-hover);color:var(--text-primary)}
+    .settings-body{padding:16px 20px;overflow-y:auto}
+    .settings-section{margin-bottom:18px}
+    .settings-section-title{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin-bottom:10px;font-weight:600}
+    .settings-row{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:9px 0;border-bottom:1px solid var(--border)}
+    .settings-row:last-child{border-bottom:none}
+    .settings-label{color:var(--text-primary);font-size:13px;flex:1}
+    .settings-help{font-size:11px;color:var(--text-muted);display:block;margin-top:2px}
+    .settings-control{display:flex;align-items:center;gap:8px}
+    .settings-control select,.settings-control input[type="number"]{background:var(--bg-mid);border:1px solid var(--border-light);color:var(--text-primary);border-radius:5px;padding:5px 8px;font-family:var(--font-ui);font-size:12px;outline:none;min-width:150px}
+    .settings-control input[type="number"]{min-width:70px}
+    .settings-control input[type="range"]{width:140px;accent-color:var(--accent)}
+    .settings-swatch{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:middle;border:1px solid var(--border)}
+    .settings-toggle{position:relative;width:34px;height:18px;background:var(--bg-hover);border-radius:10px;cursor:pointer;transition:background .15s;border:1px solid var(--border-light)}
+    .settings-toggle::after{content:'';position:absolute;top:1px;left:1px;width:14px;height:14px;border-radius:50%;background:var(--text-secondary);transition:all .15s}
+    .settings-toggle.on{background:var(--accent)}
+    .settings-toggle.on::after{left:17px;background:#fff}
+
+    /* ── VISIBLE WHITESPACE ── */
+    /* CodeMirror wraps each space in a span with class .cm-ws-space
+       (and .cm-ws-tab for tabs) via the overlay we register in JS.
+       We render a dot/arrow centered over the space character so
+       the layout doesn't shift. */
+    .cm-s-ha .cm-ws-space{position:relative}
+    .cm-s-ha .cm-ws-space::before{
+      content:'·';color:var(--text-muted);opacity:.55;
+      position:absolute;left:0;right:0;top:0;bottom:0;
+      display:flex;align-items:center;justify-content:center;
+      pointer-events:none;font-weight:400
+    }
+    .cm-s-ha .cm-ws-tab{position:relative}
+    .cm-s-ha .cm-ws-tab::before{
+      content:'→';color:var(--text-muted);opacity:.45;
+      position:absolute;left:0;right:0;top:0;bottom:0;
+      display:flex;align-items:center;justify-content:flex-start;
+      pointer-events:none
+    }
+
     /* ── INDENT GUIDES ── */
-    /* Faint vertical lines every --indent-ch (tab size). Painted as a
-       repeating background on each line; monospace + ch-units keep them
-       aligned with actual indentation. Toggle via the .indent-guides
-       class on .CodeMirror. */
+    /* Opt-in: apply the .indent-guides class to the CodeMirror wrapper.
+       OFF by default — subtle when on. */
     .CodeMirror.indent-guides .CodeMirror-line{
-      background-image: linear-gradient(
-        to right,
-        rgba(130,170,255,.10) 1px,
-        transparent 1px
-      );
+      background-image: linear-gradient(to right,
+        color-mix(in srgb, var(--text-muted) 45%, transparent) 1px,
+        transparent 1px);
       background-size: var(--indent-ch, 2ch) 100%;
       background-repeat: repeat-x;
       background-position-x: calc(-1 * var(--indent-ch, 2ch));
-    }
-    .CodeMirror.indent-guides .CodeMirror-activeline-background ~ .CodeMirror-line,
-    .CodeMirror.indent-guides .CodeMirror-line:has(.CodeMirror-activeline){
-      background-image: linear-gradient(
-        to right,
-        rgba(130,170,255,.22) 1px,
-        transparent 1px
-      );
     }
 
     /* ── HINT POPUP (CodeMirror show-hint) ── */
@@ -396,6 +568,10 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 12a9 9 0 1 0 9-9"/><polyline points="3 3 3 9 9 9"/></svg>
     Restart HA
   </div>
+  <div class="status-item status-clickable" id="status-settings" onclick="openSettings()" title="Settings">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    Settings
+  </div>
   <div class="status-item status-clickable" id="status-reload" onclick="haReloadMenu(event)" title="Reload…">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
     Reload
@@ -430,6 +606,140 @@
   <div class="context-divider"></div>
   <div class="context-item" onclick="treeCtxDownload()">Download</div>
   <div class="context-item" onclick="treeCtxDelete()" style="color:var(--accent-red)">Delete</div>
+</div>
+
+<!-- Floating edit-actions menu (pencil FAB) -->
+<button class="fab" id="fab-btn" onclick="toggleFabMenu(event)" title="Editor actions">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+    <path d="M12 20h9"/>
+    <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+  </svg>
+</button>
+<div class="fab-menu" id="fab-menu">
+  <div class="fab-menu-item" onclick="fabAction('undo')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/></svg>
+    Undo <span class="fab-menu-shortcut">⌘Z</span>
+  </div>
+  <div class="fab-menu-item" onclick="fabAction('redo')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 15-6.7L21 13"/></svg>
+    Redo <span class="fab-menu-shortcut">⇧⌘Z</span>
+  </div>
+  <div class="fab-menu-divider"></div>
+  <div class="fab-menu-item" onclick="fabAction('comment')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+    Toggle comment <span class="fab-menu-shortcut">⌘/</span>
+  </div>
+  <div class="fab-menu-item" onclick="fabAction('indent')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="3 8 7 12 3 16"/><line x1="21" y1="12" x2="11" y2="12"/><line x1="21" y1="6" x2="11" y2="6"/><line x1="21" y1="18" x2="11" y2="18"/></svg>
+    Indent line <span class="fab-menu-shortcut">Tab</span>
+  </div>
+  <div class="fab-menu-item" onclick="fabAction('outdent')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="7 8 3 12 7 16"/><line x1="21" y1="12" x2="11" y2="12"/><line x1="21" y1="6" x2="11" y2="6"/><line x1="21" y1="18" x2="11" y2="18"/></svg>
+    Outdent line <span class="fab-menu-shortcut">⇧Tab</span>
+  </div>
+  <div class="fab-menu-divider"></div>
+  <div class="fab-menu-item" onclick="fabAction('fold')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="8 10 12 6 16 10"/><polyline points="8 14 12 18 16 14"/></svg>
+    Fold at cursor
+  </div>
+  <div class="fab-menu-item" onclick="fabAction('foldAll')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/></svg>
+    Fold all
+  </div>
+  <div class="fab-menu-item" onclick="fabAction('unfoldAll')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="4 20 10 14 4 14"/><polyline points="20 4 14 10 20 10"/></svg>
+    Unfold all
+  </div>
+  <div class="fab-menu-divider"></div>
+  <div class="fab-menu-item" onclick="fabAction('find')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    Find <span class="fab-menu-shortcut">⌘F</span>
+  </div>
+  <div class="fab-menu-item" onclick="fabAction('replace')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 4l6 6-6 6"/><path d="M4 9a5 5 0 0 1 5-5h11"/><path d="M10 20l-6-6 6-6"/><path d="M20 15a5 5 0 0 1-5 5H4"/></svg>
+    Replace <span class="fab-menu-shortcut">⌘H</span>
+  </div>
+</div>
+
+<!-- Settings Modal -->
+<div class="settings-overlay" id="settings-modal">
+  <div class="settings-modal">
+    <div class="settings-header">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:16px;height:16px"><circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 10v6M4.22 4.22l4.24 4.24m7.08 7.08l4.24 4.24M1 12h6m10 0h6M4.22 19.78l4.24-4.24m7.08-7.08l4.24-4.24"/></svg>
+      <div class="settings-title">Settings</div>
+      <button class="settings-close" onclick="closeSettings()">×</button>
+    </div>
+    <div class="settings-body">
+      <div class="settings-section">
+        <div class="settings-section-title">Appearance</div>
+        <div class="settings-row">
+          <div class="settings-label">Theme
+            <span class="settings-help">Pick a palette for the whole app and the editor.</span>
+          </div>
+          <div class="settings-control">
+            <select id="set-theme" onchange="setTheme(this.value)"></select>
+          </div>
+        </div>
+        <div class="settings-row">
+          <div class="settings-label">Editor font size
+            <span class="settings-help" id="set-fontsize-label">13 px</span>
+          </div>
+          <div class="settings-control">
+            <input type="range" id="set-fontsize" min="10" max="22" step="1">
+            <input type="number" id="set-fontsize-num" min="10" max="22" step="1">
+          </div>
+        </div>
+        <div class="settings-row">
+          <div class="settings-label">Indent guides
+            <span class="settings-help">Faint vertical lines at each tab stop.</span>
+          </div>
+          <div class="settings-control">
+            <div class="settings-toggle" id="set-guides" onclick="toggleIndentGuides(); refreshSettingsUI()"></div>
+          </div>
+        </div>
+        <div class="settings-row">
+          <div class="settings-label">Show whitespace
+            <span class="settings-help">Render spaces as · and tabs as → (matches HA File Editor).</span>
+          </div>
+          <div class="settings-control">
+            <div class="settings-toggle" id="set-ws" onclick="toggleWhitespace(); refreshSettingsUI()"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-title">Editor</div>
+        <div class="settings-row">
+          <div class="settings-label">Tab size
+            <span class="settings-help">Number of spaces per indent level.</span>
+          </div>
+          <div class="settings-control">
+            <select id="set-tabsize" onchange="setTabSize(parseInt(this.value,10))">
+              <option value="2">2</option><option value="4">4</option><option value="8">8</option>
+            </select>
+          </div>
+        </div>
+        <div class="settings-row">
+          <div class="settings-label">Indent with
+            <span class="settings-help">Whether new indents use spaces or a tab character.</span>
+          </div>
+          <div class="settings-control">
+            <select id="set-indent" onchange="setIndentStyle(this.value==='tabs')">
+              <option value="spaces">Spaces</option><option value="tabs">Tabs</option>
+            </select>
+          </div>
+        </div>
+        <div class="settings-row">
+          <div class="settings-label">Line wrapping
+            <span class="settings-help">Wrap long lines instead of horizontal scroll.</span>
+          </div>
+          <div class="settings-control">
+            <div class="settings-toggle" id="set-wrap" onclick="toggleLineWrap(); refreshSettingsUI()"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- Command Palette -->
@@ -531,6 +841,20 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
 
 <script>
+// ═══════════════════════════════════════════════════════════════
+// EARLY THEME APPLY (prevents flash of default theme)
+// Reads the saved theme/font size out of localStorage and applies
+// them as HTML attributes/vars before the rest of the app boots.
+// ═══════════════════════════════════════════════════════════════
+(function earlyThemeApply(){
+  try {
+    const saved = JSON.parse(localStorage.getItem('fep-prefs') || '{}');
+    if (saved.theme) document.documentElement.setAttribute('data-theme', saved.theme);
+    if (saved.fontSize) document.documentElement.style.setProperty('--editor-font-size', saved.fontSize + 'px');
+    if (saved.tabSize) document.documentElement.style.setProperty('--indent-ch', saved.tabSize + 'ch');
+  } catch {}
+})();
+
 // ═══════════════════════════════════════════════════════════════
 // MOCK FILE SYSTEM — replace with HA API calls (see stubs below)
 // ═══════════════════════════════════════════════════════════════
@@ -818,7 +1142,7 @@ let activePanel = 'files';
 function initEditor() {
   const ta = document.getElementById('editor-textarea');
   editor = CodeMirror.fromTextArea(ta, {
-    theme: 'ha-dark',
+    theme: 'ha',
     lineNumbers: true,
     lineWrapping: false,
     tabSize: 2,
@@ -1043,6 +1367,18 @@ function renderTabs() {
   const spacer = document.createElement('div');
   spacer.className = 'tab-empty';
   bar.appendChild(spacer);
+
+  const active = tabs.find(t => t.id === activeTabId);
+  const modified = !!(active && active.modified);
+  const actions = document.createElement('div');
+  actions.className = 'tab-actions';
+  actions.innerHTML = `
+    <button class="tab-save-btn ${modified ? 'modified' : ''} ${active ? '' : 'disabled'}"
+            onclick="saveCurrentFile()" title="Save (Ctrl+S)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+      <span>${modified ? 'Save*' : 'Save'}</span>
+    </button>`;
+  bar.appendChild(actions);
 }
 
 function updateBreadcrumb(path) {
@@ -1612,7 +1948,25 @@ async function haReload(domain) {
 // EDITOR PREFERENCES (persisted in localStorage)
 // ═══════════════════════════════════════════════════════════════
 const PREFS_KEY = 'fep-prefs';
-const PREFS = { tabSize: 2, indentWithTabs: false, indentGuides: true };
+const THEMES = [
+  { id: 'github-light',     name: 'GitHub Light',     kind: 'light' },
+  { id: 'ha-light',         name: 'HA Light',         kind: 'light' },
+  { id: 'solarized-light',  name: 'Solarized Light',  kind: 'light' },
+  { id: 'ha-cream',         name: 'HA Cream',         kind: 'light' },
+  { id: 'nord-light',       name: 'Nord Light',       kind: 'light' },
+  { id: 'ha-soft',          name: 'HA Soft (dark)',   kind: 'dark' },
+  { id: 'ha-muted',         name: 'HA Muted (dark)',  kind: 'dark' },
+  { id: 'ha-dark',          name: 'HA Dark',          kind: 'dark' },
+];
+const PREFS = {
+  theme: 'github-light',
+  fontSize: 13,
+  tabSize: 2,
+  indentWithTabs: false,
+  indentGuides: false,
+  lineWrapping: false,
+  showWhitespace: false,
+};
 
 function loadPrefs() {
   try { Object.assign(PREFS, JSON.parse(localStorage.getItem(PREFS_KEY) || '{}')); }
@@ -1622,33 +1976,174 @@ function savePrefs() {
   try { localStorage.setItem(PREFS_KEY, JSON.stringify(PREFS)); } catch {}
 }
 function applyPrefs() {
+  // Theme: live on <html> via data-theme so :root vars re-resolve
+  const themeId = THEMES.some(t => t.id === PREFS.theme) ? PREFS.theme : 'github-light';
+  document.documentElement.setAttribute('data-theme', themeId);
+
+  // Font size
+  const fs = Math.max(10, Math.min(24, Number(PREFS.fontSize) || 13));
+  document.documentElement.style.setProperty('--editor-font-size', fs + 'px');
+
   if (!editor) return;
   editor.setOption('tabSize', PREFS.tabSize);
   editor.setOption('indentUnit', PREFS.tabSize);
   editor.setOption('indentWithTabs', PREFS.indentWithTabs);
+  editor.setOption('lineWrapping', !!PREFS.lineWrapping);
   document.documentElement.style.setProperty('--indent-ch', PREFS.tabSize + 'ch');
   const wrap = editor.getWrapperElement();
-  wrap.classList.toggle('indent-guides', PREFS.indentGuides);
+  wrap.classList.toggle('indent-guides', !!PREFS.indentGuides);
+  applyWhitespace();
   editor.refresh();
 }
 
+function setTheme(id) {
+  if (!THEMES.some(t => t.id === id)) return;
+  PREFS.theme = id;
+  savePrefs(); applyPrefs();
+  showToast(`Theme: ${THEMES.find(t => t.id === id).name}`);
+}
+function setFontSize(n) {
+  PREFS.fontSize = Number(n) || 13;
+  savePrefs(); applyPrefs();
+}
 function setTabSize(n) {
   PREFS.tabSize = n;
-  savePrefs();
-  applyPrefs();
+  savePrefs(); applyPrefs();
   showToast(`Tab size: ${n}`);
 }
 function setIndentStyle(useTabs) {
   PREFS.indentWithTabs = !!useTabs;
-  savePrefs();
-  applyPrefs();
+  savePrefs(); applyPrefs();
   showToast(useTabs ? 'Indent: tabs' : 'Indent: spaces');
 }
 function toggleIndentGuides() {
   PREFS.indentGuides = !PREFS.indentGuides;
-  savePrefs();
-  applyPrefs();
+  savePrefs(); applyPrefs();
   showToast(`Indent guides: ${PREFS.indentGuides ? 'on' : 'off'}`);
+}
+function toggleLineWrap() {
+  PREFS.lineWrapping = !PREFS.lineWrapping;
+  savePrefs(); applyPrefs();
+  showToast(`Line wrap: ${PREFS.lineWrapping ? 'on' : 'off'}`);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SETTINGS MODAL
+// ═══════════════════════════════════════════════════════════════
+function openSettings() {
+  buildSettingsUI();
+  refreshSettingsUI();
+  document.getElementById('settings-modal').classList.add('show');
+}
+function closeSettings() {
+  document.getElementById('settings-modal').classList.remove('show');
+}
+
+function buildSettingsUI() {
+  // Theme dropdown — build once
+  const sel = document.getElementById('set-theme');
+  if (!sel.options.length) {
+    // Group by kind
+    const mkOption = t => {
+      const o = document.createElement('option');
+      o.value = t.id;
+      o.textContent = t.name;
+      return o;
+    };
+    const gLight = document.createElement('optgroup'); gLight.label = 'Light';
+    const gDark  = document.createElement('optgroup'); gDark.label  = 'Dark';
+    for (const t of THEMES) (t.kind === 'light' ? gLight : gDark).appendChild(mkOption(t));
+    sel.appendChild(gLight);
+    sel.appendChild(gDark);
+  }
+
+  // Font size slider — bind once
+  const fs = document.getElementById('set-fontsize');
+  const fsn = document.getElementById('set-fontsize-num');
+  if (!fs.dataset.bound) {
+    const apply = v => {
+      const n = Math.max(10, Math.min(22, Number(v) || 13));
+      fs.value = n; fsn.value = n;
+      document.getElementById('set-fontsize-label').textContent = n + ' px';
+      setFontSize(n);
+    };
+    fs.addEventListener('input',  e => apply(e.target.value));
+    fsn.addEventListener('input', e => apply(e.target.value));
+    fs.dataset.bound = '1';
+  }
+}
+
+function refreshSettingsUI() {
+  document.getElementById('set-theme').value = PREFS.theme;
+  document.getElementById('set-fontsize').value = PREFS.fontSize;
+  document.getElementById('set-fontsize-num').value = PREFS.fontSize;
+  document.getElementById('set-fontsize-label').textContent = PREFS.fontSize + ' px';
+  document.getElementById('set-tabsize').value = String(PREFS.tabSize);
+  document.getElementById('set-indent').value = PREFS.indentWithTabs ? 'tabs' : 'spaces';
+  document.getElementById('set-guides').classList.toggle('on', !!PREFS.indentGuides);
+  document.getElementById('set-ws').classList.toggle('on', !!PREFS.showWhitespace);
+  document.getElementById('set-wrap').classList.toggle('on', !!PREFS.lineWrapping);
+}
+
+// Dismiss on backdrop click
+document.getElementById('settings-modal').addEventListener('click', e => {
+  if (e.target.id === 'settings-modal') closeSettings();
+});
+
+// ═══════════════════════════════════════════════════════════════
+// FAB (pencil) menu — editor actions
+// ═══════════════════════════════════════════════════════════════
+function toggleFabMenu(e) {
+  e.stopPropagation();
+  document.getElementById('fab-menu').classList.toggle('show');
+}
+function closeFabMenu() {
+  document.getElementById('fab-menu').classList.remove('show');
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('#fab-menu') && !e.target.closest('#fab-btn')) closeFabMenu();
+});
+
+function fabAction(cmd) {
+  closeFabMenu();
+  if (!editor) return;
+  editor.focus();
+  switch (cmd) {
+    case 'undo':      editor.undo(); break;
+    case 'redo':      editor.redo(); break;
+    case 'comment':   editor.toggleComment ? editor.toggleComment() : editor.execCommand('toggleComment'); break;
+    case 'indent':    editor.execCommand('indentMore'); break;
+    case 'outdent':   editor.execCommand('indentLess'); break;
+    case 'fold':      editor.foldCode(editor.getCursor()); break;
+    case 'foldAll':   editor.execCommand('foldAll'); break;
+    case 'unfoldAll': editor.execCommand('unfoldAll'); break;
+    case 'find':      editor.execCommand('find'); break;
+    case 'replace':   editor.execCommand('replace'); break;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// WHITESPACE RENDERING (dots for spaces, arrows for tabs)
+// ═══════════════════════════════════════════════════════════════
+const _wsOverlay = {
+  token(stream) {
+    const ch = stream.peek();
+    if (ch === ' ')  { stream.next(); return 'ws-space'; }
+    if (ch === '\t') { stream.next(); return 'ws-tab'; }
+    while (stream.peek() && stream.peek() !== ' ' && stream.peek() !== '\t') stream.next();
+    return null;
+  }
+};
+let _wsActive = false;
+function applyWhitespace() {
+  if (!editor) return;
+  if (PREFS.showWhitespace && !_wsActive) { editor.addOverlay(_wsOverlay); _wsActive = true; }
+  else if (!PREFS.showWhitespace && _wsActive) { editor.removeOverlay(_wsOverlay); _wsActive = false; }
+}
+function toggleWhitespace() {
+  PREFS.showWhitespace = !PREFS.showWhitespace;
+  savePrefs(); applyWhitespace();
+  showToast(`Whitespace: ${PREFS.showWhitespace ? 'visible' : 'hidden'}`);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1865,6 +2360,21 @@ const COMMANDS = [
   { cat: 'View',   title: 'Indent with spaces',                                 run: () => setIndentStyle(false) },
   { cat: 'View',   title: 'Indent with tabs',                                   run: () => setIndentStyle(true) },
   { cat: 'View',   title: 'Toggle indent guides',                               run: () => toggleIndentGuides() },
+  { cat: 'View',   title: 'Toggle visible whitespace',                           run: () => toggleWhitespace() },
+  { cat: 'View',   title: 'Toggle line wrap',                                    run: () => toggleLineWrap() },
+  { cat: 'View',   title: 'Font size: 11',                                       run: () => setFontSize(11) },
+  { cat: 'View',   title: 'Font size: 13',                                       run: () => setFontSize(13) },
+  { cat: 'View',   title: 'Font size: 15',                                       run: () => setFontSize(15) },
+  { cat: 'View',   title: 'Font size: 17',                                       run: () => setFontSize(17) },
+  { cat: 'View',   title: 'Open Settings…',          shortcut: '',               run: () => openSettings() },
+  { cat: 'Theme',  title: 'GitHub Light (default)',                              run: () => setTheme('github-light') },
+  { cat: 'Theme',  title: 'HA Light',                                            run: () => setTheme('ha-light') },
+  { cat: 'Theme',  title: 'Solarized Light',                                     run: () => setTheme('solarized-light') },
+  { cat: 'Theme',  title: 'HA Cream',                                            run: () => setTheme('ha-cream') },
+  { cat: 'Theme',  title: 'Nord Light',                                          run: () => setTheme('nord-light') },
+  { cat: 'Theme',  title: 'HA Soft (dark)',                                      run: () => setTheme('ha-soft') },
+  { cat: 'Theme',  title: 'HA Muted (dark)',                                     run: () => setTheme('ha-muted') },
+  { cat: 'Theme',  title: 'HA Dark (original)',                                  run: () => setTheme('ha-dark') },
   { cat: 'Git',    title: 'Pull',                                              run: () => gitPull() },
   { cat: 'Git',    title: 'Push',                                              run: () => gitPush() },
   { cat: 'Git',    title: 'Commit (focus message)',                            run: () => { switchPanel('git'); document.getElementById('git-commit-msg').focus(); } },

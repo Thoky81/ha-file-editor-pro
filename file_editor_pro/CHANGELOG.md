@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.3.0 — Themes, Settings, FAB, visible save
+
+- **Settings modal** (gear in the status bar). Groups: Appearance (theme, font size, indent guides, whitespace), Editor (tab size, indent style, line wrapping). All preferences persist in `localStorage`.
+- **Eight themes** shipped. Default is now **GitHub Light**. Picker groups Light / Dark:
+  - Light: GitHub Light, HA Light, Solarized Light, HA Cream, Nord Light
+  - Dark: HA Soft, HA Muted, HA Dark (original)
+  - Available via the Settings modal or the command palette under `Theme:`.
+- **Editor font size** (10–22 px) with a slider + numeric input in Settings; `View: Font size:` shortcuts in the palette.
+- **Visible Save button** in the tab-bar action area, with a highlighted amber state when the active file has unsaved changes (`Save*`).
+- **Pencil FAB** at bottom-right of the editor with a menu: undo / redo / toggle comment / indent / outdent / fold (at cursor / all / unfold all) / find / replace.
+- **Visible whitespace** option (dots for spaces, arrows for tabs) — matches the original HA File Editor's look.
+- **Indent guides default OFF** per user feedback; when on, they're now subtler and tint-aware via the theme's muted color.
+- All CSS colors reference a single set of per-theme variables (`--bg-*`, `--text-*`, `--accent*`, `--syn-*`). CodeMirror tokens use `--syn-*` so syntax highlighting re-theme instantly.
+- Early theme apply: reads the saved theme from `localStorage` before the editor mounts to avoid a flash of the default theme.
+
 ## 1.2.2 — Store-ready branding & docs
 
 - **Icon and logo** — amber YAML-list mark (`icon.png`, `logo.png`) applied across the add-on store tile, sidebar panel, and info tab.
