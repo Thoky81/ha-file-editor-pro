@@ -2140,12 +2140,19 @@ function fabAction(cmd) {
 // ═══════════════════════════════════════════════════════════════
 // WHITESPACE RENDERING (dots for spaces, arrows for tabs)
 // ═══════════════════════════════════════════════════════════════
+// Only mark *leading* whitespace (indentation). Inline spaces
+// between tokens aren't marked — they'd add clutter in YAML where
+// `- value` always has a space after the list dash.
 const _wsOverlay = {
   token(stream) {
-    const ch = stream.peek();
-    if (ch === ' ')  { stream.next(); return 'ws-space'; }
-    if (ch === '\t') { stream.next(); return 'ws-tab'; }
-    while (stream.peek() && stream.peek() !== ' ' && stream.peek() !== '\t') stream.next();
+    const m = stream.string.match(/^[ \t]*/);
+    const leadingLen = m ? m[0].length : 0;
+    if (stream.pos < leadingLen) {
+      const ch = stream.peek();
+      stream.next();
+      return ch === ' ' ? 'ws-space' : 'ws-tab';
+    }
+    stream.skipToEnd();
     return null;
   }
 };

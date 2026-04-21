@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.4 — Whitespace dots only on indentation + lighter icon/logo
+
+- Whitespace dots now render for **leading whitespace only** (indentation). Inline spaces between tokens — for example the mandatory space after a YAML list dash in `- value` — are no longer dotted, so the indent count stays easy to read without visual noise in the content area.
+- **icon.png** repainted on a light background with a subtle 1 px border so it sits cleanly on the add-on store Info tab.
+- **logo.png** widened (250 → 320 px) with a smaller wordmark so "Pro" is no longer cropped when HA scales the banner.
+
 ## 1.3.3 — One dot per space
 
 - Whitespace indicator now paints **one dot per space**. The editor overlay merges consecutive space tokens into one `span`, so a pseudo-element `::before` was rendering the dot only once per run. Switched to a tiled background (radial-gradient, `background-size: 1ch 1em`) that repeats one dot for every 1ch of span width, independent of how many characters the span wraps. Tabs use a similar 4px background tile for the arrow.
