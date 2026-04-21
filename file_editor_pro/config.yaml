@@ -1,7 +1,7 @@
 name: File Editor Pro
-version: "1.0.0"
+version: "1.1.0"
 slug: file_editor_pro
-description: Modern multi-tab editor for Home Assistant config (YAML, Python, JSON) with git-aware sidebar, fold gutters, cross-file search and YAML validation.
+description: Modern multi-tab editor for Home Assistant config (YAML, Python, JSON) with real git, upload/download, HA restart/reload, config check, YAML validation and cross-file search.
 url: https://github.com/Thoky81/ha-file-editor-pro
 arch:
   - amd64
@@ -14,7 +14,17 @@ boot: auto
 init: false
 map:
   - config:rw
+  - ssl:ro
+homeassistant_api: true
 ingress: true
 ingress_port: 8099
 panel_icon: mdi:file-code
 panel_title: File Editor Pro
+options:
+  git_user_name: ""
+  git_user_email: ""
+  show_hidden: false
+schema:
+  git_user_name: str?
+  git_user_email: str?
+  show_hidden: bool

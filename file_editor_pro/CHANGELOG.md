@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.1.0 — Sprint 1: parity with File Editor
+
+- **Real git integration**: status, diff, commit, pull, push via backend subprocess. Sidebar git panel now reflects the real `/config` repo; file tree shows live M/A/U/D badges.
+- **Upload / download**: drag-and-drop upload button in the explorer header; right-click → Download on any file.
+- **Tree context menu**: right-click any item for Rename, Duplicate, New File, New Folder, Upload, Download, Delete.
+- **HA actions in the status bar**: Check Config, Restart HA, and a Reload menu (core config / automations / scripts / scenes / templates / groups).
+- **Config check** surfaces invalid configuration via toast + console.
+- **Add-on options**: `git_user_name`, `git_user_email`, `show_hidden`.
+- **Permissions**: `homeassistant_api: true`, `ssl:ro` mount for SSH keys.
+- Backend: `git`, `openssh-client` baked into the image; `httpx` + `python-multipart` added.
+
 ## 1.0.0
 
 - Initial release.
