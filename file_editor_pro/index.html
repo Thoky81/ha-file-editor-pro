@@ -224,6 +224,30 @@
     .jinja-btn{background:var(--accent);color:#0a0e18;border:none;border-radius:5px;padding:6px 14px;font-family:var(--font-ui);font-size:12px;font-weight:600;cursor:pointer}
     .jinja-btn:hover{opacity:.9}
 
+    /* ── INDENT GUIDES ── */
+    /* Faint vertical lines every --indent-ch (tab size). Painted as a
+       repeating background on each line; monospace + ch-units keep them
+       aligned with actual indentation. Toggle via the .indent-guides
+       class on .CodeMirror. */
+    .CodeMirror.indent-guides .CodeMirror-line{
+      background-image: linear-gradient(
+        to right,
+        rgba(130,170,255,.10) 1px,
+        transparent 1px
+      );
+      background-size: var(--indent-ch, 2ch) 100%;
+      background-repeat: repeat-x;
+      background-position-x: calc(-1 * var(--indent-ch, 2ch));
+    }
+    .CodeMirror.indent-guides .CodeMirror-activeline-background ~ .CodeMirror-line,
+    .CodeMirror.indent-guides .CodeMirror-line:has(.CodeMirror-activeline){
+      background-image: linear-gradient(
+        to right,
+        rgba(130,170,255,.22) 1px,
+        transparent 1px
+      );
+    }
+
     /* ── HINT POPUP (CodeMirror show-hint) ── */
     .CodeMirror-hints{background:var(--bg-light) !important;border:1px solid var(--border-light) !important;border-radius:6px !important;box-shadow:0 8px 24px rgba(0,0,0,.6) !important;font-family:var(--font-mono) !important;font-size:12px !important;padding:4px !important;z-index:1000 !important}
     .CodeMirror-hint{color:var(--text-secondary) !important;padding:4px 8px !important;border-radius:3px !important}
@@ -1585,6 +1609,49 @@ async function haReload(domain) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// EDITOR PREFERENCES (persisted in localStorage)
+// ═══════════════════════════════════════════════════════════════
+const PREFS_KEY = 'fep-prefs';
+const PREFS = { tabSize: 2, indentWithTabs: false, indentGuides: true };
+
+function loadPrefs() {
+  try { Object.assign(PREFS, JSON.parse(localStorage.getItem(PREFS_KEY) || '{}')); }
+  catch {}
+}
+function savePrefs() {
+  try { localStorage.setItem(PREFS_KEY, JSON.stringify(PREFS)); } catch {}
+}
+function applyPrefs() {
+  if (!editor) return;
+  editor.setOption('tabSize', PREFS.tabSize);
+  editor.setOption('indentUnit', PREFS.tabSize);
+  editor.setOption('indentWithTabs', PREFS.indentWithTabs);
+  document.documentElement.style.setProperty('--indent-ch', PREFS.tabSize + 'ch');
+  const wrap = editor.getWrapperElement();
+  wrap.classList.toggle('indent-guides', PREFS.indentGuides);
+  editor.refresh();
+}
+
+function setTabSize(n) {
+  PREFS.tabSize = n;
+  savePrefs();
+  applyPrefs();
+  showToast(`Tab size: ${n}`);
+}
+function setIndentStyle(useTabs) {
+  PREFS.indentWithTabs = !!useTabs;
+  savePrefs();
+  applyPrefs();
+  showToast(useTabs ? 'Indent: tabs' : 'Indent: spaces');
+}
+function toggleIndentGuides() {
+  PREFS.indentGuides = !PREFS.indentGuides;
+  savePrefs();
+  applyPrefs();
+  showToast(`Indent guides: ${PREFS.indentGuides ? 'on' : 'off'}`);
+}
+
+// ═══════════════════════════════════════════════════════════════
 // HA ENTITY / SERVICE CACHE (for autocomplete)
 // ═══════════════════════════════════════════════════════════════
 const HA_CACHE = { entities: [], services: [], loaded: false, loading: null };
@@ -1792,6 +1859,12 @@ const COMMANDS = [
   { cat: 'View',   title: 'Show Explorer',           shortcut: 'Ctrl+Shift+E', run: () => switchPanel('files') },
   { cat: 'View',   title: 'Show Search',             shortcut: 'Ctrl+Shift+F', run: () => switchPanel('search') },
   { cat: 'View',   title: 'Show Source Control',                               run: () => switchPanel('git') },
+  { cat: 'View',   title: 'Tab size: 2',                                        run: () => setTabSize(2) },
+  { cat: 'View',   title: 'Tab size: 4',                                        run: () => setTabSize(4) },
+  { cat: 'View',   title: 'Tab size: 8',                                        run: () => setTabSize(8) },
+  { cat: 'View',   title: 'Indent with spaces',                                 run: () => setIndentStyle(false) },
+  { cat: 'View',   title: 'Indent with tabs',                                   run: () => setIndentStyle(true) },
+  { cat: 'View',   title: 'Toggle indent guides',                               run: () => toggleIndentGuides() },
   { cat: 'Git',    title: 'Pull',                                              run: () => gitPull() },
   { cat: 'Git',    title: 'Push',                                              run: () => gitPush() },
   { cat: 'Git',    title: 'Commit (focus message)',                            run: () => { switchPanel('git'); document.getElementById('git-commit-msg').focus(); } },
@@ -1986,6 +2059,9 @@ document.getElementById('jinja-modal').addEventListener('click', e => {
 document.addEventListener('DOMContentLoaded', async () => {
   initEditor();
   editor.getWrapperElement().style.display = 'none';
+
+  loadPrefs();
+  applyPrefs();
 
   // Wire show-hint with our HA-aware source
   editor.setOption('hintOptions', { hint: haHintSource, completeSingle: false });

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.1 — Indent guides & editor prefs
+
+- **Indent guides** in the editor (faint vertical lines at each indent level), toggleable from the command palette.
+- **Configurable tab size** (2 / 4 / 8) and **indent style** (spaces / tabs), accessible via the command palette under `View:`.
+- Preferences persist in `localStorage` and apply across all open tabs.
+
 ## 1.2.0 — Sprint 2: the differentiator
 
 - **HA-aware autocomplete**: entity IDs and service names complete as you type. Auto-triggers after `service:` / `entity_id:` and when typing a domain-prefixed identifier; Ctrl+Space anywhere to force. Cache pulled from `/api/states` and `/api/services` on load, refreshable via command palette.
