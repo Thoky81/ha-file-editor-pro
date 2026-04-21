@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.2 — Store-ready branding & docs
+
+- **Icon and logo** — amber YAML-list mark (`icon.png`, `logo.png`) applied across the add-on store tile, sidebar panel, and info tab.
+- **`DOCS.md`** — full Documentation tab content in the store: install steps, every feature, keyboard shortcuts, configuration reference, permissions explainer, troubleshooting.
+
 ## 1.2.1 — Indent guides & editor prefs
 
 - **Indent guides** in the editor (faint vertical lines at each indent level), toggleable from the command palette.
