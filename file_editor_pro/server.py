@@ -377,6 +377,79 @@ async def ha_restart():
     return await ha_call("POST", "/services/homeassistant/restart")
 
 
+@app.get("/api/ha/states")
+async def ha_states():
+    """Slim list of entities for autocomplete: [{entity_id, name, domain}]."""
+    if not SUPERVISOR_TOKEN:
+        raise HTTPException(503, "Supervisor token not available")
+    async with httpx.AsyncClient(timeout=30) as client:
+        r = await client.get(
+            f"{HA_API_BASE}/states",
+            headers={"Authorization": f"Bearer {SUPERVISOR_TOKEN}"},
+        )
+    if r.status_code >= 400:
+        raise HTTPException(r.status_code, r.text)
+    out = []
+    for s in r.json():
+        eid = s.get("entity_id", "")
+        out.append({
+            "entity_id": eid,
+            "domain": eid.split(".", 1)[0] if "." in eid else "",
+            "name": (s.get("attributes") or {}).get("friendly_name") or eid,
+        })
+    return out
+
+
+@app.get("/api/ha/services")
+async def ha_services():
+    """Flatten services to [{domain, service, name, description}] for autocomplete."""
+    if not SUPERVISOR_TOKEN:
+        raise HTTPException(503, "Supervisor token not available")
+    async with httpx.AsyncClient(timeout=30) as client:
+        r = await client.get(
+            f"{HA_API_BASE}/services",
+            headers={"Authorization": f"Bearer {SUPERVISOR_TOKEN}"},
+        )
+    if r.status_code >= 400:
+        raise HTTPException(r.status_code, r.text)
+    out = []
+    for domain_obj in r.json():
+        domain = domain_obj.get("domain", "")
+        services = domain_obj.get("services") or {}
+        for svc, meta in services.items():
+            out.append({
+                "domain": domain,
+                "service": svc,
+                "full": f"{domain}.{svc}",
+                "name": (meta or {}).get("name") or svc,
+                "description": (meta or {}).get("description") or "",
+            })
+    return out
+
+
+class TemplateBody(BaseModel):
+    template: str
+
+
+@app.post("/api/ha/template")
+async def ha_template(body: TemplateBody):
+    """Render a Jinja template through HA. Returns {result} or {error}."""
+    if not SUPERVISOR_TOKEN:
+        raise HTTPException(503, "Supervisor token not available")
+    async with httpx.AsyncClient(timeout=30) as client:
+        r = await client.post(
+            f"{HA_API_BASE}/template",
+            headers={
+                "Authorization": f"Bearer {SUPERVISOR_TOKEN}",
+                "Content-Type": "application/json",
+            },
+            json={"template": body.template},
+        )
+    if r.status_code >= 400:
+        return {"ok": False, "error": r.text, "status": r.status_code}
+    return {"ok": True, "result": r.text}
+
+
 class ReloadBody(BaseModel):
     domain: str  # automation, script, scene, template, input_* etc.
 

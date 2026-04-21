@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/dialog/dialog.min.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldgutter.min.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/lint/lint.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.css">
 
   <style>
     :root {
@@ -191,6 +192,44 @@
     .context-divider{height:1px;background:var(--border);margin:4px 0}
     .context-shortcut{margin-left:auto;font-family:var(--font-mono);font-size:10px;color:var(--text-muted)}
 
+    /* ── COMMAND PALETTE ── */
+    .cmdpal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2000;display:none;padding-top:12vh;justify-content:center;backdrop-filter:blur(2px)}
+    .cmdpal-overlay.show{display:flex}
+    .cmdpal{width:min(640px,94vw);background:var(--bg-light);border:1px solid var(--border-light);border-radius:10px;box-shadow:0 16px 48px rgba(0,0,0,.7);overflow:hidden;display:flex;flex-direction:column;max-height:60vh}
+    .cmdpal-input{width:100%;background:var(--bg-mid);border:none;border-bottom:1px solid var(--border);padding:12px 14px;color:var(--text-primary);font-family:var(--font-ui);font-size:14px;outline:none}
+    .cmdpal-list{overflow-y:auto;padding:6px;flex:1;min-height:0}
+    .cmdpal-item{padding:7px 10px;border-radius:5px;cursor:pointer;display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--text-secondary)}
+    .cmdpal-item:hover,.cmdpal-item.selected{background:var(--bg-hover);color:var(--text-primary)}
+    .cmdpal-item .cmdpal-cat{font-family:var(--font-mono);font-size:10px;color:var(--text-muted);text-transform:uppercase;min-width:60px}
+    .cmdpal-item .cmdpal-title{flex:1}
+    .cmdpal-item .cmdpal-shortcut{font-family:var(--font-mono);font-size:10px;color:var(--text-muted)}
+    .cmdpal-empty{padding:20px;text-align:center;color:var(--text-muted);font-size:12px}
+
+    /* ── JINJA PREVIEW MODAL ── */
+    .jinja-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1900;display:none;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
+    .jinja-overlay.show{display:flex}
+    .jinja-modal{width:min(960px,94vw);height:min(640px,82vh);background:var(--bg-light);border:1px solid var(--border-light);border-radius:10px;box-shadow:0 16px 48px rgba(0,0,0,.7);display:flex;flex-direction:column;overflow:hidden}
+    .jinja-header{display:flex;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);gap:10px}
+    .jinja-title{font-size:13px;color:var(--text-primary);font-weight:600}
+    .jinja-hint{font-size:11px;color:var(--text-muted);font-family:var(--font-mono)}
+    .jinja-close{margin-left:auto;background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer;line-height:1;padding:2px 6px;border-radius:4px}
+    .jinja-close:hover{background:var(--bg-hover);color:var(--text-primary)}
+    .jinja-body{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);min-height:0}
+    .jinja-pane{display:flex;flex-direction:column;background:var(--bg-darkest);min-height:0}
+    .jinja-label{padding:6px 12px;font-size:10px;color:var(--text-muted);text-transform:uppercase;font-family:var(--font-mono);background:var(--bg-dark);border-bottom:1px solid var(--border)}
+    .jinja-textarea{flex:1;background:var(--bg-darkest);color:var(--text-primary);border:none;outline:none;padding:10px 14px;font-family:var(--font-mono);font-size:12.5px;line-height:1.6;resize:none}
+    .jinja-output{flex:1;overflow:auto;padding:10px 14px;font-family:var(--font-mono);font-size:12.5px;line-height:1.6;white-space:pre-wrap;color:var(--text-primary)}
+    .jinja-output.error{color:var(--accent-red)}
+    .jinja-footer{padding:8px 14px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px}
+    .jinja-btn{background:var(--accent);color:#0a0e18;border:none;border-radius:5px;padding:6px 14px;font-family:var(--font-ui);font-size:12px;font-weight:600;cursor:pointer}
+    .jinja-btn:hover{opacity:.9}
+
+    /* ── HINT POPUP (CodeMirror show-hint) ── */
+    .CodeMirror-hints{background:var(--bg-light) !important;border:1px solid var(--border-light) !important;border-radius:6px !important;box-shadow:0 8px 24px rgba(0,0,0,.6) !important;font-family:var(--font-mono) !important;font-size:12px !important;padding:4px !important;z-index:1000 !important}
+    .CodeMirror-hint{color:var(--text-secondary) !important;padding:4px 8px !important;border-radius:3px !important}
+    li.CodeMirror-hint-active{background:var(--bg-hover) !important;color:var(--text-primary) !important}
+    .hint-entity-domain{color:var(--text-muted);font-size:10px;margin-left:8px}
+
     /* ── PANEL VISIBILITY ── */
     .panel-content{display:none;flex-direction:column;height:100%}
     .panel-content.active{display:flex}
@@ -369,6 +408,39 @@
   <div class="context-item" onclick="treeCtxDelete()" style="color:var(--accent-red)">Delete</div>
 </div>
 
+<!-- Command Palette -->
+<div class="cmdpal-overlay" id="cmdpal">
+  <div class="cmdpal">
+    <input type="text" class="cmdpal-input" id="cmdpal-input" placeholder="Type a command or search snippets…" autocomplete="off" spellcheck="false">
+    <div class="cmdpal-list" id="cmdpal-list"></div>
+  </div>
+</div>
+
+<!-- Jinja Template Preview -->
+<div class="jinja-overlay" id="jinja-modal">
+  <div class="jinja-modal">
+    <div class="jinja-header">
+      <div class="jinja-title">Jinja Template Preview</div>
+      <div class="jinja-hint">Ctrl+Enter to render · Esc to close</div>
+      <button class="jinja-close" onclick="closeTemplatePreview()">×</button>
+    </div>
+    <div class="jinja-body">
+      <div class="jinja-pane">
+        <div class="jinja-label">Template</div>
+        <textarea id="jinja-input" class="jinja-textarea" placeholder="{{ states('sun.sun') }}"></textarea>
+      </div>
+      <div class="jinja-pane">
+        <div class="jinja-label">Rendered</div>
+        <div id="jinja-output" class="jinja-output"></div>
+      </div>
+    </div>
+    <div class="jinja-footer">
+      <button class="jinja-btn" onclick="renderJinja()">Render</button>
+      <span class="jinja-hint" id="jinja-status"></span>
+    </div>
+  </div>
+</div>
+
 <!-- HA reload popup -->
 <div class="context-menu" id="reload-menu">
   <div class="context-item" onclick="haReload('homeassistant')">Core config</div>
@@ -430,6 +502,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/search/jump-to-line.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/dialog/dialog.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/comment/comment.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/anyword-hint.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
 
 <script>
@@ -1511,11 +1585,426 @@ async function haReload(domain) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// HA ENTITY / SERVICE CACHE (for autocomplete)
+// ═══════════════════════════════════════════════════════════════
+const HA_CACHE = { entities: [], services: [], loaded: false, loading: null };
+
+async function loadHAData(force = false) {
+  if (!API.available) return;
+  if (HA_CACHE.loaded && !force) return;
+  if (HA_CACHE.loading) return HA_CACHE.loading;
+  HA_CACHE.loading = (async () => {
+    try {
+      const [sR, svR] = await Promise.all([
+        fetch(API.url('/api/ha/states')),
+        fetch(API.url('/api/ha/services')),
+      ]);
+      if (sR.ok) HA_CACHE.entities = await sR.json();
+      if (svR.ok) HA_CACHE.services = await svR.json();
+      HA_CACHE.loaded = true;
+    } catch (e) {
+      console.warn('HA data fetch failed', e);
+    } finally {
+      HA_CACHE.loading = null;
+    }
+  })();
+  return HA_CACHE.loading;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CODEMIRROR HINTS — entities + services + HA keywords
+// ═══════════════════════════════════════════════════════════════
+const HA_YAML_KEYS = [
+  'alias','description','mode','max','trigger','triggers','condition','conditions',
+  'action','actions','service','service_data','target','entity_id','device_id','area_id',
+  'platform','event','event_type','state','from','to','for','at','offset','variables',
+  'data','data_template','delay','repeat','choose','default','parallel','wait_template',
+  'wait_for_trigger','sequence','initial_state','icon','unique_id','attributes',
+];
+
+function haHintSource(cm) {
+  const cur = cm.getCursor();
+  const token = cm.getTokenAt(cur);
+  const line = cm.getLine(cur.line);
+  const prefix = line.slice(0, cur.ch);
+  const start = token.start;
+  const end = cur.ch;
+  const word = line.slice(start, end);
+  const list = [];
+
+  // Entity completion — when a partial entity id (with a dot) is being typed,
+  // or after entity_id:/target:/device_tracker:/etc.
+  const entityHint = /([a-z_]+\.[a-z0-9_]*)$/.exec(prefix);
+  if (entityHint) {
+    const q = entityHint[1].toLowerCase();
+    for (const e of HA_CACHE.entities) {
+      if (e.entity_id.startsWith(q) || e.name.toLowerCase().includes(q)) {
+        list.push({
+          text: e.entity_id,
+          displayText: e.entity_id,
+          render(el) {
+            el.innerHTML = `<span>${e.entity_id}</span><span class="hint-entity-domain">${e.name}</span>`;
+          },
+        });
+      }
+      if (list.length >= 40) break;
+    }
+    if (list.length) {
+      return { list, from: CodeMirror.Pos(cur.line, cur.ch - entityHint[1].length), to: cur };
+    }
+  }
+
+  // Service completion — `service: light.turn_on` or bare `light.turn_on`
+  const svcHint = /service:\s*([a-z_]*\.?[a-z_]*)$/.exec(prefix);
+  if (svcHint) {
+    const q = svcHint[1].toLowerCase();
+    for (const s of HA_CACHE.services) {
+      if (s.full.startsWith(q)) {
+        list.push({
+          text: s.full,
+          displayText: s.full,
+          render(el) {
+            el.innerHTML = `<span>${s.full}</span><span class="hint-entity-domain">${s.name || ''}</span>`;
+          },
+        });
+      }
+      if (list.length >= 40) break;
+    }
+    if (list.length) {
+      return { list, from: CodeMirror.Pos(cur.line, cur.ch - svcHint[1].length), to: cur };
+    }
+  }
+
+  // Fallback: HA YAML keys + anyword.
+  if (word && /^[a-zA-Z_]/.test(word)) {
+    for (const k of HA_YAML_KEYS) {
+      if (k.startsWith(word)) list.push(k);
+    }
+    if (list.length) {
+      return { list, from: CodeMirror.Pos(cur.line, start), to: cur };
+    }
+  }
+
+  return null;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SNIPPETS
+// ═══════════════════════════════════════════════════════════════
+const SNIPPETS = {
+  automation: `- id: '${Date.now()}'
+  alias: New Automation
+  description: ''
+  mode: single
+  trigger:
+    - platform: state
+      entity_id: sensor.example
+  condition: []
+  action:
+    - service: notify.persistent_notification
+      data:
+        message: "Automation fired"
+`,
+  script: `new_script:
+  alias: New Script
+  mode: single
+  sequence:
+    - service: notify.persistent_notification
+      data:
+        message: "Script ran"
+`,
+  template_sensor: `- sensor:
+    - name: "Example Template Sensor"
+      unique_id: example_template_sensor
+      state: "{{ states('sensor.source') | float(0) * 1.8 + 32 }}"
+      unit_of_measurement: "°F"
+      availability: "{{ has_value('sensor.source') }}"
+`,
+  template_binary: `- binary_sensor:
+    - name: "Sun Is Up"
+      unique_id: sun_is_up
+      state: "{{ is_state('sun.sun', 'above_horizon') }}"
+      device_class: light
+`,
+  rest_sensor: `- platform: rest
+  name: Example REST Sensor
+  resource: https://api.example.com/data
+  method: GET
+  value_template: "{{ value_json.field }}"
+  scan_interval: 300
+  headers:
+    Accept: application/json
+`,
+  input_boolean: `example_toggle:
+  name: Example Toggle
+  icon: mdi:toggle-switch
+`,
+  trigger_time: `- platform: time
+  at: '09:00:00'
+`,
+  trigger_state: `- platform: state
+  entity_id: sensor.example
+  to: 'on'
+  for: '00:05:00'
+`,
+  trigger_numeric: `- platform: numeric_state
+  entity_id: sensor.temperature
+  above: 25
+`,
+  condition_time: `- condition: time
+  after: '08:00:00'
+  before: '22:00:00'
+  weekday: [mon, tue, wed, thu, fri]
+`,
+  action_notify: `- service: notify.persistent_notification
+  data:
+    title: "Title"
+    message: "Body"
+`,
+  action_service: `- service: light.turn_on
+  target:
+    entity_id: light.example
+  data:
+    brightness_pct: 75
+`,
+};
+
+function insertSnippet(key) {
+  const snip = SNIPPETS[key];
+  if (!snip || !editor) return;
+  const cur = editor.getCursor();
+  const line = editor.getLine(cur.line);
+  // If mid-line or non-empty, add a newline before
+  const prefix = line.length && cur.ch > 0 ? '\n' : '';
+  editor.replaceRange(prefix + snip, cur);
+  editor.focus();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// COMMAND PALETTE
+// ═══════════════════════════════════════════════════════════════
+const COMMANDS = [
+  { cat: 'File',   title: 'Save current file',       shortcut: 'Ctrl+S',       run: () => saveCurrentFile() },
+  { cat: 'File',   title: 'New file',                                          run: () => promptNewFile() },
+  { cat: 'File',   title: 'New folder',                                        run: () => promptNewFolder() },
+  { cat: 'File',   title: 'Upload file',                                       run: () => uploadFilePrompt() },
+  { cat: 'File',   title: 'Refresh tree',                                      run: () => refreshTree() },
+  { cat: 'View',   title: 'Show Explorer',           shortcut: 'Ctrl+Shift+E', run: () => switchPanel('files') },
+  { cat: 'View',   title: 'Show Search',             shortcut: 'Ctrl+Shift+F', run: () => switchPanel('search') },
+  { cat: 'View',   title: 'Show Source Control',                               run: () => switchPanel('git') },
+  { cat: 'Git',    title: 'Pull',                                              run: () => gitPull() },
+  { cat: 'Git',    title: 'Push',                                              run: () => gitPush() },
+  { cat: 'Git',    title: 'Commit (focus message)',                            run: () => { switchPanel('git'); document.getElementById('git-commit-msg').focus(); } },
+  { cat: 'Git',    title: 'Refresh status',                                    run: () => refreshGit() },
+  { cat: 'HA',     title: 'Check Configuration',                               run: () => haCheckConfig() },
+  { cat: 'HA',     title: 'Restart Home Assistant',                            run: () => haRestart() },
+  { cat: 'HA',     title: 'Reload core config',                                run: () => haReload('homeassistant') },
+  { cat: 'HA',     title: 'Reload automations',                                run: () => haReload('automation') },
+  { cat: 'HA',     title: 'Reload scripts',                                    run: () => haReload('script') },
+  { cat: 'HA',     title: 'Reload scenes',                                     run: () => haReload('scene') },
+  { cat: 'HA',     title: 'Reload template entities',                          run: () => haReload('template') },
+  { cat: 'HA',     title: 'Preview Jinja template…',  shortcut: 'Ctrl+Alt+J', run: () => openTemplatePreview() },
+  { cat: 'HA',     title: 'Refresh entity/service cache',                      run: () => loadHAData(true).then(() => showToast('HA cache refreshed')) },
+  { cat: 'Snippet',title: 'Insert: Automation skeleton',                       run: () => insertSnippet('automation') },
+  { cat: 'Snippet',title: 'Insert: Script skeleton',                           run: () => insertSnippet('script') },
+  { cat: 'Snippet',title: 'Insert: Template Sensor',                           run: () => insertSnippet('template_sensor') },
+  { cat: 'Snippet',title: 'Insert: Template Binary Sensor',                    run: () => insertSnippet('template_binary') },
+  { cat: 'Snippet',title: 'Insert: REST Sensor',                               run: () => insertSnippet('rest_sensor') },
+  { cat: 'Snippet',title: 'Insert: input_boolean',                             run: () => insertSnippet('input_boolean') },
+  { cat: 'Snippet',title: 'Insert: Trigger — time',                            run: () => insertSnippet('trigger_time') },
+  { cat: 'Snippet',title: 'Insert: Trigger — state',                           run: () => insertSnippet('trigger_state') },
+  { cat: 'Snippet',title: 'Insert: Trigger — numeric_state',                   run: () => insertSnippet('trigger_numeric') },
+  { cat: 'Snippet',title: 'Insert: Condition — time',                          run: () => insertSnippet('condition_time') },
+  { cat: 'Snippet',title: 'Insert: Action — notify',                           run: () => insertSnippet('action_notify') },
+  { cat: 'Snippet',title: 'Insert: Action — service call',                     run: () => insertSnippet('action_service') },
+];
+
+let _cmdpalIdx = 0;
+let _cmdpalFiltered = [];
+
+function openCmdPal() {
+  const ov = document.getElementById('cmdpal');
+  const input = document.getElementById('cmdpal-input');
+  input.value = '';
+  renderCmdPal('');
+  ov.classList.add('show');
+  setTimeout(() => input.focus(), 10);
+}
+
+function closeCmdPal() {
+  document.getElementById('cmdpal').classList.remove('show');
+}
+
+function renderCmdPal(query) {
+  const q = (query || '').toLowerCase().trim();
+  const list = document.getElementById('cmdpal-list');
+
+  // Also offer "Open: <file>" for any file currently in the tree
+  const fileCmds = Object.keys(FILES).map(path => ({
+    cat: 'Open', title: path, run: () => openFile(path),
+  }));
+  const all = [...COMMANDS, ...fileCmds];
+
+  _cmdpalFiltered = q
+    ? all.filter(c => (c.cat + ' ' + c.title).toLowerCase().includes(q))
+    : all;
+  _cmdpalIdx = 0;
+
+  if (!_cmdpalFiltered.length) {
+    list.innerHTML = '<div class="cmdpal-empty">No matches</div>';
+    return;
+  }
+  list.innerHTML = _cmdpalFiltered.slice(0, 80).map((c, i) => `
+    <div class="cmdpal-item ${i === 0 ? 'selected' : ''}" data-idx="${i}">
+      <span class="cmdpal-cat">${c.cat}</span>
+      <span class="cmdpal-title">${escapeHtml(c.title)}</span>
+      <span class="cmdpal-shortcut">${c.shortcut || ''}</span>
+    </div>`).join('');
+  list.querySelectorAll('.cmdpal-item').forEach(el => {
+    el.addEventListener('mouseenter', () => {
+      _cmdpalIdx = Number(el.dataset.idx);
+      updateCmdPalSelection();
+    });
+    el.addEventListener('click', () => runCmdPal(Number(el.dataset.idx)));
+  });
+}
+
+function updateCmdPalSelection() {
+  const items = document.querySelectorAll('#cmdpal-list .cmdpal-item');
+  items.forEach((el, i) => el.classList.toggle('selected', i === _cmdpalIdx));
+  const sel = items[_cmdpalIdx];
+  if (sel) sel.scrollIntoView({ block: 'nearest' });
+}
+
+function runCmdPal(idx) {
+  const c = _cmdpalFiltered[idx];
+  closeCmdPal();
+  if (c) setTimeout(() => c.run(), 0);
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, ch => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  })[ch]);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// JINJA TEMPLATE PREVIEW
+// ═══════════════════════════════════════════════════════════════
+function openTemplatePreview(seed) {
+  const input = document.getElementById('jinja-input');
+  // Seed from selection, or from active editor content if it looks like a template
+  if (seed) input.value = seed;
+  else {
+    const sel = editor ? editor.getSelection() : '';
+    if (sel) input.value = sel;
+    else if (!input.value) input.value = "{{ states('sun.sun') }}";
+  }
+  document.getElementById('jinja-output').textContent = '';
+  document.getElementById('jinja-status').textContent = '';
+  document.getElementById('jinja-modal').classList.add('show');
+  setTimeout(() => input.focus(), 10);
+}
+
+function closeTemplatePreview() {
+  document.getElementById('jinja-modal').classList.remove('show');
+}
+
+async function renderJinja() {
+  if (!API.available) { showToast('Demo mode — no backend'); return; }
+  const tpl = document.getElementById('jinja-input').value;
+  const out = document.getElementById('jinja-output');
+  const status = document.getElementById('jinja-status');
+  out.classList.remove('error');
+  out.textContent = '';
+  status.textContent = 'Rendering…';
+  try {
+    const r = await fetch(API.url('/api/ha/template'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ template: tpl }),
+    });
+    const data = await r.json();
+    if (data.ok) {
+      out.textContent = data.result;
+      status.textContent = 'OK';
+    } else {
+      out.textContent = data.error || 'Render error';
+      out.classList.add('error');
+      status.textContent = `Error ${data.status || ''}`;
+    }
+  } catch (e) {
+    out.textContent = e.message;
+    out.classList.add('error');
+    status.textContent = 'Request failed';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// GLOBAL KEY HANDLERS for palette + Jinja
+// ═══════════════════════════════════════════════════════════════
+document.addEventListener('keydown', e => {
+  // Ctrl/Cmd+Shift+P → palette
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'P' || e.key === 'p')) {
+    e.preventDefault();
+    openCmdPal();
+    return;
+  }
+  // Ctrl/Cmd+Alt+J → Jinja preview
+  if ((e.ctrlKey || e.metaKey) && e.altKey && (e.key === 'j' || e.key === 'J')) {
+    e.preventDefault();
+    openTemplatePreview();
+    return;
+  }
+  // Palette navigation
+  const pal = document.getElementById('cmdpal');
+  if (pal.classList.contains('show')) {
+    if (e.key === 'Escape') { e.preventDefault(); closeCmdPal(); return; }
+    if (e.key === 'ArrowDown') { e.preventDefault(); _cmdpalIdx = Math.min(_cmdpalFiltered.length - 1, _cmdpalIdx + 1); updateCmdPalSelection(); return; }
+    if (e.key === 'ArrowUp') { e.preventDefault(); _cmdpalIdx = Math.max(0, _cmdpalIdx - 1); updateCmdPalSelection(); return; }
+    if (e.key === 'Enter') { e.preventDefault(); runCmdPal(_cmdpalIdx); return; }
+  }
+  // Jinja modal
+  const jm = document.getElementById('jinja-modal');
+  if (jm.classList.contains('show')) {
+    if (e.key === 'Escape' && e.target.id !== 'jinja-input') { e.preventDefault(); closeTemplatePreview(); return; }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); renderJinja(); return; }
+  }
+});
+
+document.getElementById('cmdpal-input').addEventListener('input', e => renderCmdPal(e.target.value));
+document.getElementById('cmdpal').addEventListener('click', e => {
+  if (e.target.id === 'cmdpal') closeCmdPal();
+});
+document.getElementById('jinja-modal').addEventListener('click', e => {
+  if (e.target.id === 'jinja-modal') closeTemplatePreview();
+});
+
+// ═══════════════════════════════════════════════════════════════
 // BOOT
 // ═══════════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', async () => {
   initEditor();
   editor.getWrapperElement().style.display = 'none';
+
+  // Wire show-hint with our HA-aware source
+  editor.setOption('hintOptions', { hint: haHintSource, completeSingle: false });
+  editor.setOption('extraKeys', {
+    ...(editor.getOption('extraKeys') || {}),
+    'Ctrl-Space': 'autocomplete',
+    'Cmd-Space': 'autocomplete',
+  });
+  // Auto-trigger hints on typing when a pattern likely wants it
+  editor.on('inputRead', (cm, change) => {
+    if (!HA_CACHE.loaded) return;
+    const cur = cm.getCursor();
+    const line = cm.getLine(cur.line).slice(0, cur.ch);
+    // Trigger when: just typed a dot in what looks like an entity/service id,
+    // or right after "service: " / "entity_id: "
+    if (/[a-z_]+\.[a-z0-9_]{0,3}$/.test(line) || /(service|entity_id):\s*$/.test(line)) {
+      cm.showHint({ hint: haHintSource, completeSingle: false });
+    }
+  });
 
   const health = await (async () => {
     try {
@@ -1541,6 +2030,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       console.warn('Backend tree fetch failed, using demo data', e);
       API.available = false;
     }
+    // Kick off the HA entity/service cache in the background
+    loadHAData().catch(() => {});
   }
 
   renderFileTree();
