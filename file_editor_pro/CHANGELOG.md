@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.9.4 — Revert the "File Editor (classic)" theme
+
+- Removed the "File Editor (classic)" theme added in 1.9.2. The user only wanted to know how the original add-on maps YAML tokens to colors; they didn't ask for a new theme entry. Theme selector is back to the eight originally shipped themes.
+
 ## 1.9.3 — Terminal fixed (bundled xterm), defensive settings refresh
 
 - **Terminal was crashing with `ReferenceError: Can't find variable: Terminal`** because the xterm.js CDN URLs I used (cdnjs) 404'd, so the global never loaded. Bundled `xterm.min.js`, `xterm.min.css`, and `xterm-addon-fit.min.js` into `file_editor_pro/vendor/` and served them as static files from the FastAPI backend. CDN dependency removed; terminal now works in ingress with strict CSP.
