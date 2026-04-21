@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.9.5 — GitHub Light: greener comments
+
+- GitHub Light's `--syn-comment` nudged from gray `#59636e` to olive `#6a7c3a`, matching the muted green used by the standard HA File Editor's Ace theme. Comments remain italic.
+
 ## 1.9.4 — Revert the "File Editor (classic)" theme
 
 - Removed the "File Editor (classic)" theme added in 1.9.2. The user only wanted to know how the original add-on maps YAML tokens to colors; they didn't ask for a new theme entry. Theme selector is back to the eight originally shipped themes.
