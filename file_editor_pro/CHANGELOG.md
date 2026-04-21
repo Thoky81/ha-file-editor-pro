@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.9.6 — Comment color matches Ace "chrome"
+
+- `--syn-comment` switched from olive `#6a7c3a` to `#236e25` — the exact green used by Ace's "chrome" theme, which is the default editor theme shipped by the standard HA File Editor add-on.
+
 ## 1.9.5 — GitHub Light: greener comments
 
 - GitHub Light's `--syn-comment` nudged from gray `#59636e` to olive `#6a7c3a`, matching the muted green used by the standard HA File Editor's Ace theme. Comments remain italic.
