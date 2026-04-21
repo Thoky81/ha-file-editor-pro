@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.9.0 — Integrated terminal, minimap, blueprint snippets
+
+- **Integrated terminal** (`Ctrl+` \` ) — xterm.js frontend over a WebSocket PTY. Spawns a shell in `/config`, respects the ingress URL base, and supports resize via the addon. Drag the top edge to resize. Clear / close buttons in the header. Backend dep: `ptyprocess`; `/api/terminal` WebSocket endpoint + `/api/terminal/available` health check.
+- **Minimap** (opt-in) — right-edge document overview. Each line renders as a short grey bar scaled to its text length; a highlighted rectangle shows the current viewport. Click anywhere on the minimap to jump that line into view. Toggle in Settings → Appearance or via `View: Toggle minimap`.
+- **Blueprint snippets** — four new insertions in the command palette: automation blueprint skeleton, script blueprint skeleton, entity selector input, time selector input. (`!input` tag was already recognized by the YAML linter.)
+
 ## 1.8.0 — Multi-cursor, sticky scroll, diff view, rainbow brackets
 
 - **Multi-cursor** (VS Code-style keybindings):

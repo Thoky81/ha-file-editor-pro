@@ -3,14 +3,22 @@ import json
 import mimetypes
 import os
 import shutil
+import struct
 import subprocess
 from pathlib import Path
 
 import httpx
 import uvicorn
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
+
+try:
+    import ptyprocess  # type: ignore
+    import fcntl, termios
+    _HAS_PTY = True
+except ImportError:
+    _HAS_PTY = False
 
 APP_DIR = Path(__file__).parent
 INDEX_HTML = APP_DIR / "index.html"
@@ -574,6 +582,72 @@ async def ha_reload(body: ReloadBody):
         raise HTTPException(400, f"Domain '{body.domain}' not supported")
     service = "reload_core_config" if body.domain == "homeassistant" else "reload"
     return await ha_call("POST", f"/services/{body.domain}/{service}")
+
+
+@app.get("/api/terminal/available")
+async def terminal_available():
+    """Tell the frontend whether the terminal feature is usable."""
+    return {"available": _HAS_PTY}
+
+
+@app.websocket("/api/terminal")
+async def terminal_ws(ws: WebSocket):
+    """Bidirectional PTY bridge. The client sends:
+      {"type":"input", "data":"..."}   — user keystrokes
+      {"type":"resize","cols":N,"rows":M} — terminal resize
+    The server pushes:
+      {"type":"output","data":"..."}   — PTY stdout/stderr
+    """
+    await ws.accept()
+    if not _HAS_PTY:
+        await ws.send_json({"type": "output", "data": "PTY support is not available in this image.\r\n"})
+        await ws.close()
+        return
+
+    shell = os.environ.get("SHELL", "/bin/sh")
+    proc = ptyprocess.PtyProcessUnicode.spawn(
+        [shell], cwd=str(CONFIG_ROOT), dimensions=(24, 80)
+    )
+
+    loop = asyncio.get_event_loop()
+
+    async def pty_to_ws():
+        while proc.isalive():
+            try:
+                chunk = await loop.run_in_executor(None, proc.read, 4096)
+            except (EOFError, OSError):
+                break
+            if not chunk:
+                break
+            try:
+                await ws.send_json({"type": "output", "data": chunk})
+            except Exception:
+                break
+
+    reader_task = asyncio.create_task(pty_to_ws())
+    try:
+        while True:
+            msg = await ws.receive_json()
+            if msg.get("type") == "input":
+                try:
+                    proc.write(msg.get("data", ""))
+                except OSError:
+                    break
+            elif msg.get("type") == "resize":
+                cols = int(msg.get("cols", 80))
+                rows = int(msg.get("rows", 24))
+                try:
+                    proc.setwinsize(rows, cols)
+                except Exception:
+                    pass
+    except WebSocketDisconnect:
+        pass
+    finally:
+        reader_task.cancel()
+        try:
+            proc.terminate(force=True)
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":

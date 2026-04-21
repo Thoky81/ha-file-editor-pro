@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/lint/lint.min.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/merge/merge.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/xterm/5.3.0/css/xterm.min.css">
 
   <style>
     :root {
@@ -409,6 +410,27 @@
     .insert-item-desc{font-family:var(--font-ui);font-size:10px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .insert-empty{padding:20px;text-align:center;color:var(--text-muted);font-size:11px}
 
+    /* ── MINIMAP ──
+       Compact full-document overview. Renders each line as a short
+       grey bar scaled to the line's text width so the user can see
+       "shape" of the file and click to scroll. Opt-in. */
+    .minimap{position:absolute;top:0;right:0;bottom:0;width:70px;background:var(--bg-dark);border-left:1px solid var(--border);z-index:3;display:none;overflow:hidden}
+    .minimap.show{display:block}
+    .minimap-inner{position:absolute;top:0;left:0;right:0;cursor:pointer}
+    .minimap-line{height:2px;margin:0 6px;background:var(--text-muted);opacity:.22;border-radius:1px}
+    .minimap-viewport{position:absolute;left:0;right:0;background:var(--accent);opacity:.15;border-left:2px solid var(--accent);pointer-events:none}
+
+    /* ── INTEGRATED TERMINAL ── */
+    .terminal-panel{position:absolute;left:0;right:0;bottom:var(--status-height,22px);background:var(--bg-darkest);border-top:1px solid var(--border);display:none;flex-direction:column;z-index:40;height:260px;min-height:120px;max-height:80vh}
+    .terminal-panel.show{display:flex}
+    .terminal-head{display:flex;align-items:center;padding:4px 10px;background:var(--bg-dark);border-bottom:1px solid var(--border);gap:8px;flex-shrink:0}
+    .terminal-title{font-family:var(--font-mono);font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}
+    .terminal-actions{margin-left:auto;display:flex;gap:4px}
+    .terminal-body{flex:1;min-height:0;overflow:hidden}
+    .terminal-body .xterm{padding:6px 10px;height:100%}
+    .terminal-resize{position:absolute;top:-3px;left:0;right:0;height:6px;cursor:ns-resize;z-index:41}
+    .terminal-resize:hover{background:var(--accent);opacity:.4}
+
     /* ── DIFF VIEW MODAL ── */
     .diff-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1850;display:none;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
     .diff-overlay.show{display:flex}
@@ -740,6 +762,10 @@
     <div class="breadcrumb" id="breadcrumb"></div>
     <div class="editor-wrapper" id="editor-wrapper">
       <div class="sticky-scroll" id="sticky-scroll"></div>
+      <div class="minimap" id="minimap">
+        <div class="minimap-inner" id="minimap-inner"></div>
+        <div class="minimap-viewport" id="minimap-viewport"></div>
+      </div>
       <div class="no-file-open" id="no-file-msg">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
         <p>Open a file from the explorer</p>
@@ -750,6 +776,23 @@
   </div>
 
 </div><!-- /app-layout -->
+
+<!-- Integrated terminal (bottom panel) -->
+<div class="terminal-panel" id="terminal-panel">
+  <div class="terminal-resize" id="terminal-resize"></div>
+  <div class="terminal-head">
+    <span class="terminal-title">Terminal</span>
+    <div class="terminal-actions">
+      <button class="icon-btn" title="Clear" onclick="clearTerminal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+      </button>
+      <button class="icon-btn" title="Close" onclick="toggleTerminal(false)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+  </div>
+  <div class="terminal-body" id="terminal-body"></div>
+</div>
 
 <!-- Status Bar -->
 <div class="status-bar">
@@ -773,6 +816,10 @@
   <div class="status-item status-clickable" id="status-settings" onclick="openSettings()" title="Settings">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 10v6M4.22 4.22l4.24 4.24m7.08 7.08l4.24 4.24M1 12h6m10 0h6M4.22 19.78l4.24-4.24m7.08-7.08l4.24-4.24"/></svg>
     Settings
+  </div>
+  <div class="status-item status-clickable" id="status-terminal" onclick="toggleTerminal()" title="Toggle terminal">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+    Terminal
   </div>
   <div class="status-item status-clickable" id="status-reload" onclick="haReloadMenu(event)" title="Reload…">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
@@ -983,6 +1030,14 @@
             <div class="settings-toggle" id="set-bp" onclick="toggleBracketColors(); refreshSettingsUI()"></div>
           </div>
         </div>
+        <div class="settings-row">
+          <div class="settings-label">Minimap
+            <span class="settings-help">Right-edge document overview. Click to jump.</span>
+          </div>
+          <div class="settings-control">
+            <div class="settings-toggle" id="set-minimap" onclick="toggleMinimap(); refreshSettingsUI()"></div>
+          </div>
+        </div>
       </div>
 
       <div class="settings-section">
@@ -1119,6 +1174,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/lint/lint.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/diff_match_patch/20121119/diff_match_patch.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/merge/merge.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xterm/5.3.0/xterm.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xterm-addon-fit/0.8.0/xterm-addon-fit.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
 
 <script>
@@ -1464,7 +1521,7 @@ function initEditor() {
     document.getElementById('status-pos').textContent = `Ln ${cur.line+1}, Col ${cur.ch+1}`;
   });
 
-  editor.on('scroll', () => updateStickyScroll());
+  editor.on('scroll', () => { updateStickyScroll(); updateMinimapViewport(); });
   let _outlineDebounce = null;
   editor.on('change', () => {
     if (!activeTabId) return;
@@ -1475,7 +1532,12 @@ function initEditor() {
       clearTimeout(_outlineDebounce);
       _outlineDebounce = setTimeout(renderOutline, 400);
     }
+    if (PREFS.minimap) {
+      clearTimeout(_minimapDebounce);
+      _minimapDebounce = setTimeout(() => { renderMinimap(); updateMinimapViewport(); }, 300);
+    }
   });
+  let _minimapDebounce = null;
 
   editor.getWrapperElement().addEventListener('contextmenu', e => {
     e.preventDefault();
@@ -2564,6 +2626,7 @@ const PREFS = {
   lineWrapping: false,
   showWhitespace: true,
   bracketColors: false,          // rainbow brackets for () [] {}
+  minimap: false,                // right-edge document overview
 };
 
 function loadPrefs() {
@@ -2611,6 +2674,7 @@ function applyPrefs() {
   applyWhitespace();
   applyIndentStyle();
   applyBracketColors();
+  applyMinimap();
   editor.refresh();
 }
 
@@ -2769,6 +2833,70 @@ function toggleBracketColors() {
   showToast(`Bracket colors: ${PREFS.bracketColors ? 'on' : 'off'}`);
 }
 
+// Minimap: a right-edge overview of the document. For every line
+// we render a small bar proportional to that line's visible length,
+// plus a highlight rectangle representing the current viewport.
+// Renders on demand when minimap toggles on or the document changes.
+function toggleMinimap() {
+  PREFS.minimap = !PREFS.minimap;
+  savePrefs(); applyMinimap();
+  showToast(`Minimap: ${PREFS.minimap ? 'on' : 'off'}`);
+}
+function applyMinimap() {
+  const el = document.getElementById('minimap');
+  if (!el) return;
+  el.classList.toggle('show', !!PREFS.minimap);
+  if (PREFS.minimap) {
+    renderMinimap();
+    updateMinimapViewport();
+  }
+}
+function renderMinimap() {
+  if (!editor || !PREFS.minimap) return;
+  const inner = document.getElementById('minimap-inner');
+  if (!inner) return;
+  const lc = editor.lineCount();
+  const frag = document.createDocumentFragment();
+  const lineHeight = 2;  // px per line bar
+  for (let i = 0; i < lc; i++) {
+    const text = editor.getLine(i) || '';
+    const bar = document.createElement('div');
+    bar.className = 'minimap-line';
+    // Width proportional to line length (relative to 80 cols)
+    const w = Math.max(4, Math.min(58, (text.length / 80) * 58));
+    bar.style.width = w + 'px';
+    frag.appendChild(bar);
+  }
+  inner.innerHTML = '';
+  inner.appendChild(frag);
+}
+function attachMinimapClick() {
+  const inner = document.getElementById('minimap-inner');
+  if (!inner || inner.dataset.bound) return;
+  inner.addEventListener('click', e => {
+    if (!editor) return;
+    const rect = inner.getBoundingClientRect();
+    const y = e.clientY - rect.top;
+    const lc = editor.lineCount();
+    const line = Math.max(0, Math.min(lc - 1, Math.floor(y / 2)));
+    editor.scrollIntoView({ line, ch: 0 }, 200);
+  });
+  inner.dataset.bound = '1';
+}
+
+function updateMinimapViewport() {
+  if (!editor || !PREFS.minimap) return;
+  const vp = document.getElementById('minimap-viewport');
+  if (!vp) return;
+  const info = editor.getScrollInfo();
+  const lc = editor.lineCount();
+  const totalH = lc * 2;
+  const top = (info.top / Math.max(1, info.height)) * totalH;
+  const h = (info.clientHeight / Math.max(1, info.height)) * totalH;
+  vp.style.top = top + 'px';
+  vp.style.height = Math.max(14, h) + 'px';
+}
+
 // ═══════════════════════════════════════════════════════════════
 // SETTINGS MODAL
 // ═══════════════════════════════════════════════════════════════
@@ -2904,6 +3032,7 @@ function refreshSettingsUI() {
   if (iol) iol.textContent = PREFS.indentOpacity + ' %';
   document.getElementById('set-ws').classList.toggle('on', !!PREFS.showWhitespace);
   document.getElementById('set-bp').classList.toggle('on', !!PREFS.bracketColors);
+  document.getElementById('set-minimap').classList.toggle('on', !!PREFS.minimap);
   document.getElementById('set-wrap').classList.toggle('on', !!PREFS.lineWrapping);
 }
 
@@ -3166,6 +3295,99 @@ function haHintSource(cm) {
 
   return null;
 }
+
+// ═══════════════════════════════════════════════════════════════
+// INTEGRATED TERMINAL — xterm.js frontend over a WebSocket PTY.
+// The backend spawns a shell in /config and pipes stdin/stdout.
+// ═══════════════════════════════════════════════════════════════
+let _term = null, _termFit = null, _termWs = null;
+
+function toggleTerminal(force) {
+  const panel = document.getElementById('terminal-panel');
+  const open = force === undefined ? !panel.classList.contains('show') : force;
+  if (!open) {
+    panel.classList.remove('show');
+    if (_termWs) { try { _termWs.close(); } catch {} _termWs = null; }
+    return;
+  }
+  if (!API.available) { showToast('Demo mode — no backend'); return; }
+  panel.classList.add('show');
+  if (!_term) setupTerminal();
+  else _termFit && _termFit.fit();
+  if (!_termWs) openTerminalWS();
+  if (editor) editor.refresh();
+}
+
+function setupTerminal() {
+  _term = new Terminal({
+    fontFamily: 'JetBrains Mono, Fira Code, monospace',
+    fontSize: 12,
+    cursorBlink: true,
+    theme: { background: '#060a10', foreground: '#c9d4e8' },
+  });
+  _termFit = new FitAddon.FitAddon();
+  _term.loadAddon(_termFit);
+  _term.open(document.getElementById('terminal-body'));
+  _termFit.fit();
+  _term.onData(d => { if (_termWs && _termWs.readyState === 1) _termWs.send(JSON.stringify({ type: 'input', data: d })); });
+  _term.onResize(({ cols, rows }) => {
+    if (_termWs && _termWs.readyState === 1) _termWs.send(JSON.stringify({ type: 'resize', cols, rows }));
+  });
+  window.addEventListener('resize', () => { if (_termFit) _termFit.fit(); });
+}
+
+function openTerminalWS() {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  // Build a URL that respects HA ingress path prefix.
+  const base = API.base.replace(/\/$/, '');
+  const url = `${proto}//${location.host}${base}/api/terminal`;
+  try {
+    _termWs = new WebSocket(url);
+  } catch (e) {
+    _term.writeln('\x1b[31mWebSocket failed: ' + e.message + '\x1b[0m');
+    return;
+  }
+  _termWs.onopen = () => {
+    if (_termFit) _termFit.fit();
+    _termWs.send(JSON.stringify({ type: 'resize', cols: _term.cols, rows: _term.rows }));
+  };
+  _termWs.onmessage = (ev) => {
+    try {
+      const msg = JSON.parse(ev.data);
+      if (msg.type === 'output') _term.write(msg.data);
+    } catch {}
+  };
+  _termWs.onclose = () => { _term.writeln('\r\n\x1b[90m[shell exited]\x1b[0m'); _termWs = null; };
+  _termWs.onerror = () => _term.writeln('\r\n\x1b[31m[websocket error]\x1b[0m');
+}
+
+function clearTerminal() { if (_term) _term.clear(); }
+
+// Drag-resize the terminal panel
+(function attachTermResizer() {
+  const r = document.getElementById('terminal-resize');
+  if (!r) return;
+  let startY = 0, startH = 0;
+  const move = e => {
+    const dy = startY - e.clientY;
+    const panel = document.getElementById('terminal-panel');
+    panel.style.height = Math.max(120, Math.min(window.innerHeight * 0.8, startH + dy)) + 'px';
+    if (_termFit) _termFit.fit();
+  };
+  const up = () => {
+    document.removeEventListener('mousemove', move);
+    document.removeEventListener('mouseup', up);
+    document.body.classList.remove('resizing');
+  };
+  r.addEventListener('mousedown', e => {
+    e.preventDefault();
+    startY = e.clientY;
+    startH = document.getElementById('terminal-panel').getBoundingClientRect().height;
+    document.body.classList.add('resizing');
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseup', up);
+  });
+})();
 
 // ═══════════════════════════════════════════════════════════════
 // DIFF VIEW — compare the active document against git HEAD (or
@@ -3590,6 +3812,59 @@ const SNIPPETS = {
   data:
     brightness_pct: 75
 `,
+  blueprint_automation: `blueprint:
+  name: Example Automation Blueprint
+  description: Describe what this blueprint does
+  domain: automation
+  source_url: https://example.com/blueprint.yaml
+  input:
+    source_entity:
+      name: Source entity
+      description: Entity to watch
+      selector:
+        entity:
+    target_light:
+      name: Target light
+      selector:
+        entity:
+          domain: light
+
+trigger:
+  - platform: state
+    entity_id: !input source_entity
+
+action:
+  - service: light.toggle
+    target:
+      entity_id: !input target_light
+`,
+  blueprint_script: `blueprint:
+  name: Example Script Blueprint
+  description: Describe what this blueprint does
+  domain: script
+  input:
+    target_entity:
+      name: Target
+      selector:
+        entity:
+
+sequence:
+  - service: homeassistant.turn_on
+    target:
+      entity_id: !input target_entity
+`,
+  blueprint_input_entity: `entity_name:
+  name: Pick an entity
+  description: Required entity selector
+  selector:
+    entity:
+      domain: sensor
+`,
+  blueprint_input_time: `time_name:
+  name: Time
+  selector:
+    time:
+`,
 };
 
 function insertSnippet(key) {
@@ -3618,6 +3893,7 @@ const COMMANDS = [
   { cat: 'View',   title: 'Show Insert panel',                                  run: () => switchPanel('insert') },
   { cat: 'View',   title: 'Show Outline panel',                                 run: () => switchPanel('outline') },
   { cat: 'File',   title: 'Quick open…',               shortcut: 'Ctrl+P',      run: () => openQuickOpen() },
+  { cat: 'View',   title: 'Toggle Terminal',           shortcut: 'Ctrl+`',      run: () => toggleTerminal() },
   { cat: 'View',   title: 'Tab size: 2',                                        run: () => setTabSize(2) },
   { cat: 'View',   title: 'Tab size: 4',                                        run: () => setTabSize(4) },
   { cat: 'View',   title: 'Tab size: 8',                                        run: () => setTabSize(8) },
@@ -3630,6 +3906,7 @@ const COMMANDS = [
   { cat: 'View',   title: 'Indent: Gradient ramp',                              run: () => setIndentStyle('gradient') },
   { cat: 'View',   title: 'Toggle visible whitespace (dots)',                   run: () => toggleWhitespace() },
   { cat: 'View',   title: 'Toggle rainbow brackets',                             run: () => toggleBracketColors() },
+  { cat: 'View',   title: 'Toggle minimap',                                      run: () => toggleMinimap() },
   { cat: 'View',   title: 'Toggle line wrap',                                    run: () => toggleLineWrap() },
   { cat: 'View',   title: 'Font size: 11',                                       run: () => setFontSize(11) },
   { cat: 'View',   title: 'Font size: 13',                                       run: () => setFontSize(13) },
@@ -3671,6 +3948,10 @@ const COMMANDS = [
   { cat: 'Snippet',title: 'Insert: Condition — time',                          run: () => insertSnippet('condition_time') },
   { cat: 'Snippet',title: 'Insert: Action — notify',                           run: () => insertSnippet('action_notify') },
   { cat: 'Snippet',title: 'Insert: Action — service call',                     run: () => insertSnippet('action_service') },
+  { cat: 'Snippet',title: 'Insert: Blueprint — automation skeleton',           run: () => insertSnippet('blueprint_automation') },
+  { cat: 'Snippet',title: 'Insert: Blueprint — script skeleton',               run: () => insertSnippet('blueprint_script') },
+  { cat: 'Snippet',title: 'Insert: Blueprint input — entity selector',         run: () => insertSnippet('blueprint_input_entity') },
+  { cat: 'Snippet',title: 'Insert: Blueprint input — time selector',           run: () => insertSnippet('blueprint_input_time') },
 ];
 
 let _cmdpalIdx = 0;
@@ -3813,6 +4094,12 @@ document.addEventListener('keydown', e => {
     openQuickOpen();
     return;
   }
+  // Ctrl+` → toggle terminal
+  if ((e.ctrlKey || e.metaKey) && e.key === '`') {
+    e.preventDefault();
+    toggleTerminal();
+    return;
+  }
   // Ctrl/Cmd+Alt+J → Jinja preview
   if ((e.ctrlKey || e.metaKey) && e.altKey && (e.key === 'j' || e.key === 'J')) {
     e.preventDefault();
@@ -3854,6 +4141,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   applyPrefs();
   updateThemeToggleIcon();
   attachSidebarResizer();
+  attachMinimapClick();
 
   // Wire show-hint with our HA-aware source
   editor.setOption('hintOptions', { hint: haHintSource, completeSingle: false });
