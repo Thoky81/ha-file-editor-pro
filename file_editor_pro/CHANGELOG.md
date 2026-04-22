@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.10.3 — Split view: equal panes and right-pane minimap
+
+- **Even split.** `.editor-right` changed from `width: 50%` (half the viewport) to `flex: 1`, so the two editor panes divide only the space left over after the activity bar and sidebar. Panes are now visually the same width.
+- **Minimap in the right pane.** Minimap code refactored to loop over a `_minimapPanes()` list so every open CodeMirror instance gets its own minimap when the setting is on. Scroll + content changes on the right pane now update its viewport box as well.
+
 ## 1.10.2 — No-cache headers on index.html
 
 - The root HTML response now carries `Cache-Control: no-store, no-cache, must-revalidate` + `Pragma: no-cache` + `Expires: 0`. Fixes the case where the add-on upgrades but the user keeps seeing the previous build — e.g. a new tree-context-menu entry that didn't show up because HA ingress or the browser cached the older `index.html`.

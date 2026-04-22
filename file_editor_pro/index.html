@@ -431,7 +431,7 @@
     .minimap-viewport{position:absolute;left:0;right:0;background:var(--accent);opacity:.15;border-left:2px solid var(--accent);pointer-events:none}
 
     /* ── SPLIT VIEW (right pane) ── */
-    .editor-right{width:50%;min-width:200px;display:none;flex-direction:column;border-left:1px solid var(--border);background:var(--bg-darkest)}
+    .editor-right{flex:1;min-width:200px;display:none;flex-direction:column;border-left:1px solid var(--border);background:var(--bg-darkest);position:relative}
     .editor-right.show{display:flex}
     .editor-right-header{display:flex;align-items:center;gap:8px;padding:5px 10px;background:var(--bg-dark);border-bottom:1px solid var(--border);font-family:var(--font-mono);font-size:11px;color:var(--text-muted);height:var(--tab-height);flex-shrink:0}
     .editor-right-header .right-path{color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
@@ -798,6 +798,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:13px;height:13px"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
       <span class="right-path" id="right-path"></span>
       <button class="editor-right-close" onclick="closeRightPane()" title="Close split">×</button>
+    </div>
+    <div class="minimap" id="minimap-right">
+      <div class="minimap-inner" id="minimap-right-inner"></div>
+      <div class="minimap-viewport" id="minimap-right-viewport"></div>
     </div>
     <textarea id="editor-right-ta"></textarea>
   </div>
@@ -3004,59 +3008,82 @@ function toggleMinimap() {
   savePrefs(); applyMinimap();
   showToast(`Minimap: ${PREFS.minimap ? 'on' : 'off'}`);
 }
+// Minimap refactored to render per pane. Each pane = { cm, ids }.
+function _minimapPanes() {
+  const list = [{
+    cm: editor,
+    container: 'minimap', inner: 'minimap-inner', viewport: 'minimap-viewport',
+  }];
+  if (_rightEditor) list.push({
+    cm: _rightEditor,
+    container: 'minimap-right', inner: 'minimap-right-inner', viewport: 'minimap-right-viewport',
+  });
+  return list;
+}
+
 function applyMinimap() {
-  const el = document.getElementById('minimap');
-  if (!el) return;
-  el.classList.toggle('show', !!PREFS.minimap);
+  for (const p of _minimapPanes()) {
+    const el = document.getElementById(p.container);
+    if (!el) continue;
+    el.classList.toggle('show', !!PREFS.minimap);
+  }
   if (PREFS.minimap) {
     renderMinimap();
     updateMinimapViewport();
   }
 }
+
 function renderMinimap() {
-  if (!editor || !PREFS.minimap) return;
-  const inner = document.getElementById('minimap-inner');
-  if (!inner) return;
-  const lc = editor.lineCount();
-  const frag = document.createDocumentFragment();
-  const lineHeight = 2;  // px per line bar
-  for (let i = 0; i < lc; i++) {
-    const text = editor.getLine(i) || '';
-    const bar = document.createElement('div');
-    bar.className = 'minimap-line';
-    // Width proportional to line length (relative to 80 cols)
-    const w = Math.max(4, Math.min(58, (text.length / 80) * 58));
-    bar.style.width = w + 'px';
-    frag.appendChild(bar);
+  if (!PREFS.minimap) return;
+  for (const p of _minimapPanes()) {
+    if (!p.cm) continue;
+    const inner = document.getElementById(p.inner);
+    if (!inner) continue;
+    const lc = p.cm.lineCount();
+    const frag = document.createDocumentFragment();
+    for (let i = 0; i < lc; i++) {
+      const text = p.cm.getLine(i) || '';
+      const bar = document.createElement('div');
+      bar.className = 'minimap-line';
+      bar.style.width = Math.max(4, Math.min(58, (text.length / 80) * 58)) + 'px';
+      frag.appendChild(bar);
+    }
+    inner.innerHTML = '';
+    inner.appendChild(frag);
   }
-  inner.innerHTML = '';
-  inner.appendChild(frag);
 }
+
 function attachMinimapClick() {
-  const inner = document.getElementById('minimap-inner');
-  if (!inner || inner.dataset.bound) return;
-  inner.addEventListener('click', e => {
-    if (!editor) return;
-    const rect = inner.getBoundingClientRect();
-    const y = e.clientY - rect.top;
-    const lc = editor.lineCount();
-    const line = Math.max(0, Math.min(lc - 1, Math.floor(y / 2)));
-    editor.scrollIntoView({ line, ch: 0 }, 200);
-  });
-  inner.dataset.bound = '1';
+  for (const p of _minimapPanes()) {
+    const inner = document.getElementById(p.inner);
+    if (!inner || inner.dataset.bound) continue;
+    inner.addEventListener('click', e => {
+      const cm = p.cm;
+      if (!cm) return;
+      const rect = inner.getBoundingClientRect();
+      const y = e.clientY - rect.top;
+      const lc = cm.lineCount();
+      const line = Math.max(0, Math.min(lc - 1, Math.floor(y / 2)));
+      cm.scrollIntoView({ line, ch: 0 }, 200);
+    });
+    inner.dataset.bound = '1';
+  }
 }
 
 function updateMinimapViewport() {
-  if (!editor || !PREFS.minimap) return;
-  const vp = document.getElementById('minimap-viewport');
-  if (!vp) return;
-  const info = editor.getScrollInfo();
-  const lc = editor.lineCount();
-  const totalH = lc * 2;
-  const top = (info.top / Math.max(1, info.height)) * totalH;
-  const h = (info.clientHeight / Math.max(1, info.height)) * totalH;
-  vp.style.top = top + 'px';
-  vp.style.height = Math.max(14, h) + 'px';
+  if (!PREFS.minimap) return;
+  for (const p of _minimapPanes()) {
+    if (!p.cm) continue;
+    const vp = document.getElementById(p.viewport);
+    if (!vp) continue;
+    const info = p.cm.getScrollInfo();
+    const lc = p.cm.lineCount();
+    const totalH = lc * 2;
+    const top = (info.top / Math.max(1, info.height)) * totalH;
+    const h = (info.clientHeight / Math.max(1, info.height)) * totalH;
+    vp.style.top = top + 'px';
+    vp.style.height = Math.max(14, h) + 'px';
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -3534,11 +3561,18 @@ async function openFileRight(path) {
     );
     _rightEditor.on('change', () => {
       // No dirty indicator for simplicity; Ctrl+S saves directly.
+      if (PREFS.minimap) { renderMinimap(); updateMinimapViewport(); }
     });
+    _rightEditor.on('scroll', () => { if (PREFS.minimap) updateMinimapViewport(); });
+    attachMinimapClick();
   }
   _rightEditor.setValue(file.content || '');
   _rightEditor.setOption('mode', file.mode);
-  setTimeout(() => { _rightEditor.refresh(); if (editor) editor.refresh(); }, 30);
+  setTimeout(() => {
+    _rightEditor.refresh();
+    if (editor) editor.refresh();
+    applyMinimap();
+  }, 30);
 }
 
 function closeRightPane() {
