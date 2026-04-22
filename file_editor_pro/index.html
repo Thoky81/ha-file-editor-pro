@@ -50,7 +50,7 @@
          plain variables (dotted paths etc.)         → near-black
          comments                                    → italic green */
       --syn-comment:#236e25; --syn-keyword:#a82a2a; --syn-string:#a82a2a;
-      --syn-number:#a82a2a;  --syn-def:#1e5b8a;    --syn-tag:#a82a2a;
+      --syn-number:#a82a2a;  --syn-def:#2c6ba0;    --syn-tag:#a82a2a;
       --syn-builtin:#1f2328; --syn-atom:#a82a2a;   --syn-meta:#a82a2a;
       --status-text:#ffffff;
     }
@@ -1564,6 +1564,7 @@ function initEditor() {
       clearTimeout(_minimapDebounce);
       _minimapDebounce = setTimeout(() => { renderMinimap(); updateMinimapViewport(); }, 300);
     }
+    scheduleJinjaValidation();
   });
   let _minimapDebounce = null;
 
@@ -1847,6 +1848,8 @@ function switchTab(id) {
   setTimeout(() => { editor.refresh(); editor.focus(); }, 10);
   renderTabs();
   validateYAML();
+  _jinjaCache = [];    // different file, drop old errors
+  scheduleJinjaValidation();
   renderFileTree();
 }
 
@@ -2015,8 +2018,107 @@ CodeMirror.registerHelper('lint', 'yaml', function (text) {
       severity: 'error',
     });
   }
+  // Overlay any cached Jinja validation errors.
+  for (const j of _jinjaCache) found.push(j);
   return found;
 });
+
+// ═══════════════════════════════════════════════════════════════
+// JINJA VALIDATION
+// Extracts every {{...}} and {%...%} expression from the active
+// document, validates each through HA's /api/template endpoint,
+// and feeds the results back into the CodeMirror lint pass so
+// syntax errors show as red gutter markers alongside YAML errors.
+// Debounced per document change; duplicate templates are only
+// validated once per change.
+// ═══════════════════════════════════════════════════════════════
+let _jinjaCache = [];                 // [{from, to, message, severity}]
+let _jinjaDebounce = null;
+let _jinjaAbort = null;
+const _JINJA_RX = /\{\{[\s\S]*?\}\}|\{%[\s\S]*?%\}/g;
+
+function _offsetToPos(text, offset) {
+  let line = 0, ch = 0;
+  for (let i = 0; i < offset; i++) {
+    if (text.charCodeAt(i) === 10) { line++; ch = 0; }
+    else ch++;
+  }
+  return CodeMirror.Pos(line, ch);
+}
+
+function extractJinjaExpressions(text) {
+  const out = [];
+  _JINJA_RX.lastIndex = 0;
+  let m;
+  while ((m = _JINJA_RX.exec(text))) {
+    out.push({
+      body: m[0],
+      from: _offsetToPos(text, m.index),
+      to:   _offsetToPos(text, m.index + m[0].length),
+    });
+  }
+  return out;
+}
+
+function scheduleJinjaValidation() {
+  clearTimeout(_jinjaDebounce);
+  _jinjaDebounce = setTimeout(validateJinjaNow, 1500);
+}
+
+async function validateJinjaNow() {
+  if (!editor || !API.available) return;
+  const tab = tabs.find(t => t.id === activeTabId);
+  if (!tab || tab.mode !== 'yaml') { _jinjaCache = []; return; }
+  const text = editor.getValue();
+  const exprs = extractJinjaExpressions(text);
+  if (!exprs.length) { _jinjaCache = []; editor.performLint?.(); return; }
+
+  if (_jinjaAbort) _jinjaAbort.abort();
+  _jinjaAbort = new AbortController();
+  const signal = _jinjaAbort.signal;
+
+  const seen = new Map();   // body → error message ("" = valid)
+  const errors = [];
+  for (const e of exprs) {
+    if (signal.aborted) return;
+    if (!seen.has(e.body)) {
+      try {
+        const r = await fetch(API.url('/api/ha/template'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ template: e.body }),
+          signal,
+        });
+        const data = await r.json();
+        seen.set(e.body, data.ok ? '' : (data.error || 'Template error').split('\n')[0]);
+      } catch (err) {
+        if (err.name === 'AbortError') return;
+        seen.set(e.body, '');   // network error — don't flag the expression
+      }
+    }
+    const msg = seen.get(e.body);
+    if (msg) errors.push({ from: e.from, to: e.to, message: msg, severity: 'error' });
+  }
+  _jinjaAbort = null;
+  _jinjaCache = errors;
+  editor.performLint?.();
+  updateJinjaStatus(errors.length);
+}
+
+function updateJinjaStatus(n) {
+  // Piggy-back on the existing YAML status item: if Jinja errors
+  // exist and YAML is valid, surface the count there instead.
+  if (!n) return;
+  const errTxt = document.getElementById('status-errors-text');
+  const errEl  = document.getElementById('status-errors');
+  // Only overwrite when YAML is currently Valid or '–'
+  const cur = errTxt?.textContent || '';
+  if (/^Valid YAML|^–/.test(cur)) {
+    errTxt.textContent = `${n} Jinja error${n > 1 ? 's' : ''}`;
+    errEl.className = 'status-item status-error-state status-clickable';
+    errEl.title = 'Jinja template validation found errors. Hover the red markers in the gutter for details.';
+  }
+}
 
 function validateYAML() {
   const errEl = document.getElementById('status-errors');
@@ -2873,15 +2975,23 @@ const _bpOverlay = {
 let _bpActive = false;
 function applyBracketColors() {
   if (!editor) return;
-  const wrap = editor.getWrapperElement();
-  if (PREFS.bracketColors && !_bpActive) { editor.addOverlay(_bpOverlay); _bpActive = true; }
-  else if (!PREFS.bracketColors && _bpActive) { editor.removeOverlay(_bpOverlay); _bpActive = false; }
-  // No longer gate on a wrapper class — the CSS rules apply as soon
-  // as the overlay starts adding cm-bp-N classes to brackets.
+  try {
+    if (PREFS.bracketColors && !_bpActive) {
+      editor.addOverlay(_bpOverlay); _bpActive = true;
+    } else if (!PREFS.bracketColors && _bpActive) {
+      editor.removeOverlay(_bpOverlay); _bpActive = false;
+    }
+  } catch (e) {
+    console.error('[bracket-colors] failed to toggle overlay:', e);
+  }
 }
 function toggleBracketColors() {
   PREFS.bracketColors = !PREFS.bracketColors;
-  savePrefs(); applyBracketColors();
+  savePrefs();
+  try { applyBracketColors(); } catch (e) { console.error(e); }
+  // Always update the visual toggle — don't trust the onclick's
+  // second statement, since an earlier throw would skip it.
+  _setToggle('set-bp', PREFS.bracketColors);
   showToast(`Bracket colors: ${PREFS.bracketColors ? 'on' : 'off'}`);
 }
 
@@ -4114,6 +4224,7 @@ const COMMANDS = [
   { cat: 'HA',     title: 'Reload scenes',                                     run: () => haReload('scene') },
   { cat: 'HA',     title: 'Reload template entities',                          run: () => haReload('template') },
   { cat: 'HA',     title: 'Preview Jinja template…',  shortcut: 'Ctrl+Alt+J', run: () => openTemplatePreview() },
+  { cat: 'HA',     title: 'Validate Jinja in current file',                    run: () => validateJinjaNow() },
   { cat: 'HA',     title: 'Refresh entity/service cache',                      run: () => loadHAData(true).then(() => showToast('HA cache refreshed')) },
   { cat: 'Snippet',title: 'Insert: Automation skeleton',                       run: () => insertSnippet('automation') },
   { cat: 'Snippet',title: 'Insert: Script skeleton',                           run: () => insertSnippet('script') },

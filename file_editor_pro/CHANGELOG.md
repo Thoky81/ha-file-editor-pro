@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.10.1 — Jinja validator, defensive bracket toggle, bluer blue
+
+- **Jinja template validator.** Every `{{…}}` and `{%…%}` expression in the active YAML file is extracted, deduplicated, and validated via HA's `/api/template` endpoint. Errors surface as red markers in the gutter alongside YAML parse errors; status bar shows the count when YAML is otherwise valid. Debounced 1500 ms per edit; aborts in-flight requests when you keep typing. Manual trigger: command palette → *HA: Validate Jinja in current file*.
+- **Rainbow brackets toggle** now always updates its visual state. Previous failure mode: the onclick's second statement (`refreshSettingsUI()`) was skipped when the first one's inner `addOverlay` threw. Moved the toggle-class update into `toggleBracketColors()` itself and wrapped the overlay work in try/catch so the pref, the toast, and the UI toggle always stay in sync regardless of what CodeMirror does.
+- **Unquoted-value blue** in GitHub Light brightened from `#1e5b8a` → `#2c6ba0` — a touch less slate, a touch more "proper blue".
+
 ## 1.10.0 — Hide sidebar, split view, status-bar polish, YAML colors
 
 - **Hide sidebar** — `Ctrl+B` (or `View: Toggle Sidebar` in the command palette) collapses the whole sidebar panel to 0 px. Activity bar stays visible, so clicking any icon (Explorer, Search, Git, …) reopens it. Preference persists.
