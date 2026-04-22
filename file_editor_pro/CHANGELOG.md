@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.10.2 — No-cache headers on index.html
+
+- The root HTML response now carries `Cache-Control: no-store, no-cache, must-revalidate` + `Pragma: no-cache` + `Expires: 0`. Fixes the case where the add-on upgrades but the user keeps seeing the previous build — e.g. a new tree-context-menu entry that didn't show up because HA ingress or the browser cached the older `index.html`.
+
 ## 1.10.1 — Jinja validator, defensive bracket toggle, bluer blue
 
 - **Jinja template validator.** Every `{{…}}` and `{%…%}` expression in the active YAML file is extracted, deduplicated, and validated via HA's `/api/template` endpoint. Errors surface as red markers in the gutter alongside YAML parse errors; status bar shows the count when YAML is otherwise valid. Debounced 1500 ms per edit; aborts in-flight requests when you keep typing. Manual trigger: command palette → *HA: Validate Jinja in current file*.

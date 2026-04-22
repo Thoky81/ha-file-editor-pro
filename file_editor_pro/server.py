@@ -138,7 +138,16 @@ def build_tree(root: Path, prefix: str = "") -> list[dict]:
 
 @app.get("/")
 async def index():
-    return FileResponse(INDEX_HTML)
+    # Aggressive no-cache: HA ingress + browsers sometimes cache the
+    # shell HTML and miss UI updates after an add-on upgrade.
+    return FileResponse(
+        INDEX_HTML,
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        },
+    )
 
 
 @app.get("/api/health")
