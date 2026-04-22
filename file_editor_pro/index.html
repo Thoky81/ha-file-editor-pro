@@ -44,9 +44,14 @@
       --accent-blue:#0969da; --accent-green:#1a7f37; --accent-red:#cf222e;
       --border:#d0d7de; --border-light:#d8dee4;
       --selection:rgba(9,105,218,.18);
-      --syn-comment:#236e25; --syn-keyword:#cf222e; --syn-string:#0a3069;
-      --syn-number:#0550ae; --syn-def:#6639ba; --syn-tag:#116329;
-      --syn-builtin:#8250df; --syn-atom:#cf222e; --syn-meta:#6639ba;
+      /* YAML colouring:
+         keys + strings + numbers + literals + !tags → dark red
+         unquoted values (identifiers after ':')     → blue
+         plain variables (dotted paths etc.)         → near-black
+         comments                                    → italic green */
+      --syn-comment:#236e25; --syn-keyword:#a82a2a; --syn-string:#a82a2a;
+      --syn-number:#a82a2a;  --syn-def:#1e5b8a;    --syn-tag:#a82a2a;
+      --syn-builtin:#1f2328; --syn-atom:#a82a2a;   --syn-meta:#a82a2a;
       --status-text:#ffffff;
     }
 
@@ -171,7 +176,9 @@
     .activity-spacer{flex:1}
 
     /* ── SIDEBAR ── */
-    .sidebar{width:var(--sidebar-width);background:var(--bg-dark);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden;position:relative}
+    .sidebar{width:var(--sidebar-width);background:var(--bg-dark);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden;position:relative;transition:width .15s}
+    .sidebar.collapsed{width:0 !important;border-right:none}
+    .sidebar.collapsed .sidebar-resizer{display:none}
     /* Resize handle: 4 px draggable strip on the right edge of the
        sidebar. Widens to 6 px on hover to make it easier to grab. */
     .sidebar-resizer{position:absolute;top:0;bottom:0;right:-2px;width:4px;cursor:col-resize;z-index:50;background:transparent;transition:background .1s}
@@ -308,7 +315,10 @@
     .cm-s-ha .CodeMirror-matchingbracket{color:var(--accent) !important;border-bottom:1px solid var(--accent)}
 
     /* ── STATUS BAR ── */
-    .status-bar{height:var(--status-height);background:var(--accent);display:flex;align-items:center;padding:0 12px;gap:16px;flex-shrink:0}
+    .status-bar{min-height:var(--status-height);background:var(--accent);display:flex;align-items:center;padding:2px 24px;gap:16px;flex-shrink:0;flex-wrap:nowrap}
+    @media (max-width: 760px){
+      .status-bar{flex-wrap:wrap;row-gap:2px;padding:3px 16px}
+    }
     .status-item{display:flex;align-items:center;gap:5px;color:var(--status-text);font-family:var(--font-mono);font-size:11px;font-weight:500;cursor:default;opacity:.95;transition:opacity .1s;white-space:nowrap}
     .status-item:hover{opacity:1}
     .status-item svg{width:12px;height:12px;stroke-width:2}
@@ -419,6 +429,15 @@
     .minimap-inner{position:absolute;top:0;left:0;right:0;cursor:pointer}
     .minimap-line{height:2px;margin:0 6px;background:var(--text-muted);opacity:.22;border-radius:1px}
     .minimap-viewport{position:absolute;left:0;right:0;background:var(--accent);opacity:.15;border-left:2px solid var(--accent);pointer-events:none}
+
+    /* ── SPLIT VIEW (right pane) ── */
+    .editor-right{width:50%;min-width:200px;display:none;flex-direction:column;border-left:1px solid var(--border);background:var(--bg-darkest)}
+    .editor-right.show{display:flex}
+    .editor-right-header{display:flex;align-items:center;gap:8px;padding:5px 10px;background:var(--bg-dark);border-bottom:1px solid var(--border);font-family:var(--font-mono);font-size:11px;color:var(--text-muted);height:var(--tab-height);flex-shrink:0}
+    .editor-right-header .right-path{color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+    .editor-right-close{background:none;border:none;color:var(--text-muted);font-size:16px;cursor:pointer;padding:0 4px;line-height:1;border-radius:3px}
+    .editor-right-close:hover{background:var(--bg-hover);color:var(--accent-red)}
+    .editor-right .CodeMirror{flex:1;min-height:0}
 
     /* ── INTEGRATED TERMINAL ── */
     .terminal-panel{position:absolute;left:0;right:0;bottom:var(--status-height,22px);background:var(--bg-darkest);border-top:1px solid var(--border);display:none;flex-direction:column;z-index:60;height:260px;min-height:120px;max-height:80vh}
@@ -773,6 +792,16 @@
     </div>
   </div>
 
+  <!-- Right pane (split view) -->
+  <div class="editor-right" id="editor-right">
+    <div class="editor-right-header">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:13px;height:13px"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      <span class="right-path" id="right-path"></span>
+      <button class="editor-right-close" onclick="closeRightPane()" title="Close split">×</button>
+    </div>
+    <textarea id="editor-right-ta"></textarea>
+  </div>
+
 </div><!-- /app-layout -->
 
 <!-- Integrated terminal (bottom panel) -->
@@ -844,6 +873,7 @@
 <!-- Tree context menu (for right-click on files/folders) -->
 <div class="context-menu" id="tree-context-menu">
   <div class="context-item" onclick="treeCtxOpen()">Open</div>
+  <div class="context-item" onclick="treeCtxOpenRight()">Open to the right</div>
   <div class="context-item" onclick="treeCtxRename()">Rename…</div>
   <div class="context-item" onclick="treeCtxDuplicate()">Duplicate…</div>
   <div class="context-divider"></div>
@@ -2023,6 +2053,8 @@ function validateYAML() {
 // PANEL SWITCHING
 // ═══════════════════════════════════════════════════════════════
 function switchPanel(panel) {
+  // Activity-bar click should un-hide the sidebar if it was collapsed.
+  if (!PREFS.sidebarVisible) toggleSidebar(true);
   activePanel = panel;
   ['files','search','git','insert','outline'].forEach(p => {
     const el = document.getElementById('panel-' + p);
@@ -2458,6 +2490,7 @@ function attachTreeContextMenu() {
 }
 
 function treeCtxOpen() { if (_treeCtxTarget?.type === 'file') openFile(_treeCtxTarget.path); }
+function treeCtxOpenRight() { if (_treeCtxTarget?.type === 'file') openFileRight(_treeCtxTarget.path); }
 
 async function treeCtxRename() {
   if (!_treeCtxTarget) return;
@@ -2628,6 +2661,7 @@ const PREFS = {
   showWhitespace: true,
   bracketColors: false,          // rainbow brackets for () [] {}
   minimap: false,                // right-edge document overview
+  sidebarVisible: true,          // Ctrl+B toggles the sidebar
 };
 
 function loadPrefs() {
@@ -2665,6 +2699,8 @@ function applyPrefs() {
   // Sidebar width (drag-resizable)
   const sw = Math.max(180, Math.min(600, Number(PREFS.sidebarWidth) || 260));
   document.documentElement.style.setProperty('--sidebar-width', sw + 'px');
+  const sb = document.getElementById('sidebar');
+  if (sb) sb.classList.toggle('collapsed', PREFS.sidebarVisible === false);
 
   if (!editor) return;
   editor.setOption('tabSize', PREFS.tabSize);
@@ -2739,6 +2775,16 @@ function setSidebarFontSize(n) {
 function setSidebarWidth(n) {
   PREFS.sidebarWidth = Math.max(180, Math.min(600, Number(n) || 260));
   savePrefs(); applyPrefs();
+}
+
+// Hide / show the sidebar. Activity bar (explorer/search/git icons)
+// stays visible so the user can click it to bring the sidebar back.
+function toggleSidebar(force) {
+  PREFS.sidebarVisible = force === undefined ? !PREFS.sidebarVisible : !!force;
+  savePrefs();
+  const sb = document.getElementById('sidebar');
+  if (sb) sb.classList.toggle('collapsed', !PREFS.sidebarVisible);
+  if (editor) setTimeout(() => editor.refresh(), 160);
 }
 
 // Drag-to-resize for the sidebar. Sets --sidebar-width live while
@@ -3332,6 +3378,78 @@ function haHintSource(cm) {
   }
 
   return null;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SPLIT VIEW — right pane shows one file at a time. Created on
+// demand via openFileRight(); close via closeRightPane().
+// ═══════════════════════════════════════════════════════════════
+let _rightEditor = null;
+let _rightPath = null;
+
+async function openFileRight(path) {
+  const file = FILES[path];
+  if (!file) return;
+  if (!file.loaded && API.available) {
+    try {
+      const { content } = await API.read(path);
+      file.content = content;
+      file.loaded = true;
+    } catch (e) { showToast('Failed to open: ' + path); return; }
+  }
+  const panel = document.getElementById('editor-right');
+  panel.classList.add('show');
+  document.getElementById('right-path').textContent = path;
+  _rightPath = path;
+  if (!_rightEditor) {
+    _rightEditor = CodeMirror.fromTextArea(
+      document.getElementById('editor-right-ta'),
+      {
+        theme: 'ha',
+        lineNumbers: true,
+        lineWrapping: false,
+        tabSize: PREFS.tabSize,
+        indentUnit: PREFS.tabSize,
+        indentWithTabs: PREFS.indentWithTabs,
+        autoCloseBrackets: true,
+        matchBrackets: true,
+        styleActiveLine: true,
+        foldGutter: true,
+        gutters: ['CodeMirror-linenumbers', 'CodeMirror-foldgutter'],
+        extraKeys: {
+          'Ctrl-S': saveRightPane,
+          'Cmd-S':  saveRightPane,
+        },
+      }
+    );
+    _rightEditor.on('change', () => {
+      // No dirty indicator for simplicity; Ctrl+S saves directly.
+    });
+  }
+  _rightEditor.setValue(file.content || '');
+  _rightEditor.setOption('mode', file.mode);
+  setTimeout(() => { _rightEditor.refresh(); if (editor) editor.refresh(); }, 30);
+}
+
+function closeRightPane() {
+  const panel = document.getElementById('editor-right');
+  panel.classList.remove('show');
+  _rightPath = null;
+  if (editor) setTimeout(() => editor.refresh(), 30);
+}
+
+async function saveRightPane() {
+  if (!_rightEditor || !_rightPath) return;
+  const content = _rightEditor.getValue();
+  if (FILES[_rightPath]) FILES[_rightPath].content = content;
+  if (API.available) {
+    try {
+      await API.write(_rightPath, content);
+      showToast(`Saved ${_rightPath}`);
+    } catch (e) { showToast('Save failed: ' + e.message); }
+  } else {
+    showToast('Demo mode — saved to local cache');
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -3952,6 +4070,9 @@ const COMMANDS = [
   { cat: 'View',   title: 'Show Outline panel',                                 run: () => switchPanel('outline') },
   { cat: 'File',   title: 'Quick open…',               shortcut: 'Ctrl+P',      run: () => openQuickOpen() },
   { cat: 'View',   title: 'Toggle Terminal',           shortcut: 'Ctrl+`',      run: () => toggleTerminal() },
+  { cat: 'View',   title: 'Toggle Sidebar',            shortcut: 'Ctrl+B',      run: () => toggleSidebar() },
+  { cat: 'View',   title: 'Close right pane',                                   run: () => closeRightPane() },
+  { cat: 'File',   title: 'Open active file to the right',                      run: () => { const t = tabs.find(x => x.id === activeTabId); if (t) openFileRight(t.path); } },
   { cat: 'View',   title: 'Tab size: 2',                                        run: () => setTabSize(2) },
   { cat: 'View',   title: 'Tab size: 4',                                        run: () => setTabSize(4) },
   { cat: 'View',   title: 'Tab size: 8',                                        run: () => setTabSize(8) },
@@ -4156,6 +4277,12 @@ document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key === '`') {
     e.preventDefault();
     toggleTerminal();
+    return;
+  }
+  // Ctrl+B → toggle sidebar
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (e.key === 'b' || e.key === 'B')) {
+    e.preventDefault();
+    toggleSidebar();
     return;
   }
   // Ctrl/Cmd+Alt+J → Jinja preview

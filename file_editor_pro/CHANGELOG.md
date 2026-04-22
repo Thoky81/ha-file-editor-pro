@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.10.0 — Hide sidebar, split view, status-bar polish, YAML colors
+
+- **Hide sidebar** — `Ctrl+B` (or `View: Toggle Sidebar` in the command palette) collapses the whole sidebar panel to 0 px. Activity bar stays visible, so clicking any icon (Explorer, Search, Git, …) reopens it. Preference persists.
+- **Split view** — right-click any file → *Open to the right*, or use the command palette *File: Open active file to the right*. Opens a second CodeMirror pane alongside the main editor, showing one file at a time. Ctrl+S in the right pane saves through to disk. Close with the × on its header.
+- **Status bar** — horizontal padding bumped so text no longer clips on rounded browser corners; on narrow viewports (< 760 px / mobile) the bar now wraps to multiple rows instead of overflowing.
+- **GitHub Light YAML colors** rebalanced. Keys and strings are now dark red, unquoted values (`parallel`, `event`, `state_changed`) are blue, and dotted identifiers stay near-black — matching the density and readability of the reference palette the user shared.
+
 ## 1.9.8 — No indent markers on comment lines
 
 - Rainbow, gradient, colored-bars and indent-guides overlays now skip lines whose first non-whitespace character is `#`. Comments render clean with just their own color — no background tint, no vertical guide, no bar.
