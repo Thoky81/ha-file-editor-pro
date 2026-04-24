@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.11.2 — Squeeze-to-fit tabs with hover-expand
+
+- Tabs now use `flex: 1 1 140px` with `min-width: 42 px` and `max-width: 180 px`, so when many are open they share the available space instead of spilling off-screen. When you hover a tab its width expands (up to 320 px) so the full filename is visible and you can click it to switch. The **active tab always keeps its natural width** (up to 360 px) so the file you're editing is never truncated. 180 ms transition on width so the effect feels smooth rather than twitchy. Filenames truncate with an ellipsis when squeezed.
+
 ## 1.11.1 — Tab overflow handling
 
 When many files are open, the tab bar overflowed and the Save button + dropdown scrolled off-screen. Three fixes:
