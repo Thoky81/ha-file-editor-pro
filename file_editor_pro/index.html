@@ -260,7 +260,23 @@
     .tab-close:hover{background:var(--bg-hover);color:var(--accent-red)}
     .tab-close svg{width:10px;height:10px;stroke-width:2.5}
     .tab-empty{flex:1;border-bottom:1px solid var(--border)}
-    .tab-actions{display:flex;align-items:center;padding:0 8px;gap:6px;border-bottom:1px solid var(--border);height:100%}
+    /* Open-tabs dropdown — shows at the right of the tab bar, helps
+       when there are more tabs than fit on screen. */
+    .tab-list-btn{position:relative;display:inline-flex;align-items:center;gap:4px;background:transparent;border:1px solid var(--border-light);color:var(--text-secondary);padding:3px 8px;border-radius:5px;font-family:var(--font-ui);font-size:11px;cursor:pointer;transition:all .1s;margin-right:4px}
+    .tab-list-btn:hover{background:var(--bg-hover);color:var(--text-primary);border-color:var(--text-muted)}
+    .tab-list-btn svg{width:12px;height:12px;stroke-width:2}
+    .tab-list-menu{position:absolute;top:calc(var(--tab-height) + 2px);right:8px;width:320px;max-height:60vh;background:var(--bg-light);border:1px solid var(--border-light);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.4);padding:4px;z-index:120;display:none;overflow-y:auto}
+    .tab-list-menu.show{display:block}
+    .tab-list-item{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:4px;cursor:pointer;color:var(--text-secondary);font-size:12px}
+    .tab-list-item:hover{background:var(--bg-hover);color:var(--text-primary)}
+    .tab-list-item.active{color:var(--accent)}
+    .tab-list-item .tli-name{flex:1;font-family:var(--font-mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .tab-list-item .tli-dir{font-family:var(--font-mono);font-size:10px;color:var(--text-muted);margin-left:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:40%}
+    .tab-list-item .tli-close{color:var(--text-muted);padding:0 4px;border-radius:3px;line-height:1;font-size:14px}
+    .tab-list-item .tli-close:hover{background:var(--bg-hover);color:var(--accent-red)}
+    .tab-list-item .tli-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);flex-shrink:0}
+    .tab-list-item .tli-dot-hidden{visibility:hidden}
+    .tab-actions{display:flex;align-items:center;padding:0 8px;gap:6px;border-bottom:1px solid var(--border);height:100%;position:sticky;right:0;background:var(--bg-dark);z-index:3;box-shadow:-6px 0 6px -6px rgba(0,0,0,.25)}
     .tab-save-btn{display:inline-flex;align-items:center;gap:6px;background:transparent;border:1px solid var(--border-light);color:var(--text-secondary);padding:3px 10px;border-radius:5px;font-family:var(--font-ui);font-size:11px;cursor:pointer;transition:all .12s}
     .tab-save-btn:hover{background:var(--bg-hover);color:var(--text-primary);border-color:var(--text-muted)}
     .tab-save-btn.modified{border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
@@ -2216,6 +2232,9 @@ function renderTabs() {
     const el = document.createElement('div');
     el.className = 'tab' + (tab.id === activeTabId ? ' active' : '');
     el.onclick = () => switchTab(tab.id);
+    // Middle-click closes the tab (common browser/editor gesture).
+    el.onmousedown = (e) => { if (e.button === 1) { e.preventDefault(); closeTab(tab.id); } };
+    el.title = tab.path;
     el.innerHTML = `
       ${tab.modified ? '<div class="tab-dot"></div>' : ''}
       <span>${tab.name}</span>
@@ -2233,13 +2252,57 @@ function renderTabs() {
   const actions = document.createElement('div');
   actions.className = 'tab-actions';
   actions.innerHTML = `
+    <button class="tab-list-btn" onclick="toggleTabList(event)" title="Show all open tabs">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg>
+      <span>${tabs.length}</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="6 9 12 15 18 9"/></svg>
+    </button>
     <button class="tab-save-btn ${modified ? 'modified' : ''} ${active ? '' : 'disabled'}"
             onclick="saveCurrentFile()" title="Save (Ctrl+S)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
       <span>${modified ? 'Save*' : 'Save'}</span>
-    </button>`;
+    </button>
+    <div class="tab-list-menu" id="tab-list-menu"></div>`;
   bar.appendChild(actions);
+
+  // Auto-scroll active tab into view
+  if (active) {
+    const activeEl = bar.querySelector('.tab.active');
+    if (activeEl && activeEl.scrollIntoView) {
+      activeEl.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }
+  }
 }
+
+function toggleTabList(e) {
+  if (e) e.stopPropagation();
+  const m = document.getElementById('tab-list-menu');
+  if (!m) return;
+  if (m.classList.contains('show')) { m.classList.remove('show'); return; }
+  // Build rows
+  m.innerHTML = tabs.map(t => `
+    <div class="tab-list-item ${t.id === activeTabId ? 'active' : ''}" data-id="${t.id}">
+      <span class="tli-dot ${t.modified ? '' : 'tli-dot-hidden'}"></span>
+      <span class="tli-name">${escapeHtml(t.name)}</span>
+      <span class="tli-dir">${escapeHtml(t.path.replace(/[^/]*$/, '').replace(/\/$/, '') || '/')}</span>
+      <span class="tli-close" data-close-id="${t.id}" title="Close">×</span>
+    </div>`).join('') || '<div class="tab-list-item" style="color:var(--text-muted)">No open files</div>';
+  m.classList.add('show');
+  m.onclick = (ev) => {
+    const closeId = ev.target.dataset?.closeId;
+    if (closeId) { ev.stopPropagation(); closeTab(closeId); toggleTabList(); return; }
+    const row = ev.target.closest('.tab-list-item');
+    if (row?.dataset.id) { switchTab(row.dataset.id); m.classList.remove('show'); }
+  };
+}
+
+document.addEventListener('click', (e) => {
+  const m = document.getElementById('tab-list-menu');
+  if (!m) return;
+  if (!e.target.closest('.tab-list-menu') && !e.target.closest('.tab-list-btn')) {
+    m.classList.remove('show');
+  }
+});
 
 function updateBreadcrumb(path) {
   const bc = document.getElementById('breadcrumb');
@@ -4615,6 +4678,10 @@ const COMMANDS = [
   { cat: 'View',   title: 'Show Insert panel',                                  run: () => switchPanel('insert') },
   { cat: 'View',   title: 'Show Outline panel',                                 run: () => switchPanel('outline') },
   { cat: 'File',   title: 'Quick open…',               shortcut: 'Ctrl+P',      run: () => openQuickOpen() },
+  { cat: 'File',   title: 'Close current tab',         shortcut: 'Ctrl+W',      run: () => { if (activeTabId) closeTab(activeTabId); } },
+  { cat: 'File',   title: 'Next tab',                  shortcut: 'Ctrl+Tab',    run: () => { if (!tabs.length) return; const i = tabs.findIndex(t => t.id === activeTabId); switchTab(tabs[(i + 1) % tabs.length].id); } },
+  { cat: 'File',   title: 'Previous tab',              shortcut: 'Ctrl+Shift+Tab', run: () => { if (!tabs.length) return; const i = tabs.findIndex(t => t.id === activeTabId); switchTab(tabs[(i - 1 + tabs.length) % tabs.length].id); } },
+  { cat: 'File',   title: 'Show all open tabs',                                  run: () => toggleTabList() },
   { cat: 'View',   title: 'Toggle Terminal',           shortcut: 'Ctrl+`',      run: () => toggleTerminal() },
   { cat: 'View',   title: 'Toggle Sidebar',            shortcut: 'Ctrl+B',      run: () => toggleSidebar() },
   { cat: 'View',   title: 'Set current folder as default startup folder',       run: () => useCurrentFolderAsDefault() },
@@ -4830,6 +4897,24 @@ document.addEventListener('keydown', e => {
   }
   // F1 → help modal
   if (e.key === 'F1') { e.preventDefault(); openHelp(); return; }
+  // Ctrl+Tab / Ctrl+Shift+Tab → cycle through tabs
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Tab') {
+    if (!tabs.length) return;
+    e.preventDefault();
+    const idx = tabs.findIndex(t => t.id === activeTabId);
+    const step = e.shiftKey ? -1 : 1;
+    const next = (idx + step + tabs.length) % tabs.length;
+    switchTab(tabs[next].id);
+    return;
+  }
+  // Ctrl+W → close active tab (prevent browser from closing the window)
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (e.key === 'w' || e.key === 'W')) {
+    if (activeTabId) {
+      e.preventDefault();
+      closeTab(activeTabId);
+    }
+    return;
+  }
   // Ctrl+B → toggle sidebar
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (e.key === 'b' || e.key === 'B')) {
     e.preventDefault();

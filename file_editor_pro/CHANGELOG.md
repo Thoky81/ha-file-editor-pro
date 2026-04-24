@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.11.1 — Tab overflow handling
+
+When many files are open, the tab bar overflowed and the Save button + dropdown scrolled off-screen. Three fixes:
+
+- **Tab-list dropdown** at the right end of the bar showing every open file (with modified dot + directory), click to switch, click `×` to close. Shows the count next to the icon.
+- **Save button + dropdown now pinned to the right** (`position: sticky`). They stay visible no matter how far the tabs scroll; a subtle left-shadow hints that there's more content behind.
+- **Navigation shortcuts**: `Ctrl+Tab` → next tab, `Ctrl+Shift+Tab` → previous tab, `Ctrl+W` → close active tab, **middle-click** on any tab to close it. Active tab auto-scrolls into view on switch. All listed in the Help modal.
+
 ## 1.11.0 — Help panel
 
 - **New `?` icon in the activity bar** (below the sidebar toggle). Opens a Help modal with:
