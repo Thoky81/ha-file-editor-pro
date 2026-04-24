@@ -179,20 +179,6 @@
     .sidebar{width:var(--sidebar-width);background:var(--bg-dark);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden;position:relative;transition:width .15s}
     .sidebar.collapsed{width:0 !important;border-right:none}
     .sidebar.collapsed .sidebar-resizer{display:none}
-    /* Visible expand button — only appears when the sidebar is
-       collapsed. Clicks re-open the sidebar. Positioned at the
-       left edge of the editor area so it reads as the same place
-       the sidebar used to be. */
-    .sidebar-expand{
-      display:none;position:absolute;top:8px;left:0;width:20px;height:28px;
-      background:var(--bg-dark);border:1px solid var(--border);border-left:none;
-      border-radius:0 6px 6px 0;color:var(--text-muted);cursor:pointer;
-      align-items:center;justify-content:center;z-index:40;padding:0;
-      box-shadow:0 2px 6px rgba(0,0,0,.15);transition:background .12s,color .12s
-    }
-    .sidebar-expand:hover{background:var(--bg-hover);color:var(--accent)}
-    .sidebar-expand svg{width:14px;height:14px;stroke-width:2}
-    .sidebar.collapsed ~ .editor-area .sidebar-expand{display:flex}
     /* Resize handle: 4 px draggable strip on the right edge of the
        sidebar. Widens to 6 px on hover to make it easier to grab. */
     .sidebar-resizer{position:absolute;top:0;bottom:0;right:-2px;width:4px;cursor:col-resize;z-index:50;background:transparent;transition:background .1s}
@@ -652,6 +638,10 @@
 
   <!-- Activity Bar -->
   <div class="activity-bar">
+    <div class="activity-item" id="act-sidebar-toggle" onclick="toggleSidebar()" title="Toggle sidebar (Ctrl+B)">
+      <!-- chevron direction depends on sidebarVisible state -->
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline id="sb-toggle-path" points="15 18 9 12 15 6"/></svg>
+    </div>
     <div class="activity-item active" id="act-files" onclick="switchPanel('files')" title="Files (⌘⇧E)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
     </div>
@@ -809,9 +799,6 @@
 
   <!-- Editor Area -->
   <div class="editor-area">
-    <button class="sidebar-expand" onclick="toggleSidebar(true)" title="Show sidebar (Ctrl+B)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="9 18 15 12 9 6"/></svg>
-    </button>
     <div class="tab-bar" id="tab-bar"><div class="tab-empty"></div></div>
     <div class="breadcrumb" id="breadcrumb"></div>
     <div class="editor-wrapper" id="editor-wrapper">
@@ -3087,6 +3074,7 @@ function applyPrefs() {
   document.documentElement.style.setProperty('--sidebar-width', sw + 'px');
   const sb = document.getElementById('sidebar');
   if (sb) sb.classList.toggle('collapsed', PREFS.sidebarVisible === false);
+  _updateSidebarToggleIcon();
 
   if (!editor) return;
   editor.setOption('tabSize', PREFS.tabSize);
@@ -3170,7 +3158,15 @@ function toggleSidebar(force) {
   savePrefs();
   const sb = document.getElementById('sidebar');
   if (sb) sb.classList.toggle('collapsed', !PREFS.sidebarVisible);
+  _updateSidebarToggleIcon();
   if (editor) setTimeout(() => editor.refresh(), 160);
+}
+function _updateSidebarToggleIcon() {
+  const p = document.getElementById('sb-toggle-path');
+  if (!p) return;
+  // ‹ when visible (click to collapse), › when hidden (click to open)
+  p.setAttribute('points',
+    PREFS.sidebarVisible ? '15 18 9 12 15 6' : '9 18 15 12 9 6');
 }
 
 function setDefaultFolder(p) {

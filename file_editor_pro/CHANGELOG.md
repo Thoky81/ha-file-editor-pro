@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.10.9 — Sidebar toggle moved into the activity bar
+
+- The expand chevron added in 1.10.8 overlapped the tab bar. Moved it into the activity bar as a dedicated item at the top (above Explorer), always visible, chevron direction flips with state (`‹` when sidebar is shown, `›` when hidden). No more overlap; re-click on the active activity-bar icon still toggles too.
+
 ## 1.10.8 — Discoverable sidebar expand + toggle on re-click
 
 - **Expand chevron when the sidebar is collapsed.** A small `›` button appears at the left edge of the editor area whenever the sidebar is hidden. Clicking it shows the sidebar back. Solves the "where did my files go?" problem after a first-time `Ctrl+B` or the header hide button.
