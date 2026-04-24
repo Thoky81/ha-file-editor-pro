@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.11.0 — Help panel
+
+- **New `?` icon in the activity bar** (below the sidebar toggle). Opens a Help modal with:
+  - Legend for every activity-bar icon (sidebar toggle, Explorer, Search, Source control, Insert, Outline, Sun/Moon theme toggle, Settings gear)
+  - File-operation shortcuts (save, quick-open, command palette, terminal, Jinja preview, sidebar toggle)
+  - Editing shortcuts (find/replace, toggle comment, autocomplete, multi-cursor, indent/outdent)
+  - File-tree actions (expand, drill-in, split-right, create/rename/delete)
+  - Source-control shortcuts
+- **`F1`** opens the Help modal too. Also in the command palette as *View: Show Help & shortcuts*.
+
 ## 1.10.10 — Drop the redundant Explorer-header hide button
 
 - Removed the double-chevron hide-sidebar button from the Explorer header. Now that the activity-bar toggle (top item) does the same thing and is always visible, the header button was duplicated clutter.

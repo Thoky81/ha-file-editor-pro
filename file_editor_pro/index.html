@@ -462,6 +462,27 @@
     .diff-body{flex:1;min-height:0;overflow:hidden}
     .diff-body .CodeMirror{height:100% !important;background:var(--bg-darkest) !important}
 
+    /* ── HELP MODAL ── */
+    .help-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1950;display:none;align-items:center;justify-content:center;backdrop-filter:blur(2px);padding:6vh 3vw}
+    .help-overlay.show{display:flex}
+    .help-modal{width:min(820px,100%);max-height:88vh;background:var(--bg-light);border:1px solid var(--border-light);border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.5);display:flex;flex-direction:column;overflow:hidden}
+    .help-header{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border);flex-shrink:0}
+    .help-title{font-size:15px;font-weight:600;color:var(--text-primary)}
+    .help-close{margin-left:auto;background:none;border:none;color:var(--text-muted);font-size:22px;cursor:pointer;line-height:1;padding:0 8px;border-radius:4px}
+    .help-close:hover{background:var(--bg-hover);color:var(--text-primary)}
+    .help-body{padding:8px 22px 18px;overflow-y:auto}
+    .help-section{margin-top:16px}
+    .help-section-title{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.07em;margin:14px 0 6px;font-weight:600}
+    .help-table{width:100%;border-collapse:collapse;font-size:12.5px}
+    .help-table td{padding:5px 0;vertical-align:top;color:var(--text-secondary)}
+    .help-table td.help-what{color:var(--text-primary);width:48%}
+    .help-table td.help-how{font-family:var(--font-mono);color:var(--accent)}
+    .help-table kbd{display:inline-block;background:var(--bg-mid);border:1px solid var(--border-light);border-bottom-width:2px;border-radius:4px;padding:1px 6px;font-family:var(--font-mono);font-size:11px;color:var(--text-primary);margin-right:2px}
+    .help-icon-row{display:flex;align-items:center;gap:10px;padding:4px 0;font-size:12.5px;color:var(--text-secondary)}
+    .help-icon-row svg{width:16px;height:16px;stroke-width:1.7;color:var(--text-primary);flex-shrink:0}
+    .help-footer{padding:10px 18px;border-top:1px solid var(--border);font-size:11px;color:var(--text-muted);text-align:right;flex-shrink:0}
+    .help-footer kbd{background:var(--bg-mid);border:1px solid var(--border-light);border-radius:3px;padding:0 4px;font-family:var(--font-mono)}
+
     /* ── INPUT PROMPT DIALOG (shared by new file/folder/rename) ── */
     .input-modal-body{padding:18px 20px}
     .input-modal-body .input-label{display:block;margin-bottom:6px;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}
@@ -659,6 +680,9 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg>
     </div>
     <div class="activity-spacer"></div>
+    <div class="activity-item" id="act-help" onclick="openHelp()" title="Help &amp; shortcuts">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12" y2="17"/></svg>
+    </div>
     <div class="activity-item" id="act-theme-toggle" onclick="toggleThemeMode()" title="Toggle light / dark theme">
       <!-- Content set dynamically by updateThemeToggleIcon() -->
     </div>
@@ -975,6 +999,93 @@
       <button class="diff-close" onclick="closeDiff()">×</button>
     </div>
     <div class="diff-body" id="diff-body"></div>
+  </div>
+</div>
+
+<!-- Help modal — shortcuts + what each activity-bar icon does. -->
+<div class="help-overlay" id="help-modal">
+  <div class="help-modal">
+    <div class="help-header">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" style="width:18px;height:18px"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12" y2="17"/></svg>
+      <div class="help-title">Help &amp; keyboard shortcuts</div>
+      <button class="help-close" onclick="closeHelp()">×</button>
+    </div>
+    <div class="help-body">
+
+      <div class="help-section-title">Sidebar controls</div>
+      <div class="help-icon-row">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="15 18 9 12 15 6"/></svg>
+        <span>Top icon — toggles the sidebar. Arrow flips with state.</span>
+      </div>
+      <div class="help-icon-row">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+        <span>Explorer · file tree, filter, open / create / rename / delete</span>
+      </div>
+      <div class="help-icon-row">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <span>Search · cross-file text search (backend-powered)</span>
+      </div>
+      <div class="help-icon-row">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>
+        <span>Source control · git status, pull, commit, push</span>
+      </div>
+      <div class="help-icon-row">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        <span>Insert · pick entities, services, triggers, conditions, events → insert at cursor</span>
+      </div>
+      <div class="help-icon-row">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg>
+        <span>Outline · top-level keys + notable list items (automations, scripts); click to jump</span>
+      </div>
+      <div class="help-icon-row">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+        <span>Sun / moon (bottom) · toggles between your default light and dark themes</span>
+      </div>
+      <div class="help-icon-row">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 10v6M4.22 4.22l4.24 4.24m7.08 7.08l4.24 4.24M1 12h6m10 0h6M4.22 19.78l4.24-4.24m7.08-7.08l4.24-4.24"/></svg>
+        <span>Gear (bottom) · opens Settings — theme, font size, indent style, …</span>
+      </div>
+
+      <div class="help-section-title">File operations</div>
+      <table class="help-table">
+        <tr><td class="help-what">Save current file</td><td class="help-how"><kbd>Ctrl</kbd><kbd>S</kbd></td></tr>
+        <tr><td class="help-what">Quick-open (fuzzy file search)</td><td class="help-how"><kbd>Ctrl</kbd><kbd>P</kbd></td></tr>
+        <tr><td class="help-what">Command palette (everything)</td><td class="help-how"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>P</kbd></td></tr>
+        <tr><td class="help-what">Toggle sidebar</td><td class="help-how"><kbd>Ctrl</kbd><kbd>B</kbd></td></tr>
+        <tr><td class="help-what">Toggle terminal</td><td class="help-how"><kbd>Ctrl</kbd><kbd>`</kbd></td></tr>
+        <tr><td class="help-what">Jinja template preview</td><td class="help-how"><kbd>Ctrl</kbd><kbd>Alt</kbd><kbd>J</kbd></td></tr>
+      </table>
+
+      <div class="help-section-title">Editing</div>
+      <table class="help-table">
+        <tr><td class="help-what">Find / Find-and-replace</td><td class="help-how"><kbd>Ctrl</kbd><kbd>F</kbd> / <kbd>Ctrl</kbd><kbd>H</kbd></td></tr>
+        <tr><td class="help-what">Toggle line comment</td><td class="help-how"><kbd>Ctrl</kbd><kbd>/</kbd></td></tr>
+        <tr><td class="help-what">Autocomplete (entities / services)</td><td class="help-how"><kbd>Ctrl</kbd><kbd>Space</kbd> (auto after typing a domain dot)</td></tr>
+        <tr><td class="help-what">Duplicate line</td><td class="help-how"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>D</kbd></td></tr>
+        <tr><td class="help-what">Select next occurrence</td><td class="help-how"><kbd>Ctrl</kbd><kbd>D</kbd></td></tr>
+        <tr><td class="help-what">Add cursor on line above / below</td><td class="help-how"><kbd>Ctrl</kbd><kbd>Alt</kbd><kbd>↑</kbd> / <kbd>Ctrl</kbd><kbd>Alt</kbd><kbd>↓</kbd></td></tr>
+        <tr><td class="help-what">Add cursor at click</td><td class="help-how"><kbd>Alt</kbd> + click</td></tr>
+        <tr><td class="help-what">Indent / outdent line</td><td class="help-how"><kbd>Tab</kbd> / <kbd>Shift</kbd><kbd>Tab</kbd></td></tr>
+      </table>
+
+      <div class="help-section-title">File tree</div>
+      <table class="help-table">
+        <tr><td class="help-what">Expand / collapse folder</td><td class="help-how">Click the folder</td></tr>
+        <tr><td class="help-what">Drill into a folder (focus mode)</td><td class="help-how">Double-click, or right-click → Focus here</td></tr>
+        <tr><td class="help-what">Open file in split (right pane)</td><td class="help-how">Right-click file → Open to the right</td></tr>
+        <tr><td class="help-what">Create / rename / delete</td><td class="help-how">Right-click → action (input prompt appears)</td></tr>
+      </table>
+
+      <div class="help-section-title">Source control (Git)</div>
+      <table class="help-table">
+        <tr><td class="help-what">Commit (when message focused)</td><td class="help-how"><kbd>Ctrl</kbd><kbd>Enter</kbd></td></tr>
+        <tr><td class="help-what">Diff current file vs HEAD</td><td class="help-how">Command palette → <em>Git: Diff current file vs HEAD</em></td></tr>
+      </table>
+
+    </div>
+    <div class="help-footer">
+      Press <kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>P</kbd> any time to see every command with its shortcut.
+    </div>
   </div>
 </div>
 
@@ -3373,6 +3484,12 @@ function updateMinimapViewport() {
 // ═══════════════════════════════════════════════════════════════
 // SETTINGS MODAL
 // ═══════════════════════════════════════════════════════════════
+function openHelp()  { document.getElementById('help-modal').classList.add('show'); }
+function closeHelp() { document.getElementById('help-modal').classList.remove('show'); }
+document.getElementById('help-modal').addEventListener('click', e => {
+  if (e.target.id === 'help-modal') closeHelp();
+});
+
 function openSettings() {
   const modal = document.getElementById('settings-modal');
   if (!modal) { console.error('[settings] modal element not found'); return; }
@@ -4522,6 +4639,7 @@ const COMMANDS = [
   { cat: 'View',   title: 'Font size: 15',                                       run: () => setFontSize(15) },
   { cat: 'View',   title: 'Font size: 17',                                       run: () => setFontSize(17) },
   { cat: 'View',   title: 'Open Settings…',          shortcut: '',               run: () => openSettings() },
+  { cat: 'View',   title: 'Show Help & shortcuts',   shortcut: 'F1',             run: () => openHelp() },
   { cat: 'Theme',  title: 'GitHub Light (default)',                              run: () => setTheme('github-light') },
   { cat: 'Theme',  title: 'HA Light',                                            run: () => setTheme('ha-light') },
   { cat: 'Theme',  title: 'Solarized Light',                                     run: () => setTheme('solarized-light') },
@@ -4710,6 +4828,8 @@ document.addEventListener('keydown', e => {
     toggleTerminal();
     return;
   }
+  // F1 → help modal
+  if (e.key === 'F1') { e.preventDefault(); openHelp(); return; }
   // Ctrl+B → toggle sidebar
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (e.key === 'b' || e.key === 'B')) {
     e.preventDefault();
