@@ -460,8 +460,63 @@ async def git_show(path: str, ref: str = "HEAD"):
     return {"ok": True, "content": out, "ref": ref}
 
 
+HA_GITIGNORE_TEMPLATE = """\
+# ──── Secrets — sensitive by default ────
+# Comment these out if you store secrets encrypted and want them in git.
+secrets.yaml
+*.secrets.yaml
+.env
+.env.*
+*.pem
+*.key
+known_hosts
+ssh_host_*
+
+# ──── Home Assistant runtime state ────
+.HA_VERSION
+.storage/
+.cloud/
+deps/
+tts/
+backups/
+
+# Databases and logs
+home-assistant_v2.db
+home-assistant_v2.db-shm
+home-assistant_v2.db-wal
+*.db
+*.db-shm
+*.db-wal
+*.log
+*.log.*
+
+# Python caches
+__pycache__/
+*.pyc
+*.pyo
+
+# OS / editor junk
+.DS_Store
+.vscode/
+.idea/
+Thumbs.db
+"""
+
+
+def _write_default_gitignore(overwrite: bool = False) -> bool:
+    """Create /config/.gitignore with HA-appropriate patterns.
+    Returns True if written, False if it already existed and
+    overwrite=False."""
+    target = CONFIG_ROOT / ".gitignore"
+    if target.exists() and not overwrite:
+        return False
+    target.write_text(HA_GITIGNORE_TEMPLATE, encoding="utf-8")
+    return True
+
+
 class InitBody(BaseModel):
     branch: str = "main"
+    seed_gitignore: bool = True   # also drop a sensible .gitignore
 
 
 @app.post("/api/git/init")
@@ -471,7 +526,19 @@ async def git_init(body: InitBody):
     code, out, err = await run_git("init", "-b", body.branch)
     if code != 0:
         raise HTTPException(500, err or out)
-    return {"ok": True, "output": out}
+    gitignore_written = False
+    if body.seed_gitignore:
+        gitignore_written = _write_default_gitignore(overwrite=False)
+    return {"ok": True, "output": out, "gitignore_written": gitignore_written}
+
+
+@app.post("/api/git/seed-gitignore")
+async def git_seed_gitignore(overwrite: bool = False):
+    """Drop (or overwrite) /config/.gitignore with the default
+    HA-appropriate patterns. Safe to call when no repo exists."""
+    written = _write_default_gitignore(overwrite=overwrite)
+    return {"ok": True, "written": written,
+            "exists_already": not written and (CONFIG_ROOT / ".gitignore").exists()}
 
 
 class RemoteBody(BaseModel):

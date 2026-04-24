@@ -2898,7 +2898,11 @@ async function refreshGit() {
           Your config folder isn't tracked by git yet. Initialise a
           repository here so your edits get <strong>M</strong>/<strong>A</strong>/<strong>U</strong>/<strong>D</strong>
           badges and you can commit them.
-          <button class="git-btn" style="margin-top:10px;display:block;width:100%" onclick="gitInit()">Initialise git repository</button>
+          <label style="display:flex;align-items:center;gap:6px;margin-top:10px;font-size:11px;color:var(--text-secondary);cursor:pointer">
+            <input type="checkbox" id="git-init-gitignore" checked style="accent-color:var(--accent)">
+            <span>Also create a default <code>.gitignore</code> (excludes <code>.storage/</code>, DBs, logs, caches)</span>
+          </label>
+          <button class="git-btn" style="margin-top:8px;display:block;width:100%" onclick="gitInit()">Initialise git repository</button>
           <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
             <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">Optional — connect to GitHub later:</div>
             <input id="git-remote-url" type="text" placeholder="https://github.com/you/repo.git"
@@ -2958,20 +2962,36 @@ async function gitCommit() {
 
 async function gitInit() {
   if (!API.available) { showToast('Demo mode — no backend'); return; }
+  const seed = document.getElementById('git-init-gitignore')?.checked !== false;
   try {
     const r = await fetch(API.url('/api/git/init'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ branch: 'main' }),
+      body: JSON.stringify({ branch: 'main', seed_gitignore: seed }),
     });
     if (!r.ok) throw new Error((await r.json()).detail || r.status);
-    // After init, offer to add a remote if a URL was typed already.
+    const data = await r.json();
     const url = document.getElementById('git-remote-url')?.value?.trim();
     if (url) await _gitAddRemote(url);
-    showToast('Git repository initialised');
+    showToast(data.gitignore_written
+      ? 'Git repository initialised (with default .gitignore)'
+      : 'Git repository initialised');
     refreshGit();
     refreshTree();
   } catch (e) { showToast('Init failed: ' + e.message); }
+}
+
+async function gitSeedGitignore(overwrite) {
+  if (!API.available) { showToast('Demo mode — no backend'); return; }
+  if (overwrite && !await new Promise(r => confirmDelete('.gitignore (will be overwritten)', r))) return;
+  try {
+    const r = await fetch(API.url('/api/git/seed-gitignore' + (overwrite ? '?overwrite=true' : '')), { method: 'POST' });
+    if (!r.ok) throw new Error((await r.json()).detail || r.status);
+    const d = await r.json();
+    showToast(d.written ? 'Default .gitignore created' :
+              d.exists_already ? '.gitignore already exists — use overwrite option' : 'Nothing to do');
+    refreshTree();
+  } catch (e) { showToast('Failed: ' + e.message); }
 }
 
 async function gitAddRemoteFromInput() {
@@ -4854,6 +4874,8 @@ const COMMANDS = [
   { cat: 'Git',    title: 'Commit (focus message)',                            run: () => { switchPanel('git'); document.getElementById('git-commit-msg').focus(); } },
   { cat: 'Git',    title: 'Refresh status',                                    run: () => refreshGit() },
   { cat: 'Git',    title: 'Initialise repository here',                         run: () => gitInit() },
+  { cat: 'Git',    title: 'Create default .gitignore (HA-appropriate patterns)',run: () => gitSeedGitignore(false) },
+  { cat: 'Git',    title: 'Overwrite .gitignore with defaults',                 run: () => gitSeedGitignore(true) },
   { cat: 'Git',    title: 'Diff current file vs HEAD',                         run: () => openDiffAgainstHead() },
   { cat: 'File',   title: 'Diff current file vs on disk',                      run: () => openDiffAgainstDisk() },
   { cat: 'HA',     title: 'Check Configuration',                               run: () => haCheckConfig() },

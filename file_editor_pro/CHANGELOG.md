@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.11.5 — Default .gitignore with secrets excluded by default
+
+- **Checkbox in the init UI** (on by default) seeds a `/config/.gitignore` alongside the repo with HA-appropriate patterns. **Secrets are excluded by default** — `secrets.yaml`, `*.secrets.yaml`, `.env`, `.env.*`, `*.pem`, `*.key`, SSH host keys. Runtime state (`.storage/`, `.cloud/`, `backups/`), databases, logs, Python caches, and OS/editor junk are all excluded too.
+- Users who *want* to commit secrets (e.g. encrypted) can delete those lines from `.gitignore` after init.
+- **Command palette**: *Git: Create default .gitignore (HA-appropriate patterns)* for existing repos, and an overwrite variant. Backend adds `POST /api/git/seed-gitignore` (with an optional `?overwrite=true`).
+
 ## 1.11.4 — Clearer help icon + guided git setup
 
 - Help button in the activity bar swapped from a thin path-drawn `?` (which read as fuzzy at 18 px) to a bold italic `i` rendered as an SVG `<text>` element inside a circle. Same update applied to the Help modal header for consistency.
