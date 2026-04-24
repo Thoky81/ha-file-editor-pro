@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.11.12 — Mac keyboard-shortcut labels
+
+All keyboard shortcuts displayed in the UI are now re-labelled for Mac users automatically. The mapping: `Ctrl → ⌘`, `Alt → ⌥`, `Shift → ⇧`, `Enter → ↵`, `Tab → ⇥`. Windows/Linux users see exactly the same labels as before.
+
+- **Help modal**, **command palette** shortcut column, button **tooltips** (`Save`, `Toggle sidebar`, etc.), the Jinja preview hint, the welcome screen hint line, and dynamic status-bar tooltips all render the correct modifier symbols.
+- Detection is a one-shot `navigator.platform` check at load, and a single DOM sweep relabels `<kbd>` elements plus `title`/`placeholder`/`aria-label` attributes. Dynamic strings go through a small `fmtInline()` helper.
+- Keybinding logic was already platform-aware (`ctrlKey || metaKey` across the board) — only the displayed labels changed.
+
 ## 1.11.11 — Jinja error list is now clickable + far fewer false positives
 
 Two fixes to how Jinja validation surfaces in the UI.

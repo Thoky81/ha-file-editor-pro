@@ -896,7 +896,7 @@
       <div class="no-file-open" id="no-file-msg">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
         <p>Open a file from the explorer</p>
-        <p style="font-size:11px;color:var(--text-muted)">Ctrl+S to save · Ctrl+F to find · Ctrl+H to replace</p>
+        <p class="welcome-hint" style="font-size:11px;color:var(--text-muted)">Ctrl+S to save · Ctrl+F to find · Ctrl+H to replace</p>
       </div>
       <textarea id="editor-textarea"></textarea>
     </div>
@@ -2633,11 +2633,15 @@ function updateJinjaStatus(n, state) {
     if (/^Valid YAML|^–/.test(cur)) {
       errTxt.textContent = 'Jinja: skipped (complex template)';
       errEl.className = 'status-item status-clickable';
-      errEl.title = 'File contains control-flow or scope-introducing Jinja tags ' +
-                    '({% if %}, {% for %}, {% macro %}, {% set x = … %}) that cannot ' +
-                    'be validated in isolation. Use Ctrl+Alt+J to preview a template, ' +
-                    'or Check Config for HA\'s full validation.';
-      errEl.onclick = () => showToast('Complex template — use Ctrl+Alt+J or Check Config to validate');
+      errEl.title = fmtInline(
+        'File contains control-flow or scope-introducing Jinja tags ' +
+        '({% if %}, {% for %}, {% macro %}, {% set x = … %}) that cannot ' +
+        'be validated in isolation. Use Ctrl+Alt+J to preview a template, ' +
+        'or Check Config for HA\'s full validation.'
+      );
+      errEl.onclick = () => showToast(fmtInline(
+        'Complex template — use Ctrl+Alt+J or Check Config to validate'
+      ));
     }
     return;
   }
@@ -5352,7 +5356,7 @@ function renderCmdPal(query) {
     <div class="cmdpal-item ${i === 0 ? 'selected' : ''}" data-idx="${i}">
       <span class="cmdpal-cat">${c.cat}</span>
       <span class="cmdpal-title">${escapeHtml(c.title)}</span>
-      <span class="cmdpal-shortcut">${c.shortcut || ''}</span>
+      <span class="cmdpal-shortcut">${escapeHtml(fmtShortcut(c.shortcut || ''))}</span>
     </div>`).join('');
   list.querySelectorAll('.cmdpal-item').forEach(el => {
     el.addEventListener('mouseenter', () => {
@@ -5380,6 +5384,63 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, ch => ({
     '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
   })[ch]);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// KEYBOARD LABELS (mac vs windows/linux)
+// ═══════════════════════════════════════════════════════════════
+// All keyboard handling internally checks both `ctrlKey` and
+// `metaKey`, so the only thing that has to change per-platform is
+// how shortcuts are *displayed* in help text, titles, placeholders
+// and the command palette.
+const IS_MAC = /Mac|iPod|iPhone|iPad/.test(navigator.platform || navigator.userAgent || '');
+
+const _KEY_LABELS = IS_MAC
+  ? { Ctrl: '⌘', Alt: '⌥', Shift: '⇧', Enter: '↵', Tab: '⇥' }
+  : null;   // non-mac: keep "Ctrl" / "Alt" / "Shift" as-is
+
+// Re-label a shortcut string like "Ctrl+Shift+P" → "⌘⇧P" on Mac.
+function fmtShortcut(s) {
+  if (!_KEY_LABELS || !s) return s;
+  return s.split('+').map(p => _KEY_LABELS[p] || p).join('');
+}
+
+// Re-label shortcut mentions embedded inside free-form text so toasts
+// and dynamically-set tooltips read naturally on Mac.
+function fmtInline(text) {
+  if (!_KEY_LABELS || !text) return text;
+  return String(text).replace(
+    /\b(?:Ctrl|Alt|Shift)(?:\+[A-Za-z0-9`\/↑↓]+)*/g,
+    fmtShortcut
+  );
+}
+
+// One-shot sweep of the rendered DOM: swap <kbd>Ctrl</kbd>/<kbd>Alt</kbd>
+// labels, and rewrite "Ctrl+…" occurrences inside title/placeholder
+// attributes and a couple of hand-written hint strings. Everything
+// rendered dynamically goes through fmtShortcut() instead.
+function _relabelShortcutsForMac() {
+  if (!_KEY_LABELS) return;
+  // <kbd> labels
+  document.querySelectorAll('kbd').forEach(k => {
+    const t = k.textContent.trim();
+    if (_KEY_LABELS[t]) k.textContent = _KEY_LABELS[t];
+  });
+  // title + placeholder + aria-label attributes
+  const re = /\b(Ctrl|Alt|Shift|Enter|Tab)\b/g;
+  const attrs = ['title', 'placeholder', 'aria-label'];
+  document.querySelectorAll('[title],[placeholder],[aria-label]').forEach(el => {
+    for (const a of attrs) {
+      const v = el.getAttribute(a);
+      if (v && re.test(v)) el.setAttribute(a, v.replace(re, (_, k) => _KEY_LABELS[k] || k));
+    }
+  });
+  // A couple of literal strings baked into the welcome / help text.
+  document.querySelectorAll('.welcome-hint, .jinja-hint').forEach(el => {
+    if (el.textContent && /\b(Ctrl|Alt|Shift)\b/.test(el.textContent)) {
+      el.textContent = el.textContent.replace(re, (_, k) => _KEY_LABELS[k] || k);
+    }
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -5516,6 +5577,8 @@ document.getElementById('jinja-modal').addEventListener('click', e => {
 // BOOT
 // ═══════════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', async () => {
+  _relabelShortcutsForMac();   // fix shortcut labels before anything shows
+
   initEditor();
   editor.getWrapperElement().style.display = 'none';
 
