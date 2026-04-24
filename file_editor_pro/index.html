@@ -970,6 +970,25 @@
   </div>
 </div>
 
+<!-- Delete confirmation dialog. Cancel is the initial focus so a
+     stray Enter cancels rather than deletes. Delete is marked as
+     the danger action and has to be deliberately clicked. -->
+<div class="confirm-overlay" id="delete-modal">
+  <div class="confirm-modal">
+    <div class="confirm-body">
+      <div class="confirm-title">Delete</div>
+      <div class="confirm-message">
+        Really delete <span class="confirm-filename" id="delete-filename"></span>?<br>
+        <span style="color:var(--text-muted);font-size:11px">This action can't be undone.</span>
+      </div>
+    </div>
+    <div class="confirm-footer">
+      <button class="confirm-btn" id="delete-cancel-btn" onclick="_confirmDelete(false)">Cancel</button>
+      <button class="confirm-btn danger" onclick="_confirmDelete(true)">Delete</button>
+    </div>
+  </div>
+</div>
+
 <!-- Unsaved-changes confirm dialog -->
 <div class="confirm-overlay" id="confirm-modal">
   <div class="confirm-modal">
@@ -1976,6 +1995,36 @@ function _doCloseTab(idx, id) {
 // ═══════════════════════════════════════════════════════════════
 // UNSAVED-CHANGES CONFIRM DIALOG
 // ═══════════════════════════════════════════════════════════════
+let _deleteCallback = null;
+function confirmDelete(pathLabel, cb) {
+  _deleteCallback = cb;
+  document.getElementById('delete-filename').textContent = pathLabel || '';
+  document.getElementById('delete-modal').classList.add('show');
+  // Focus Cancel so Enter on the keyboard = cancel (safer).
+  setTimeout(() => document.getElementById('delete-cancel-btn')?.focus(), 30);
+}
+function _confirmDelete(ok) {
+  document.getElementById('delete-modal').classList.remove('show');
+  const cb = _deleteCallback; _deleteCallback = null;
+  if (cb) cb(!!ok);
+}
+document.getElementById('delete-modal').addEventListener('click', e => {
+  if (e.target.id === 'delete-modal') _confirmDelete(false);
+});
+document.addEventListener('keydown', e => {
+  const m = document.getElementById('delete-modal');
+  if (m && m.classList.contains('show')) {
+    if (e.key === 'Escape') { e.preventDefault(); _confirmDelete(false); }
+    else if (e.key === 'Enter') {
+      // Only fire if the focused element is the cancel button (the
+      // primary focus target), so Enter really does mean cancel.
+      if (document.activeElement?.id === 'delete-cancel-btn') {
+        e.preventDefault(); _confirmDelete(false);
+      }
+    }
+  }
+});
+
 let _confirmCallback = null;
 function confirmUnsaved(tab, cb) {
   _confirmCallback = cb;
@@ -2479,26 +2528,35 @@ function modeForPath(name) {
 }
 
 function ingestBackendTree(nodes) {
-  // Backend now returns a list of root nodes (config / ssl / share /
-  // addons / media / backup). Each root's path is prefixed with its
-  // name so we can resolve every request unambiguously.
+  // Preserve which directories were expanded BEFORE the refresh so
+  // create/delete/rename doesn't snap the tree shut.
+  const expanded = new Set();
+  (function collect(list) {
+    for (const n of (list || [])) {
+      if (n.type === 'dir' && n.open && n.path) expanded.add(n.path);
+      if (n.children && n.children.length) collect(n.children);
+    }
+  })(TREE);
+
   for (const key of Object.keys(FILES)) delete FILES[key];
   function walk(list) {
     return list.map(n => {
       if (n.type === 'dir') {
-        return { name: n.name, type: 'dir', open: false, path: n.path, children: walk(n.children || []) };
+        return { name: n.name, type: 'dir',
+                 open: expanded.has(n.path),
+                 path: n.path, children: walk(n.children || []) };
       }
       FILES[n.path] = { mode: modeForPath(n.name), gitStatus: null, content: null, loaded: false };
       return { name: n.name, path: n.path };
     });
   }
   TREE.length = 0;
-  // Expand the primary root (config) so the user lands on something
-  // familiar; the other roots start collapsed.
+  // First ingest (no expanded set) — default: config root open, others closed.
+  const firstLoad = expanded.size === 0;
   const walked = nodes.map(n => {
-    const open = n.name === 'config';
+    const open = expanded.has(n.path) || (firstLoad && n.name === 'config');
     return { name: n.name, type: 'dir', open, path: n.path,
-             children: walk(n.children || []).map(c => ({ ...c })) };
+             children: walk(n.children || []) };
   });
   for (const r of walked) TREE.push(r);
 }
@@ -2742,20 +2800,25 @@ async function treeCtxDownload() {
 
 async function treeCtxDelete() {
   if (!_treeCtxTarget) return;
-  if (!confirm(`Delete ${_treeCtxTarget.path}?`)) return;
-  if (!API.available) { showToast('Demo mode — no backend'); return; }
-  try {
-    const r = await fetch(API.url('/api/files/delete'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path: _treeCtxTarget.path }),
-    });
-    if (!r.ok) throw new Error((await r.json()).detail || r.status);
-    // Close any open tab for this path
-    const tab = tabs.find(t => t.path === _treeCtxTarget.path);
-    if (tab) closeTab(tab.id);
-    refreshTree();
-  } catch (e) { showToast('Delete failed: ' + e.message); }
+  const target = _treeCtxTarget;
+  // Custom confirm so Cancel is always the initial focus (safe
+  // default: Enter = cancel), and the red Delete button is a
+  // deliberate mouse click.
+  confirmDelete(target.path, async (ok) => {
+    if (!ok) return;
+    if (!API.available) { showToast('Demo mode — no backend'); return; }
+    try {
+      const r = await fetch(API.url('/api/files/delete'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: target.path }),
+      });
+      if (!r.ok) throw new Error((await r.json()).detail || r.status);
+      const tab = tabs.find(t => t.path === target.path);
+      if (tab) closeTab(tab.id);
+      refreshTree();
+    } catch (e) { showToast('Delete failed: ' + e.message); }
+  });
 }
 
 async function promptNewFileIn(dir) {
