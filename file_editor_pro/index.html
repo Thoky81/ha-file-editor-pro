@@ -813,6 +813,9 @@
           <button class="icon-btn" title="Push" onclick="gitPush()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 5v14"/><polyline points="19 12 12 5 5 12"/></svg>
           </button>
+          <button class="icon-btn" title="Clear stale .git/index.lock (use only if git reports 'Another git process seems to be running')" onclick="gitClearLock()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 1 1 8 0"/><line x1="12" y1="15" x2="12" y2="17"/></svg>
+          </button>
         </div>
       </div>
       <div class="sidebar-content">
@@ -3107,19 +3110,45 @@ async function gitCommit() {
   const paths = GIT_CHANGES.filter(c => _gitStaged.get(c.path)).map(c => c.path);
   if (!paths.length) { showToast('Nothing staged — tick at least one file'); return; }
   const allSelected = paths.length === GIT_CHANGES.length;
-  try {
+  const body = allSelected ? { message: msg } : { message: msg, paths };
+
+  async function attempt() {
     const r = await fetch(API.url('/api/git/commit'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       // Send paths only for partial commits — omit (null) to signal
       // "add everything" (git add -A, picks up renames/deletes too).
-      body: JSON.stringify(allSelected ? { message: msg } : { message: msg, paths }),
+      body: JSON.stringify(body),
     });
     if (!r.ok) throw new Error((await r.json()).detail || r.status);
+  }
+
+  try {
+    await attempt();
     showToast(`Committed ${paths.length} file${paths.length>1?'s':''}`);
     box.value = '';
     refreshGit();
   } catch (e) {
+    // If the failure is a stale git lock, offer a one-click recover-and-retry
+    // instead of leaving the user to find the unlock button themselves.
+    if (/index\.lock/i.test(e.message)) {
+      const retry = window.confirm(
+        'A stale .git/index.lock is blocking git operations.\n\n' +
+        'This usually means a previous git command was interrupted. ' +
+        'Clear the lock and retry the commit?'
+      );
+      if (!retry) return;
+      try {
+        await fetch(API.url('/api/git/clear-lock'), { method: 'POST' });
+        await attempt();
+        showToast(`Committed ${paths.length} file${paths.length>1?'s':''}`);
+        box.value = '';
+        refreshGit();
+      } catch (e2) {
+        showToast('Commit failed: ' + e2.message);
+      }
+      return;
+    }
     showToast('Commit failed: ' + e.message);
   }
 }
@@ -3197,6 +3226,18 @@ async function gitPush() {
     showToast('Pushed');
     refreshGit();
   } catch (e) { showToast('Push failed: ' + e.message); }
+}
+
+async function gitClearLock() {
+  if (!API.available) { showToast('Demo mode — no backend'); return; }
+  try {
+    const r = await fetch(API.url('/api/git/clear-lock'), { method: 'POST' });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || r.status);
+    showToast(d.cleared ? 'Stale git lock cleared — try the commit again'
+                        : 'No git lock to clear');
+    refreshGit();
+  } catch (e) { showToast('Clear lock failed: ' + e.message); }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -5038,6 +5079,7 @@ const COMMANDS = [
   { cat: 'Git',    title: 'Push',                                              run: () => gitPush() },
   { cat: 'Git',    title: 'Commit (focus message)',                            run: () => { switchPanel('git'); document.getElementById('git-commit-msg').focus(); } },
   { cat: 'Git',    title: 'Refresh status',                                    run: () => refreshGit() },
+  { cat: 'Git',    title: 'Clear stale index.lock',                             run: () => gitClearLock() },
   { cat: 'Git',    title: 'Initialise repository here',                         run: () => gitInit() },
   { cat: 'Git',    title: 'Create default .gitignore (HA-appropriate patterns)',run: () => gitSeedGitignore(false) },
   { cat: 'Git',    title: 'Overwrite .gitignore with defaults',                 run: () => gitSeedGitignore(true) },

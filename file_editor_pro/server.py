@@ -5,6 +5,7 @@ import os
 import shutil
 import struct
 import subprocess
+import time
 from pathlib import Path
 
 import httpx
@@ -338,16 +339,52 @@ def has_git() -> bool:
     return shutil.which("git") is not None and (CONFIG_ROOT / ".git").is_dir()
 
 
+# Serialize git operations so two requests from the UI can't race each
+# other into .git/index.lock conflicts.
+_GIT_LOCK = asyncio.Lock()
+
+# Age above which .git/index.lock is treated as abandoned and removed.
+# A real git process rarely holds the lock for more than a couple of
+# seconds; keeping a conservative 15 s window means we never step on a
+# live operation the add-on launched itself.
+_STALE_LOCK_SECS = 15
+
+
+def _clear_stale_index_lock(cwd: Path = CONFIG_ROOT) -> bool:
+    """Remove .git/index.lock if it looks abandoned.
+
+    Returns True if a lock file was actually cleared. The usual cause is
+    an earlier git process being killed mid-operation (container stop,
+    OOM, etc.), which leaves the lock behind and then blocks every
+    subsequent commit with "File exists".
+    """
+    lock = cwd / ".git" / "index.lock"
+    try:
+        if not lock.exists():
+            return False
+        age = time.time() - lock.stat().st_mtime
+        if age >= _STALE_LOCK_SECS:
+            lock.unlink(missing_ok=True)
+            return True
+    except OSError:
+        pass
+    return False
+
+
 async def run_git(*args: str, cwd: Path = CONFIG_ROOT) -> tuple[int, str, str]:
-    proc = await asyncio.create_subprocess_exec(
-        "git", *args,
-        cwd=str(cwd),
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-        env={**os.environ, "GIT_TERMINAL_PROMPT": "0"},
-    )
-    out, err = await proc.communicate()
-    return proc.returncode or 0, out.decode(errors="replace"), err.decode(errors="replace")
+    async with _GIT_LOCK:
+        # Best-effort: if a prior run crashed and left a stale lock,
+        # clear it so the next command isn't permanently broken.
+        _clear_stale_index_lock(cwd)
+        proc = await asyncio.create_subprocess_exec(
+            "git", *args,
+            cwd=str(cwd),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            env={**os.environ, "GIT_TERMINAL_PROMPT": "0"},
+        )
+        out, err = await proc.communicate()
+        return proc.returncode or 0, out.decode(errors="replace"), err.decode(errors="replace")
 
 
 @app.get("/api/git/status")
@@ -429,7 +466,7 @@ async def git_commit(body: CommitBody):
     else:
         code, _, err = await run_git("add", "-A")
     if code != 0:
-        raise HTTPException(500, f"git add failed: {err}")
+        raise HTTPException(500, _friendly_git_err("git add", err))
 
     # Commit only the specified paths when given — otherwise commit
     # everything that was just staged.
@@ -439,8 +476,37 @@ async def git_commit(body: CommitBody):
     else:
         code, out, err = await run_git("commit", "-m", body.message)
     if code != 0:
-        raise HTTPException(500, f"git commit failed: {err or out}")
+        raise HTTPException(500, _friendly_git_err("git commit", err or out))
     return {"ok": True, "output": out}
+
+
+def _friendly_git_err(action: str, err: str) -> str:
+    """Turn raw git stderr into something an add-on user can act on."""
+    e = (err or "").strip()
+    if "index.lock" in e and "File exists" in e:
+        return (f"{action} failed: a stale .git/index.lock is blocking git. "
+                "Click the Source Control header → Clear lock, then retry.")
+    return f"{action} failed: {e}"
+
+
+@app.post("/api/git/clear-lock")
+async def git_clear_lock():
+    """Force-remove .git/index.lock regardless of age.
+
+    Exposed so the UI can recover from a fresh lock that the automatic
+    15-second window hasn't yet treated as stale. Safe in this add-on
+    because git calls are serialized through `_GIT_LOCK` and no other
+    process in the container writes to the repo.
+    """
+    if not has_git():
+        raise HTTPException(400, "Not a git repository")
+    lock = CONFIG_ROOT / ".git" / "index.lock"
+    existed = lock.exists()
+    try:
+        lock.unlink(missing_ok=True)
+    except OSError as e:
+        raise HTTPException(500, f"Could not remove lock: {e}")
+    return {"ok": True, "cleared": existed}
 
 
 @app.post("/api/git/push")

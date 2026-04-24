@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.11.8 — Stale git lock recovery
+
+Fixes *"fatal: Unable to create '/config/.git/index.lock': File exists"* — a recurring failure when a previous git operation was interrupted (container stop, OOM, browser refresh mid-commit) and left its lockfile behind. The add-on couldn't commit again until that file was removed by hand.
+
+- **Auto-clear on the way in.** Every backend git call now checks for `.git/index.lock` first and removes it if it's older than 15 seconds. Live operations the add-on just started (<15 s) are never disturbed, so this is safe even under normal use.
+- **Serialized git access.** All git subprocesses now run under a single `asyncio.Lock`, so two panel actions firing at the same instant can't collide into a lockfile conflict of their own making.
+- **Commit-time auto-retry.** If a commit still hits a stale-lock error, the panel pops a confirm dialog: *"Clear the lock and retry?"* — one click recovers, no terminal needed.
+- **Unlock button in the Source Control header.** Next to Refresh / Pull / Push: a small padlock icon that force-clears `index.lock`. Use it only when the friendly retry dialog doesn't appear but git still refuses to cooperate.
+- **Command palette entry**: *Git: Clear stale index.lock*.
+- **Clearer error message** — when a stale lock is the cause, the toast now tells you what to click, instead of dumping raw git stderr.
+
 ## 1.11.7 — Logs panel: persistent notification history
 
 - **New Logs panel** — every toast notification is now captured in a 500-entry ring buffer so you can re-read messages that disappeared before you finished reading them. Open it from the **Logs** button in the status bar (bottom-right), press **F12**, or use the command palette (*View: Show Logs*).
