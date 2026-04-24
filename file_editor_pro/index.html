@@ -462,6 +462,13 @@
     .diff-body{flex:1;min-height:0;overflow:hidden}
     .diff-body .CodeMirror{height:100% !important;background:var(--bg-darkest) !important}
 
+    /* ── INPUT PROMPT DIALOG (shared by new file/folder/rename) ── */
+    .input-modal-body{padding:18px 20px}
+    .input-modal-body .input-label{display:block;margin-bottom:6px;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}
+    .input-modal-body input[type=text]{width:100%;background:var(--bg-mid);border:1px solid var(--border-light);color:var(--text-primary);border-radius:5px;padding:8px 10px;font-family:var(--font-mono);font-size:13px;outline:none;box-sizing:border-box}
+    .input-modal-body input[type=text]:focus{border-color:var(--accent)}
+    .input-modal-body .input-hint{margin-top:8px;font-size:11px;color:var(--text-muted);font-family:var(--font-mono)}
+
     /* ── UNSAVED-CHANGES CONFIRM DIALOG ── */
     .confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2100;display:none;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
     .confirm-overlay.show{display:flex}
@@ -967,6 +974,24 @@
       <button class="diff-close" onclick="closeDiff()">×</button>
     </div>
     <div class="diff-body" id="diff-body"></div>
+  </div>
+</div>
+
+<!-- Reusable input prompt (replaces native prompt() for new file /
+     folder / rename). OK button is primary-focused; Enter submits. -->
+<div class="confirm-overlay" id="input-modal">
+  <div class="confirm-modal">
+    <div class="input-modal-body">
+      <div class="confirm-title" id="input-title">Input</div>
+      <div class="confirm-message" id="input-message" style="margin-bottom:10px"></div>
+      <label class="input-label" id="input-label">Name</label>
+      <input type="text" id="input-field" spellcheck="false" autocomplete="off">
+      <div class="input-hint" id="input-hint"></div>
+    </div>
+    <div class="confirm-footer">
+      <button class="confirm-btn" onclick="_inputResolve(null)">Cancel</button>
+      <button class="confirm-btn primary" id="input-ok-btn" onclick="_inputResolve(document.getElementById('input-field').value)">OK</button>
+    </div>
   </div>
 </div>
 
@@ -1995,6 +2020,37 @@ function _doCloseTab(idx, id) {
 // ═══════════════════════════════════════════════════════════════
 // UNSAVED-CHANGES CONFIRM DIALOG
 // ═══════════════════════════════════════════════════════════════
+// Reusable input dialog. Returns a Promise that resolves to the
+// trimmed string or null on cancel. Replaces native prompt().
+let _inputPromise = null;
+function promptInput({ title, message, label, okLabel, hint, defaultValue, placeholder }) {
+  return new Promise(resolve => {
+    _inputPromise = resolve;
+    document.getElementById('input-title').textContent   = title   || 'Input';
+    document.getElementById('input-message').textContent = message || '';
+    document.getElementById('input-label').textContent   = label   || 'Name';
+    document.getElementById('input-hint').textContent    = hint    || '';
+    const f = document.getElementById('input-field');
+    f.value = defaultValue || '';
+    f.placeholder = placeholder || '';
+    document.getElementById('input-ok-btn').textContent = okLabel || 'OK';
+    document.getElementById('input-modal').classList.add('show');
+    setTimeout(() => { f.focus(); f.select(); }, 30);
+  });
+}
+function _inputResolve(value) {
+  document.getElementById('input-modal').classList.remove('show');
+  const r = _inputPromise; _inputPromise = null;
+  if (r) r(value == null ? null : value.trim() || null);
+}
+document.getElementById('input-modal').addEventListener('click', e => {
+  if (e.target.id === 'input-modal') _inputResolve(null);
+});
+document.getElementById('input-field').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); _inputResolve(e.target.value); }
+  if (e.key === 'Escape') { e.preventDefault(); _inputResolve(null); }
+});
+
 let _deleteCallback = null;
 function confirmDelete(pathLabel, cb) {
   _deleteCallback = cb;
@@ -2687,15 +2743,22 @@ async function refreshTree() {
 
 async function promptNewFolder() {
   const dir = currentContextDir();
-  const base = dir ? dir + '/' : '';
-  const name = prompt('New folder name (will be created under ' + (dir || '/') + '):', base + 'new_folder');
+  const name = await promptInput({
+    title: 'New folder',
+    label: 'Folder name',
+    okLabel: 'Create',
+    defaultValue: 'new_folder',
+    placeholder: 'new_folder',
+    hint: 'Will be created under ' + (dir || '/'),
+  });
   if (!name) return;
+  const fullPath = dir ? dir.replace(/\/$/, '') + '/' + name.replace(/^\/+/, '') : name.replace(/^\/+/, '');
   if (!API.available) { showToast('Demo mode — no backend'); return; }
   try {
     const r = await fetch(API.url('/api/files/mkdir'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path: name }),
+      body: JSON.stringify({ path: fullPath }),
     });
     if (!r.ok) throw new Error((await r.json()).detail || r.status);
     refreshTree();
@@ -2759,8 +2822,17 @@ function treeCtxFocus() { if (_treeCtxTarget?.type === 'dir') setTreeFocus(_tree
 async function treeCtxRename() {
   if (!_treeCtxTarget) return;
   const current = _treeCtxTarget.path;
-  const next = prompt('New path (relative to /config):', current);
-  if (!next || next === current) return;
+  const dir = current.replace(/[^/]*$/, '').replace(/\/$/, '');
+  const base = current.split('/').pop();
+  const name = await promptInput({
+    title: 'Rename',
+    label: 'New name',
+    okLabel: 'Rename',
+    defaultValue: base,
+    hint: 'In ' + (dir || '/'),
+  });
+  if (!name || name === base) return;
+  const next = dir ? dir + '/' + name : name;
   if (!API.available) { showToast('Demo mode — no backend'); return; }
   try {
     const r = await fetch(API.url('/api/files/rename'), {
@@ -2776,8 +2848,19 @@ async function treeCtxRename() {
 async function treeCtxDuplicate() {
   if (!_treeCtxTarget || _treeCtxTarget.type !== 'file' || !API.available) return;
   const src = _treeCtxTarget.path;
-  const dst = prompt('Copy to path:', src.replace(/(\.[^.]+)?$/, '.copy$1'));
-  if (!dst || dst === src) return;
+  const dir = src.replace(/[^/]*$/, '').replace(/\/$/, '');
+  const base = src.split('/').pop();
+  const defaultName = base.replace(/(\.[^.]+)?$/, '.copy$1');
+  const name = await promptInput({
+    title: 'Duplicate file',
+    label: 'New name',
+    okLabel: 'Duplicate',
+    defaultValue: defaultName,
+    hint: 'In ' + (dir || '/'),
+  });
+  if (!name) return;
+  const dst = dir ? dir + '/' + name : name;
+  if (dst === src) return;
   try {
     const { content } = await API.read(src);
     await API.write(dst, content);
@@ -2822,14 +2905,23 @@ async function treeCtxDelete() {
 }
 
 async function promptNewFileIn(dir) {
-  const base = dir ? dir.replace(/\/?$/, '/') : '';
-  const name = prompt('New file name (will be created under ' + (dir || '/') + '):', base + 'new_file.yaml');
+  const name = await promptInput({
+    title: 'New file',
+    label: 'File name',
+    okLabel: 'Create',
+    defaultValue: 'new_file.yaml',
+    placeholder: 'new_file.yaml',
+    hint: 'Will be created under ' + (dir || '/'),
+  });
   if (!name) return;
+  // Prepend the context directory — the input captures only the
+  // filename, so users don't see a confusing full path.
+  const fullPath = dir ? dir.replace(/\/$/, '') + '/' + name.replace(/^\/+/, '') : name.replace(/^\/+/, '');
   if (!API.available) { showToast('Demo mode — no backend'); return; }
   try {
-    await API.write(name, '');
+    await API.write(fullPath, '');
     await refreshTree();
-    openFile(name);
+    openFile(fullPath);
   } catch (e) { showToast('Create failed: ' + e.message); }
 }
 

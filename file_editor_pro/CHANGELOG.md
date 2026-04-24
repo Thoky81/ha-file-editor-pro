@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.10.7 — Custom input dialog for create / rename / duplicate
+
+- **New file, New folder, Rename, Duplicate** now use the same custom modal style as the delete confirmation. Title, label, text field, *Cancel* + action button. Enter submits, Esc cancels, input is auto-selected for quick edits.
+- **Input field shows only the filename, not the full path.** Creating a new file under `config/packages/` used to pre-fill `config/packages/new_file.yaml`; now it just shows `new_file.yaml` with a hint "*Will be created under config/packages*" below. The app joins the dir + name internally. Same treatment for Rename (only the basename is edited, directory stays).
+
 ## 1.10.6 — Preserved expanded state + custom delete confirm
 
 - **Tree no longer collapses on create / delete / rename.** `ingestBackendTree` now snapshots every currently-open directory path and re-applies the expanded flag after the refresh, so you don't have to re-open folders every time you modify the filesystem.
