@@ -377,8 +377,18 @@ async def git_status():
             status = "U"
         elif "M" in xy:
             status = "M"
-        changes.append({"path": path, "status": status, "xy": xy})
+        # Prefix with the root name so frontend keys match
+        # (tree uses root-prefixed paths like "config/…").
+        changes.append({"path": f"config/{path}", "status": status, "xy": xy})
     return {"repo": True, "branch": branch, "changes": changes}
+
+
+def _strip_config_prefix(p: str) -> str:
+    """Strip leading 'config/' from a path so it matches a git-repo-
+    relative path (our repo is /config)."""
+    if p.startswith("config/"):
+        return p[len("config/"):]
+    return p
 
 
 @app.get("/api/git/diff")
@@ -387,7 +397,7 @@ async def git_diff(path: str | None = None):
         raise HTTPException(400, "Not a git repository")
     args = ["diff", "--no-color"]
     if path:
-        args += ["--", path]
+        args += ["--", _strip_config_prefix(path)]
     code, out, err = await run_git(*args)
     return {"ok": code == 0, "diff": out, "error": err}
 
@@ -412,13 +422,22 @@ async def git_commit(body: CommitBody):
         await run_git("config", "user.email", email)
 
     if body.paths:
-        code, _, err = await run_git("add", "--", *body.paths)
+        # Strip the "config/" prefix the frontend uses; git works
+        # relative to CONFIG_ROOT so it needs plain paths.
+        gp = [_strip_config_prefix(p) for p in body.paths]
+        code, _, err = await run_git("add", "--", *gp)
     else:
         code, _, err = await run_git("add", "-A")
     if code != 0:
         raise HTTPException(500, f"git add failed: {err}")
 
-    code, out, err = await run_git("commit", "-m", body.message)
+    # Commit only the specified paths when given — otherwise commit
+    # everything that was just staged.
+    if body.paths:
+        gp = [_strip_config_prefix(p) for p in body.paths]
+        code, out, err = await run_git("commit", "-m", body.message, "--", *gp)
+    else:
+        code, out, err = await run_git("commit", "-m", body.message)
     if code != 0:
         raise HTTPException(500, f"git commit failed: {err or out}")
     return {"ok": True, "output": out}
@@ -451,9 +470,7 @@ async def git_show(path: str, ref: str = "HEAD"):
         raise HTTPException(400, "Not a git repository")
     # Paths may be root-prefixed (e.g. "config/foo.yaml"). Git works
     # relative to CONFIG_ROOT — strip the "config/" prefix if present.
-    rel = path
-    if rel.startswith("config/"):
-        rel = rel[len("config/"):]
+    rel = _strip_config_prefix(path)
     code, out, err = await run_git("show", f"{ref}:{rel}", cwd=CONFIG_ROOT)
     if code != 0:
         return {"ok": False, "error": err.strip() or out.strip()}

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.11.6 — Selective staging in Source Control + fix path mismatch
+
+- **Per-file checkboxes** in the Source Control panel. Every change gets a checkbox (staged by default). Uncheck a file and it won't be part of the next commit. The commit button label updates in real time — *Commit 3/7 to main* when a subset is selected, *Commit 7 files to main* when all are. Commits now only stage + commit the checked paths (`git add --` then `git commit -- paths`). Folders work too (git add recurses).
+- **Fixed a long-standing path mismatch.** git worked at `/config`, but the frontend sees paths prefixed with the root name (e.g. `config/configuration.yaml`). `/api/git/status` now prefixes its returned paths with `config/` so the tree git badges light up correctly; `/api/git/commit`, `/api/git/diff`, `/api/git/show` strip the prefix before calling git so partial commits and per-file diffs finally work. (Previously per-path operations silently no-op'd.)
+
 ## 1.11.5 — Default .gitignore with secrets excluded by default
 
 - **Checkbox in the init UI** (on by default) seeds a `/config/.gitignore` alongside the repo with HA-appropriate patterns. **Secrets are excluded by default** — `secrets.yaml`, `*.secrets.yaml`, `.env`, `.env.*`, `*.pem`, `*.key`, SSH host keys. Runtime state (`.storage/`, `.cloud/`, `backups/`), databases, logs, Python caches, and OS/editor junk are all excluded too.

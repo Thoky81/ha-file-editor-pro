@@ -239,6 +239,8 @@
     .git-file{display:flex;align-items:center;gap:6px;padding:4px 8px;border-radius:4px;cursor:pointer;transition:background .1s;font-family:var(--font-mono);font-size:11px}
     .git-file:hover{background:var(--bg-hover)}
     .git-status-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+    .git-stage-cb{accent-color:var(--accent);cursor:pointer;flex-shrink:0;margin:0}
+    .git-file .git-file-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
     .git-file-name{color:var(--text-secondary);flex:1}
     .git-commit-area{margin-top:12px;border-top:1px solid var(--border);padding-top:12px}
     .git-commit-input{width:100%;background:var(--bg-mid);border:1px solid var(--border-light);border-radius:6px;padding:8px;color:var(--text-primary);font-family:var(--font-ui);font-size:12px;outline:none;resize:vertical;min-height:60px;transition:border-color .15s}
@@ -2692,6 +2694,11 @@ function esc(s) {
 // ═══════════════════════════════════════════════════════════════
 // GIT PANEL
 // ═══════════════════════════════════════════════════════════════
+// Per-change staging state. Path → bool (checked for next commit).
+// Default: every change is staged when first seen; unchecking a file
+// means it's skipped by the commit.
+const _gitStaged = new Map();
+
 function renderGitPanel() {
   const el    = document.getElementById('git-changes');
   const badge = document.getElementById('git-badge');
@@ -2702,12 +2709,35 @@ function renderGitPanel() {
   const colors = { M:'#f0a500', A:'#4ec994', U:'#4d9ef8', D:'#f07070' };
   const labels = { M:'Modified', A:'Added', U:'Untracked', D:'Deleted' };
 
-  el.innerHTML = GIT_CHANGES.map(f => `
-    <div class="git-file" onclick="openFile('${f.path}')">
+  // Drop staged entries for paths no longer in the change set.
+  const present = new Set(GIT_CHANGES.map(f => f.path));
+  for (const k of Array.from(_gitStaged.keys())) if (!present.has(k)) _gitStaged.delete(k);
+  // Initialise new paths as staged.
+  for (const f of GIT_CHANGES) if (!_gitStaged.has(f.path)) _gitStaged.set(f.path, true);
+
+  el.innerHTML = GIT_CHANGES.map(f => {
+    const staged = !!_gitStaged.get(f.path);
+    return `
+    <div class="git-file" data-path="${escapeHtml(f.path)}">
+      <input type="checkbox" class="git-stage-cb" ${staged ? 'checked' : ''}
+             title="Include in next commit"
+             onclick="event.stopPropagation(); _gitStaged.set(${JSON.stringify(f.path)}, this.checked); _renderStagedCount()">
       <div class="git-status-dot" style="background:${colors[f.status]}"></div>
-      <span class="git-file-name">${f.path}</span>
+      <span class="git-file-name" onclick="openFile(${JSON.stringify(f.path)})">${escapeHtml(f.path)}</span>
       <span style="color:${colors[f.status]};font-family:var(--font-mono);font-size:10px;font-weight:600">${labels[f.status]}</span>
-    </div>`).join('');
+    </div>`;
+  }).join('');
+  _renderStagedCount();
+}
+
+function _renderStagedCount() {
+  const sel = Array.from(_gitStaged.entries()).filter(([,v]) => v).length;
+  const btn = document.getElementById('git-commit-btn-label');
+  if (!btn) return;
+  const branch = document.getElementById('git-branch-name')?.textContent || '';
+  if (sel === 0) btn.textContent = 'Nothing staged';
+  else if (sel === GIT_CHANGES.length) btn.textContent = `Commit ${sel} file${sel>1?'s':''} to ${branch}`;
+  else btn.textContent = `Commit ${sel}/${GIT_CHANGES.length} to ${branch}`;
 }
 
 function mockCommit() { gitCommit(); }
@@ -2945,14 +2975,20 @@ async function gitCommit() {
     box.value = '';
     return;
   }
+  // Collect checked paths — commit only what the user has staged.
+  const paths = GIT_CHANGES.filter(c => _gitStaged.get(c.path)).map(c => c.path);
+  if (!paths.length) { showToast('Nothing staged — tick at least one file'); return; }
+  const allSelected = paths.length === GIT_CHANGES.length;
   try {
     const r = await fetch(API.url('/api/git/commit'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: msg }),
+      // Send paths only for partial commits — omit (null) to signal
+      // "add everything" (git add -A, picks up renames/deletes too).
+      body: JSON.stringify(allSelected ? { message: msg } : { message: msg, paths }),
     });
     if (!r.ok) throw new Error((await r.json()).detail || r.status);
-    showToast('Committed');
+    showToast(`Committed ${paths.length} file${paths.length>1?'s':''}`);
     box.value = '';
     refreshGit();
   } catch (e) {
