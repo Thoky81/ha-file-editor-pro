@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.10.8 — Discoverable sidebar expand + toggle on re-click
+
+- **Expand chevron when the sidebar is collapsed.** A small `›` button appears at the left edge of the editor area whenever the sidebar is hidden. Clicking it shows the sidebar back. Solves the "where did my files go?" problem after a first-time `Ctrl+B` or the header hide button.
+- **Clicking the active activity-bar icon now hides the sidebar.** Explorer / Search / Git / Insert / Outline: pressing the already-active icon toggles the sidebar off (rather than re-showing the same panel). Pressing a different icon opens its panel and brings the sidebar back.
+
 ## 1.10.7 — Custom input dialog for create / rename / duplicate
 
 - **New file, New folder, Rename, Duplicate** now use the same custom modal style as the delete confirmation. Title, label, text field, *Cancel* + action button. Enter submits, Esc cancels, input is auto-selected for quick edits.
