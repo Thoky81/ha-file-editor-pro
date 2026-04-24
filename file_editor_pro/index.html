@@ -1966,16 +1966,23 @@ function filterFileTree(q) {
   if (!query) { renderFileTree(); return; }
 
   const hits = [];
-  (function walk(list) {
+  (function walk(list, hiddenAncestor) {
     for (const n of list) {
-      if (n.type === 'dir') { walk(n.children || []); continue; }
+      // Client-side hidden filter: skip dot-items (and everything
+      // underneath a dot-dir) unless the user has show-hidden on.
+      const isHidden = hiddenAncestor || n.name.startsWith('.');
+      if (isHidden && !PREFS.showHidden) {
+        if (n.type === 'dir') continue;   // don't descend
+        else continue;
+      }
+      if (n.type === 'dir') { walk(n.children || [], isHidden); continue; }
       if (!n.path) continue;
       if (n.name.toLowerCase().includes(query) ||
           n.path.toLowerCase().includes(query)) {
         hits.push(n);
       }
     }
-  })(TREE);
+  })(TREE, false);
 
   container.innerHTML = '';
   if (!hits.length) {
@@ -2059,6 +2066,11 @@ function renderFileTree() {
 }
 
 function renderNodes(nodes, container, depth) {
+  // Client-side hidden filter. Tree data always contains dot-items
+  // (fetched once with ?hidden=1) so toggling is instant.
+  if (!PREFS.showHidden) {
+    nodes = nodes.filter(n => !n.name.startsWith('.'));
+  }
   nodes.forEach(node => {
     const isDir = node.type === 'dir';
     const indent = 8 + depth * 16;
@@ -3068,8 +3080,11 @@ const API = {
     } catch { return false; }
   },
   async tree() {
-    const qs = PREFS.showHidden ? '?hidden=1' : '';
-    const r = await fetch(this.url('/api/files/tree' + qs), { cache: 'no-store' });
+    // Always fetch hidden items too; the client filters them out at
+    // render time based on PREFS.showHidden. That way toggling the
+    // "show hidden" button is instant — no network round-trip, no
+    // backend rewalk, no re-render latency beyond one DOM pass.
+    const r = await fetch(this.url('/api/files/tree?hidden=1'), { cache: 'no-store' });
     if (!r.ok) throw new Error('tree ' + r.status);
     return r.json();
   },
@@ -4008,9 +4023,13 @@ function toggleShowHidden() {
   savePrefs();
   applyShowHiddenButton();
   showToast(`Hidden files: ${PREFS.showHidden ? 'shown' : 'hidden'}`);
-  // Re-fetch the tree so dotfiles appear or disappear. refreshTree()
-  // passes PREFS.showHidden via the API.tree() query string.
-  refreshTree();
+  // The tree data already contains every dotfile (fetched with
+  // hidden=1), so we only need to re-render — no network fetch, no
+  // re-walking the filesystem. If a filter query is active, re-run
+  // that path so the filter also respects the new hidden setting.
+  const q = document.getElementById('tree-filter')?.value;
+  if (q) filterFileTree(q);
+  else renderFileTree();
 }
 
 function applyShowHiddenButton() {

@@ -31,7 +31,18 @@ PORT = int(os.environ.get("PORT", "8099"))
 SUPERVISOR_TOKEN = os.environ.get("SUPERVISOR_TOKEN", "")
 HA_API_BASE = "http://supervisor/core/api"
 
-SKIP_DIRS = {".git", ".storage", "__pycache__", "node_modules", ".cloud"}
+# Always skipped in the tree walk — even when show_hidden is on.
+# These are never useful to edit and can balloon the tree (some are
+# routinely tens of thousands of files), so we short-circuit them
+# before the walker descends. If a user legitimately needs one of
+# these, they can still open it through the terminal.
+SKIP_DIRS = {
+    ".git", ".storage", ".cloud", "__pycache__", "node_modules",
+    ".venv", "venv", ".tox",
+    ".mypy_cache", ".pytest_cache", ".ruff_cache", ".cache",
+    ".idea", ".vscode",
+    "deps", "tts",
+}
 MAX_READ_BYTES = 2 * 1024 * 1024
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 

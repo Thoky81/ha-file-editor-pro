@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.11.13 — Instant show/hide hidden-files toggle
+
+The hidden-files toggle used to take a few seconds in either direction — every click triggered a full backend filesystem walk followed by a complete tree re-render. Now it's a single DOM pass.
+
+- **Fetch once, filter on the client.** The tree is always fetched with `?hidden=1`, so dotfiles are present in the client-side model. `renderNodes()` and the Explorer filter drop them when `PREFS.showHidden` is off. Toggling only re-renders — no network round-trip, no backend rewalk.
+- **Bigger `SKIP_DIRS` list in the backend** so expensive noise folders are never walked, even when hidden is on: `.venv`, `venv`, `.tox`, `.mypy_cache`, `.pytest_cache`, `.ruff_cache`, `.cache`, `.idea`, `.vscode`, plus HA's own `tts/` and `deps/`. Existing skips (`.git`, `.storage`, `.cloud`, `__pycache__`, `node_modules`) are preserved. This also speeds up the initial tree fetch on large `/config`s.
+
 ## 1.11.12 — Mac keyboard-shortcut labels
 
 All keyboard shortcuts displayed in the UI are now re-labelled for Mac users automatically. The mapping: `Ctrl → ⌘`, `Alt → ⌥`, `Shift → ⇧`, `Enter → ↵`, `Tab → ⇥`. Windows/Linux users see exactly the same labels as before.
