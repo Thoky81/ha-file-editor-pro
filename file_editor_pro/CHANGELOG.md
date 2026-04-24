@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.10.10 — Drop the redundant Explorer-header hide button
+
+- Removed the double-chevron hide-sidebar button from the Explorer header. Now that the activity-bar toggle (top item) does the same thing and is always visible, the header button was duplicated clutter.
+
 ## 1.10.9 — Sidebar toggle moved into the activity bar
 
 - The expand chevron added in 1.10.8 overlapped the tab bar. Moved it into the activity bar as a dedicated item at the top (above Explorer), always visible, chevron direction flips with state (`‹` when sidebar is shown, `›` when hidden). No more overlap; re-click on the active activity-bar icon still toggles too.
