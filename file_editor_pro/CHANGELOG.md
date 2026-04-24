@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.11.11 — Jinja error list is now clickable + far fewer false positives
+
+Two fixes to how Jinja validation surfaces in the UI.
+
+- **Status-bar click finally opens an error list.** The *"N Jinja errors"* indicator in the bottom status bar used to look clickable but did nothing. It now opens a modal that lists every error with line/column, the offending expression, and the underlying message. Click a row to jump the cursor to that expression. There's also a *Re-check* button and an Escape/click-outside close.
+- **Far fewer false positives.** The old validator sent each `{{ … }}` and `{% … %}` fragment to HA's template renderer in isolation. That made isolated `{% if %}` / `{% for %}` / `{% macro %}` / `{% set x = y %}` fragments look like syntax errors (no matching close tag, no variable in scope), even though the full template would render fine.
+  - **`{% … %}` statements are no longer validated one-by-one.** They almost always participate in a larger block that a per-fragment check can't see.
+  - **If a file contains any `{% … %}` statement, per-expression validation is skipped for the whole file** — the status bar shows *"Jinja: skipped (complex template)"* and the tooltip points at Ctrl+Alt+J (template preview) and HA's Check Config for authoritative validation.
+  - Simple files with only `{{ expr }}` expressions are still validated expression-by-expression as before.
+- **Command palette**: *HA: Show Jinja error list* (opens the same modal directly).
+
 ## 1.11.10 — Hidden-files toggle + "nothing to commit" treated as success
 
 - **Show / hide hidden files** toggle in the Explorer toolbar (the eye icon next to Refresh). Flip it to reveal dotfiles and dotdirs (`.gitignore`, `.storage`, `.env`, etc.) on demand — the state persists in preferences and also applies to cross-file search. Runtime toggle, no add-on restart. Command palette: *View: Toggle hidden files (dotfiles) in Explorer*.

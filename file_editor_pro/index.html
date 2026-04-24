@@ -1087,6 +1087,21 @@
   </div>
 </div>
 
+<!-- Jinja errors modal — opens from the status bar when validation finds issues. -->
+<div class="logs-overlay" id="jinja-errors-modal">
+  <div class="logs-modal">
+    <div class="logs-header">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" style="width:16px;height:16px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><circle cx="12" cy="16" r=".5" fill="currentColor"/></svg>
+      <div class="logs-title">Jinja errors</div>
+      <div class="logs-actions">
+        <button class="confirm-btn" onclick="revalidateJinja()">Re-check</button>
+        <button class="help-close" onclick="closeJinjaErrorsModal()" style="margin-left:4px">×</button>
+      </div>
+    </div>
+    <div class="logs-body" id="jinja-errors-body"></div>
+  </div>
+</div>
+
 <!-- Help modal — shortcuts + what each activity-bar icon does. -->
 <div class="help-overlay" id="help-modal">
   <div class="help-modal">
@@ -2525,6 +2540,20 @@ function extractJinjaExpressions(text) {
   return out;
 }
 
+// Any `{%...%}` statement creates scope that an isolated `{{ expr }}`
+// render won't have. `{% if %}` / `{% for %}` need matching closers;
+// `{% set x = v %}` may define a name referenced by `{{ x }}` later;
+// `{% macro %}` defines functions used from `{{ mymacro() }}`. Sending
+// individual fragments to HA's /api/template without that context
+// produces false positives, so we skip per-expression validation when
+// any statement tag is present — the template preview (Ctrl+Alt+J)
+// and HA's Check Config remain available for real validation.
+const _JINJA_STATEMENT_RX = /\{%[^%]*%\}/;
+
+function _fileHasJinjaContext(text) {
+  return _JINJA_STATEMENT_RX.test(text);
+}
+
 function scheduleJinjaValidation() {
   clearTimeout(_jinjaDebounce);
   _jinjaDebounce = setTimeout(validateJinjaNow, 1500);
@@ -2535,8 +2564,29 @@ async function validateJinjaNow() {
   const tab = tabs.find(t => t.id === activeTabId);
   if (!tab || tab.mode !== 'yaml') { _jinjaCache = []; return; }
   const text = editor.getValue();
-  const exprs = extractJinjaExpressions(text);
-  if (!exprs.length) { _jinjaCache = []; editor.performLint?.(); return; }
+
+  // Skip files that contain control-flow / scope-introducing Jinja tags:
+  // per-expression validation can't see macros, loops, or set-bindings
+  // defined elsewhere, which produces false positives. The template
+  // preview (Ctrl+Alt+J) or HA's own config check remain available.
+  if (_fileHasJinjaContext(text)) {
+    _jinjaCache = [];
+    editor.performLint?.();
+    updateJinjaStatus(0, 'skipped');
+    return;
+  }
+
+  const all = extractJinjaExpressions(text);
+  // Only validate `{{ ... }}` expressions. `{% ... %}` statements (even
+  // self-contained ones like `{% set x = 1 %}`) don't produce a render
+  // result on their own and are skipped to avoid noise.
+  const exprs = all.filter(e => e.body.startsWith('{{'));
+  if (!exprs.length) {
+    _jinjaCache = [];
+    editor.performLint?.();
+    updateJinjaStatus(0);
+    return;
+  }
 
   if (_jinjaAbort) _jinjaAbort.abort();
   _jinjaAbort = new AbortController();
@@ -2562,7 +2612,7 @@ async function validateJinjaNow() {
       }
     }
     const msg = seen.get(e.body);
-    if (msg) errors.push({ from: e.from, to: e.to, message: msg, severity: 'error' });
+    if (msg) errors.push({ from: e.from, to: e.to, message: msg, severity: 'error', body: e.body });
   }
   _jinjaAbort = null;
   _jinjaCache = errors;
@@ -2570,19 +2620,91 @@ async function validateJinjaNow() {
   updateJinjaStatus(errors.length);
 }
 
-function updateJinjaStatus(n) {
+function updateJinjaStatus(n, state) {
   // Piggy-back on the existing YAML status item: if Jinja errors
   // exist and YAML is valid, surface the count there instead.
-  if (!n) return;
   const errTxt = document.getElementById('status-errors-text');
   const errEl  = document.getElementById('status-errors');
-  // Only overwrite when YAML is currently Valid or '–'
-  const cur = errTxt?.textContent || '';
-  if (/^Valid YAML|^–/.test(cur)) {
+  if (!errTxt || !errEl) return;
+  const cur = errTxt.textContent || '';
+
+  if (state === 'skipped') {
+    // Only overwrite if nothing more important is showing.
+    if (/^Valid YAML|^–/.test(cur)) {
+      errTxt.textContent = 'Jinja: skipped (complex template)';
+      errEl.className = 'status-item status-clickable';
+      errEl.title = 'File contains control-flow or scope-introducing Jinja tags ' +
+                    '({% if %}, {% for %}, {% macro %}, {% set x = … %}) that cannot ' +
+                    'be validated in isolation. Use Ctrl+Alt+J to preview a template, ' +
+                    'or Check Config for HA\'s full validation.';
+      errEl.onclick = () => showToast('Complex template — use Ctrl+Alt+J or Check Config to validate');
+    }
+    return;
+  }
+
+  if (!n) {
+    // Clear any leftover Jinja message if we now have no errors.
+    if (/^\d+ Jinja error|^Jinja: skipped/.test(cur)) {
+      errTxt.textContent = 'Valid YAML';
+      errEl.className = 'status-item status-ok-state';
+      errEl.title = '';
+      errEl.onclick = null;
+    }
+    return;
+  }
+
+  if (/^Valid YAML|^–|^Jinja:/.test(cur)) {
     errTxt.textContent = `${n} Jinja error${n > 1 ? 's' : ''}`;
     errEl.className = 'status-item status-error-state status-clickable';
-    errEl.title = 'Jinja template validation found errors. Hover the red markers in the gutter for details.';
+    errEl.title = `Click to see the ${n === 1 ? 'error' : 'errors'}`;
+    // Wire the click — previously the item said "status-clickable" but
+    // had no handler, so clicking it did nothing.
+    errEl.onclick = openJinjaErrorsModal;
   }
+}
+
+function openJinjaErrorsModal() {
+  const modal = document.getElementById('jinja-errors-modal');
+  if (!modal) return;
+  renderJinjaErrors();
+  modal.classList.add('show');
+}
+
+function closeJinjaErrorsModal() {
+  document.getElementById('jinja-errors-modal')?.classList.remove('show');
+}
+
+function revalidateJinja() {
+  validateJinjaNow().then(() => renderJinjaErrors());
+}
+
+function renderJinjaErrors() {
+  const body = document.getElementById('jinja-errors-body');
+  if (!body) return;
+  if (!_jinjaCache.length) {
+    body.innerHTML = '<div class="logs-empty">No Jinja errors in the current file.</div>';
+    return;
+  }
+  // Sorted by line number for readability. Each row jumps the cursor
+  // to the start of the offending expression when clicked.
+  const sorted = _jinjaCache.slice().sort((a, b) =>
+    a.from.line - b.from.line || a.from.ch - b.from.ch);
+  body.innerHTML = sorted.map((e, i) => `
+    <div class="logs-row error" data-i="${i}" style="grid-template-columns:90px 1fr;cursor:pointer">
+      <span class="ts">Ln ${e.from.line + 1}:${e.from.ch + 1}</span>
+      <span class="msg">${escapeHtml(e.message)}${e.body ? `<div style="color:var(--text-muted);font-size:11px;margin-top:3px">${escapeHtml(e.body.length > 140 ? e.body.slice(0, 140) + '…' : e.body)}</div>` : ''}</span>
+    </div>`).join('');
+  body.querySelectorAll('.logs-row').forEach(row => {
+    row.addEventListener('click', () => {
+      const e = sorted[Number(row.dataset.i)];
+      if (e && editor) {
+        editor.focus();
+        editor.setCursor(e.from);
+        editor.scrollIntoView(e.from, 100);
+      }
+      closeJinjaErrorsModal();
+    });
+  });
 }
 
 function validateYAML() {
@@ -2898,6 +3020,9 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('logs-modal')?.addEventListener('click', e => {
     if (e.target.id === 'logs-modal') closeLogs();
   });
+  document.getElementById('jinja-errors-modal')?.addEventListener('click', e => {
+    if (e.target.id === 'jinja-errors-modal') closeJinjaErrorsModal();
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════
@@ -2911,6 +3036,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     document.getElementById('context-menu').classList.remove('show');
     if (document.getElementById('logs-modal')?.classList.contains('show')) closeLogs();
+    if (document.getElementById('jinja-errors-modal')?.classList.contains('show')) closeJinjaErrorsModal();
   }
 });
 
@@ -5164,6 +5290,7 @@ const COMMANDS = [
   { cat: 'HA',     title: 'Reload template entities',                          run: () => haReload('template') },
   { cat: 'HA',     title: 'Preview Jinja template…',  shortcut: 'Ctrl+Alt+J', run: () => openTemplatePreview() },
   { cat: 'HA',     title: 'Validate Jinja in current file',                    run: () => validateJinjaNow() },
+  { cat: 'HA',     title: 'Show Jinja error list',                              run: () => openJinjaErrorsModal() },
   { cat: 'HA',     title: 'Refresh entity/service cache',                      run: () => loadHAData(true).then(() => showToast('HA cache refreshed')) },
   { cat: 'Snippet',title: 'Insert: Automation skeleton',                       run: () => insertSnippet('automation') },
   { cat: 'Snippet',title: 'Insert: Script skeleton',                           run: () => insertSnippet('script') },
