@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.10.4 — Visible collapse button, context-aware new file/folder, folder drill-down
+
+- **Hide sidebar button** added to the Explorer header (right-most chevrons icon, next to Collapse All). Complements the existing Ctrl+B shortcut so users who don't know the shortcut can still hide it.
+- **New file / New folder now use a real target directory.** Order of preference: right-click target → currently focused tree folder → directory of the active tab → root. The prompt also tells you which directory the new item will land in, so it's not ambiguous.
+- **Folder drill-down (focus mode).** Double-click any directory in the tree (or right-click → *Focus here*) to view just that folder's contents. A small breadcrumb appears at the top of the tree (`↑ Root  ›  packages  ›  …`) — click any part to navigate back up. Single-click still expands/collapses as before; the drill-down is purely opt-in.
+
 ## 1.10.3 — Split view: equal panes and right-pane minimap
 
 - **Even split.** `.editor-right` changed from `width: 50%` (half the viewport) to `flex: 1`, so the two editor panes divide only the space left over after the activity bar and sidebar. Panes are now visually the same width.

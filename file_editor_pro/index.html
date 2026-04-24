@@ -601,6 +601,14 @@
     .cm-s-ha .cm-ig-7{background-color:color-mix(in srgb, var(--accent) 33%, transparent)}
     .cm-s-ha .cm-ig-8{background-color:color-mix(in srgb, var(--accent) 37%, transparent)}
 
+    /* ── FILE-TREE FOCUS BREADCRUMB ── */
+    .tree-breadcrumb{display:flex;align-items:center;gap:4px;padding:6px 10px;border-bottom:1px solid var(--border);background:var(--bg-mid);font-family:var(--font-mono);font-size:11px;color:var(--text-secondary);flex-wrap:wrap}
+    .tree-breadcrumb-part{cursor:pointer;padding:1px 4px;border-radius:3px;transition:background .1s}
+    .tree-breadcrumb-part:hover{background:var(--bg-hover);color:var(--text-primary)}
+    .tree-breadcrumb-sep{color:var(--text-muted)}
+    .tree-breadcrumb-back{background:none;border:1px solid var(--border-light);color:var(--text-muted);border-radius:4px;padding:0 6px;cursor:pointer;font-size:11px;line-height:18px;margin-right:4px}
+    .tree-breadcrumb-back:hover{background:var(--bg-hover);color:var(--text-primary)}
+
     /* ── INDENT GUIDES ── (overlay-tagged, ONLY in the indent area) */
     .cm-s-ha .cm-ig-line{
       box-shadow: inset 1px 0 0 color-mix(in srgb, var(--text-muted) 25%, transparent);
@@ -676,9 +684,14 @@
           <button class="icon-btn" title="Collapse All" onclick="collapseAll()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
           </button>
+          <button class="icon-btn" title="Hide sidebar (Ctrl+B)" onclick="toggleSidebar(false)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="11 18 5 12 11 6"/><polyline points="18 18 12 12 18 6"/></svg>
+          </button>
         </div>
       </div>
       <div class="sidebar-content">
+        <!-- Focus-folder breadcrumb. Shows only when drilled into a directory. -->
+        <div class="tree-breadcrumb" id="tree-breadcrumb" style="display:none"></div>
         <input type="text" class="insert-search" id="tree-filter" placeholder="Filter files…" spellcheck="false"
                oninput="filterFileTree(this.value)" style="margin:6px 8px 4px;width:calc(100% - 16px)">
         <div class="file-tree" id="file-tree"></div>
@@ -878,6 +891,7 @@
 <div class="context-menu" id="tree-context-menu">
   <div class="context-item" onclick="treeCtxOpen()">Open</div>
   <div class="context-item" onclick="treeCtxOpenRight()">Open to the right</div>
+  <div class="context-item" onclick="treeCtxFocus()">Focus here (drill in)</div>
   <div class="context-item" onclick="treeCtxRename()">Rename…</div>
   <div class="context-item" onclick="treeCtxDuplicate()">Duplicate…</div>
   <div class="context-divider"></div>
@@ -1719,10 +1733,59 @@ function filterFileTree(q) {
   }
 }
 
+// "Focus folder" — drill into a subtree. When set, the tree shows
+// only that folder's children plus a breadcrumb to navigate back.
+let _treeFocusPath = null;
+
+function _findTreeNodeByPath(list, path) {
+  for (const n of list) {
+    if (n.path === path) return n;
+    if (n.children && n.children.length) {
+      const hit = _findTreeNodeByPath(n.children, path);
+      if (hit) return hit;
+    }
+  }
+  return null;
+}
+
+function setTreeFocus(path) {
+  _treeFocusPath = path || null;
+  renderFileTree();
+}
+
+function renderTreeBreadcrumb() {
+  const bc = document.getElementById('tree-breadcrumb');
+  if (!bc) return;
+  if (!_treeFocusPath) { bc.style.display = 'none'; bc.innerHTML = ''; return; }
+  const parts = _treeFocusPath.split('/').filter(Boolean);
+  const crumbs = [];
+  crumbs.push('<button class="tree-breadcrumb-back" onclick="setTreeFocus(null)" title="Show full tree">↑ Root</button>');
+  let acc = '';
+  parts.forEach((p, i) => {
+    acc = acc ? acc + '/' + p : p;
+    crumbs.push(`<span class="tree-breadcrumb-part" onclick="setTreeFocus('${acc}')">${escapeHtml(p)}</span>`);
+    if (i < parts.length - 1) crumbs.push('<span class="tree-breadcrumb-sep">›</span>');
+  });
+  bc.innerHTML = crumbs.join('');
+  bc.style.display = 'flex';
+}
+
 function renderFileTree() {
   const c = document.getElementById('file-tree');
+  if (!c) return;
   c.innerHTML = '';
-  renderNodes(TREE, c, 0);
+  renderTreeBreadcrumb();
+  if (_treeFocusPath) {
+    const node = _findTreeNodeByPath(TREE, _treeFocusPath);
+    if (node && node.children) renderNodes(node.children, c, 0);
+    else {
+      // Focus path vanished (e.g. after a refresh) — fall back to root
+      _treeFocusPath = null;
+      renderNodes(TREE, c, 0);
+    }
+  } else {
+    renderNodes(TREE, c, 0);
+  }
 }
 
 function renderNodes(nodes, container, depth) {
@@ -1752,6 +1815,12 @@ function renderNodes(nodes, container, depth) {
         </div>
         <span class="tree-name">${node.name}</span>`;
       item.onclick = () => toggleDir(node, item, container, depth);
+      // Double-click a directory to drill into it — only that folder's
+      // contents are shown, with a breadcrumb to navigate back up.
+      item.ondblclick = (e) => {
+        e.preventDefault();
+        setTreeFocus(node.path || node.name);
+      };
     } else {
       const gs  = FILES[node.path]?.gitStatus;
       const col = fileColor(node.name);
@@ -1965,8 +2034,25 @@ function saveCurrentFile() {
   // → haWriteFile(tab.path, content);
 }
 
+// Current "context directory" for new-file / new-folder / upload
+// actions. Checks in order: tree-ctx right-click target → focused
+// folder → directory of the active tab → root.
+function currentContextDir() {
+  if (_treeCtxTarget?.type === 'dir') return _treeCtxTarget.path || '';
+  if (_treeCtxTarget?.type === 'file' && _treeCtxTarget.path) {
+    return _treeCtxTarget.path.replace(/[^/]*$/, '').replace(/\/$/, '');
+  }
+  if (_treeFocusPath) return _treeFocusPath;
+  const tab = tabs.find(t => t.id === activeTabId);
+  if (tab && tab.path) return tab.path.replace(/[^/]*$/, '').replace(/\/$/, '');
+  return '';
+}
+
 function promptNewFile() {
-  const name = prompt('New file name:', 'new_automation.yaml');
+  const dir = currentContextDir();
+  if (API.available) return promptNewFileIn(dir);
+  // Local / demo fallback when no backend
+  const name = prompt('New file name:', (dir ? dir + '/' : '') + 'new_automation.yaml');
   if (!name) return;
   const mode = /\.ya?ml$/.test(name) ? 'yaml' : /\.py$/.test(name) ? 'python' : 'javascript';
   FILES[name] = { mode, gitStatus:'A', content:'' };
@@ -2531,7 +2617,9 @@ async function refreshTree() {
 }
 
 async function promptNewFolder() {
-  const name = prompt('New folder path (relative to /config):', 'packages/new');
+  const dir = currentContextDir();
+  const base = dir ? dir + '/' : '';
+  const name = prompt('New folder name (will be created under ' + (dir || '/') + '):', base + 'new_folder');
   if (!name) return;
   if (!API.available) { showToast('Demo mode — no backend'); return; }
   try {
@@ -2597,6 +2685,7 @@ function attachTreeContextMenu() {
 
 function treeCtxOpen() { if (_treeCtxTarget?.type === 'file') openFile(_treeCtxTarget.path); }
 function treeCtxOpenRight() { if (_treeCtxTarget?.type === 'file') openFileRight(_treeCtxTarget.path); }
+function treeCtxFocus() { if (_treeCtxTarget?.type === 'dir') setTreeFocus(_treeCtxTarget.path || ''); }
 
 async function treeCtxRename() {
   if (!_treeCtxTarget) return;
@@ -2659,9 +2748,10 @@ async function treeCtxDelete() {
 }
 
 async function promptNewFileIn(dir) {
-  const name = prompt('New file name:', (dir ? dir.replace(/\/?$/,'/') : '') + 'new_file.yaml');
+  const base = dir ? dir.replace(/\/?$/, '/') : '';
+  const name = prompt('New file name (will be created under ' + (dir || '/') + '):', base + 'new_file.yaml');
   if (!name) return;
-  if (!API.available) { promptNewFile(); return; }
+  if (!API.available) { showToast('Demo mode — no backend'); return; }
   try {
     await API.write(name, '');
     await refreshTree();
