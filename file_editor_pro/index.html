@@ -1026,6 +1026,17 @@
           </div>
         </div>
         <div class="settings-row">
+          <div class="settings-label">Default folder on startup
+            <span class="settings-help">Drill into this folder when the app opens. Empty = show the whole tree.</span>
+          </div>
+          <div class="settings-control" style="gap:6px">
+            <input type="text" id="set-default-folder" placeholder="e.g. config"
+                   onchange="setDefaultFolder(this.value)"
+                   style="min-width:150px;background:var(--bg-mid);border:1px solid var(--border-light);color:var(--text-primary);border-radius:5px;padding:5px 8px;font-family:var(--font-mono);font-size:12px;outline:none">
+            <button class="confirm-btn" type="button" onclick="useCurrentFolderAsDefault()" title="Use the currently focused folder">Use current</button>
+          </div>
+        </div>
+        <div class="settings-row">
           <div class="settings-label">Editor font size
             <span class="settings-help" id="set-fontsize-label">13 px</span>
           </div>
@@ -2858,6 +2869,7 @@ const PREFS = {
   bracketColors: false,          // rainbow brackets for () [] {}
   minimap: false,                // right-edge document overview
   sidebarVisible: true,          // Ctrl+B toggles the sidebar
+  defaultFolder: '',             // drill into this path on startup (empty = full tree)
 };
 
 function loadPrefs() {
@@ -2981,6 +2993,17 @@ function toggleSidebar(force) {
   const sb = document.getElementById('sidebar');
   if (sb) sb.classList.toggle('collapsed', !PREFS.sidebarVisible);
   if (editor) setTimeout(() => editor.refresh(), 160);
+}
+
+function setDefaultFolder(p) {
+  PREFS.defaultFolder = (p || '').replace(/^\/+|\/+$/g, '');
+  savePrefs();
+  showToast(PREFS.defaultFolder ? `Default folder: ${PREFS.defaultFolder}` : 'Default folder cleared');
+}
+function useCurrentFolderAsDefault() {
+  setDefaultFolder(_treeFocusPath || '');
+  const el = document.getElementById('set-default-folder');
+  if (el) el.value = PREFS.defaultFolder;
 }
 
 // Drag-to-resize for the sidebar. Sets --sidebar-width live while
@@ -3301,6 +3324,7 @@ function refreshSettingsUI() {
   _setVal('set-indentstyle',  PREFS.indentStyle || 'none');
   _setVal('set-default-light', PREFS.defaultLight || 'github-light');
   _setVal('set-default-dark',  PREFS.defaultDark  || 'ha-dark');
+  _setVal('set-default-folder', PREFS.defaultFolder || '');
   _setVal('set-sidebar-fontsize',     PREFS.sidebarFontSize);
   _setVal('set-sidebar-fontsize-num', PREFS.sidebarFontSize);
   _setText('set-sidebar-fontsize-label', PREFS.sidebarFontSize + ' px');
@@ -4305,6 +4329,7 @@ const COMMANDS = [
   { cat: 'File',   title: 'Quick open…',               shortcut: 'Ctrl+P',      run: () => openQuickOpen() },
   { cat: 'View',   title: 'Toggle Terminal',           shortcut: 'Ctrl+`',      run: () => toggleTerminal() },
   { cat: 'View',   title: 'Toggle Sidebar',            shortcut: 'Ctrl+B',      run: () => toggleSidebar() },
+  { cat: 'View',   title: 'Set current folder as default startup folder',       run: () => useCurrentFolderAsDefault() },
   { cat: 'View',   title: 'Close right pane',                                   run: () => closeRightPane() },
   { cat: 'File',   title: 'Open active file to the right',                      run: () => { const t = tabs.find(x => x.id === activeTabId); if (t) openFileRight(t.path); } },
   { cat: 'View',   title: 'Tab size: 2',                                        run: () => setTabSize(2) },
@@ -4608,6 +4633,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     // Kick off the HA entity/service cache in the background
     loadHAData().catch(() => {});
+  }
+
+  // Apply the startup default folder (if the path still exists).
+  if (PREFS.defaultFolder) {
+    const node = _findTreeNodeByPath(TREE, PREFS.defaultFolder);
+    if (node) _treeFocusPath = PREFS.defaultFolder;
   }
 
   renderFileTree();

@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.10.5 — Default folder on startup
+
+- Settings → Appearance → **Default folder on startup**. Enter a path (e.g. `config` or `config/packages`) and the app drills into that folder automatically on load. Empty = full tree as before. The *Use current* button next to the field fills it with whatever folder you're currently focused on. Also available from the command palette as *View: Set current folder as default startup folder*.
+
 ## 1.10.4 — Visible collapse button, context-aware new file/folder, folder drill-down
 
 - **Hide sidebar button** added to the Explorer header (right-most chevrons icon, next to Collapse All). Complements the existing Ctrl+B shortcut so users who don't know the shortcut can still hide it.
