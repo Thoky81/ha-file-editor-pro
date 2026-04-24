@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.11.7 — Logs panel: persistent notification history
+
+- **New Logs panel** — every toast notification is now captured in a 500-entry ring buffer so you can re-read messages that disappeared before you finished reading them. Open it from the **Logs** button in the status bar (bottom-right), press **F12**, or use the command palette (*View: Show Logs*).
+- **Error toasts linger longer** — 6 seconds instead of 2.2, and they're rendered with a red accent so they're immediately distinguishable from plain info.
+- **Unread-error badge** on the status-bar button — a red count appears when an error toast fires and clears when you open the panel.
+- **Copy all** button dumps the full log as ISO-timestamped lines to the clipboard; text inside the panel is also **selectable with the mouse** so you can grab a single line. **Clear** wipes the buffer.
+- Escape closes the panel; clicking outside the modal does too.
+
 ## 1.11.6 — Selective staging in Source Control + fix path mismatch
 
 - **Per-file checkboxes** in the Source Control panel. Every change gets a checkbox (staged by default). Uncheck a file and it won't be part of the next commit. The commit button label updates in real time — *Commit 3/7 to main* when a subset is selected, *Commit 7 files to main* when all are. Commits now only stage + commit the checked paths (`git add --` then `git commit -- paths`). Folders work too (git add recurses).
