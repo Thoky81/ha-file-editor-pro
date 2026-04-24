@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.11.15 — Visible timestamp prefill in the commit box
+
+Follow-up to 1.11.14: the auto-timestamp now appears **inside the commit-message textarea** so you can see it before hitting Commit and edit it if you want. Previously the timestamp only kicked in as a hidden fallback when the box was empty.
+
+- On load and whenever the box is empty and focused, it pre-fills with the current local time in `YYYY-MM-DD HH:MM` form.
+- Typing replaces it — the autofill tracker only refreshes the timestamp when the value is still the one we put there, so your in-progress message is never clobbered.
+- After a successful commit the box is re-prefilled with a fresh timestamp, ready for the next one.
+
 ## 1.11.14 — Auto-timestamped commits
 
 - **Commit with no message.** If the commit box is empty, the message defaults to the current local date and time in `YYYY-MM-DD HH:MM` form (e.g. `2026-04-24 14:32`). Hit the Commit button — or Ctrl+Enter — without typing anything and you get a clean, sortable entry in `git log`. Typing a message still works exactly as before.

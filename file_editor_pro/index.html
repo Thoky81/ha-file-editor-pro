@@ -3256,6 +3256,28 @@ function _autoCommitMessage() {
          `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+// Prefill the commit-message box with a timestamp whenever it's empty,
+// so the user can either commit as-is or erase and type their own.
+// `_lastAutoMsg` lets us distinguish "user typed" from "autofilled"
+// — we only refresh the autofill when the value is still ours.
+let _lastAutoMsg = '';
+function prefillCommitMessage() {
+  const box = document.getElementById('git-commit-msg');
+  if (!box) return;
+  if (box.value && box.value !== _lastAutoMsg) return;   // user typed — leave alone
+  _lastAutoMsg = _autoCommitMessage();
+  box.value = _lastAutoMsg;
+}
+document.addEventListener('DOMContentLoaded', () => {
+  const box = document.getElementById('git-commit-msg');
+  if (!box) return;
+  prefillCommitMessage();
+  // Re-prefill whenever the box is empty again (e.g. after a commit
+  // or after the user cleared it), so focusing always shows today's
+  // current timestamp.
+  box.addEventListener('focus', prefillCommitMessage);
+});
+
 async function gitCommit() {
   const box = document.getElementById('git-commit-msg');
   // Empty message → autogenerate a timestamp like "2026-04-24 14:32".
@@ -3300,6 +3322,7 @@ async function gitCommit() {
     } else {
       showToast(`Committed ${paths.length} file${paths.length>1?'s':''}`);
       box.value = '';
+      prefillCommitMessage();   // ready for the next commit
     }
     refreshGit();
   };
