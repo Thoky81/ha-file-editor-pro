@@ -281,7 +281,7 @@
     .tab-list-btn{position:relative;display:inline-flex;align-items:center;gap:4px;background:transparent;border:1px solid var(--border-light);color:var(--text-secondary);padding:3px 8px;border-radius:5px;font-family:var(--font-ui);font-size:11px;cursor:pointer;transition:all .1s;margin-right:4px}
     .tab-list-btn:hover{background:var(--bg-hover);color:var(--text-primary);border-color:var(--text-muted)}
     .tab-list-btn svg{width:12px;height:12px;stroke-width:2}
-    .tab-list-menu{position:absolute;top:calc(var(--tab-height) + 2px);right:8px;width:320px;max-height:60vh;background:var(--bg-light);border:1px solid var(--border-light);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.4);padding:4px;z-index:120;display:none;overflow-y:auto}
+    .tab-list-menu{position:fixed;width:320px;max-height:60vh;background:var(--bg-light);border:1px solid var(--border-light);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.4);padding:4px;z-index:1200;display:none;overflow-y:auto}
     .tab-list-menu.show{display:block}
     .tab-list-item{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:4px;cursor:pointer;color:var(--text-secondary);font-size:12px}
     .tab-list-item:hover{background:var(--bg-hover);color:var(--text-primary)}
@@ -2103,6 +2103,7 @@ function openFile(path, treeItem) {
   renderTabs();
   switchTab(tab.id);
   renderFileTree();
+  savePersistedTabs();
 }
 
 function switchTab(id) {
@@ -2123,6 +2124,7 @@ function switchTab(id) {
   _jinjaCache = [];    // different file, drop old errors
   scheduleJinjaValidation();
   renderFileTree();
+  savePersistedTabs();
 }
 
 function closeTab(id, e) {
@@ -2159,6 +2161,7 @@ function _doCloseTab(idx, id) {
   }
   renderTabs();
   renderFileTree();
+  savePersistedTabs();
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -2303,6 +2306,15 @@ function toggleTabList(e) {
       <span class="tli-dir">${escapeHtml(t.path.replace(/[^/]*$/, '').replace(/\/$/, '') || '/')}</span>
       <span class="tli-close" data-close-id="${t.id}" title="Close">×</span>
     </div>`).join('') || '<div class="tab-list-item" style="color:var(--text-muted)">No open files</div>';
+  // Position under the trigger button via fixed coordinates so the
+  // tab-bar's overflow:hidden doesn't clip the dropdown.
+  const btn = e && e.currentTarget ? e.currentTarget : document.querySelector('.tab-list-btn');
+  if (btn) {
+    const rect = btn.getBoundingClientRect();
+    m.style.top   = (rect.bottom + 4) + 'px';
+    m.style.right = (window.innerWidth - rect.right) + 'px';
+    m.style.left  = 'auto';
+  }
   m.classList.add('show');
   m.onclick = (ev) => {
     const closeId = ev.target.dataset?.closeId;
@@ -3238,6 +3250,34 @@ function loadPrefs() {
 }
 function savePrefs() {
   try { localStorage.setItem(PREFS_KEY, JSON.stringify(PREFS)); } catch {}
+}
+
+// Persist/restore open tabs across reloads.
+const TABS_KEY = 'fep-tabs';
+function savePersistedTabs() {
+  try {
+    const snap = {
+      paths: tabs.map(t => t.path).filter(Boolean),
+      active: tabs.find(t => t.id === activeTabId)?.path || null,
+    };
+    localStorage.setItem(TABS_KEY, JSON.stringify(snap));
+  } catch {}
+}
+async function restorePersistedTabs() {
+  let snap;
+  try { snap = JSON.parse(localStorage.getItem(TABS_KEY) || 'null'); } catch { snap = null; }
+  // Return value: did a saved state exist at all? If so, respect it
+  // even if the user had closed every tab — don't auto-open one.
+  if (!snap) return false;
+  const paths = Array.isArray(snap.paths) ? snap.paths : [];
+  for (const p of paths) {
+    if (FILES[p]) await openFile(p);
+  }
+  if (snap.active) {
+    const t = tabs.find(tab => tab.path === snap.active);
+    if (t) switchTab(t.id);
+  }
+  return true;
 }
 function applyPrefs() {
   // Theme: live on <html> via data-theme so :root vars re-resolve
@@ -5037,9 +5077,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   attachTreeContextMenu();
   await refreshGit();
 
-  const preferred = ['configuration.yaml', 'automations.yaml', 'scripts.yaml'];
-  const first = preferred.find(p => FILES[p]) || Object.keys(FILES)[0];
-  if (first) openFile(first);
+  // Restore open tabs from the previous session. If there's no
+  // snapshot, stay on the empty "Open a file from the explorer"
+  // placeholder rather than guessing — predictable behaviour.
+  await restorePersistedTabs();
 });
 
 

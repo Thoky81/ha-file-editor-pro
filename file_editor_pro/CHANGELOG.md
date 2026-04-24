@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.11.3 — Dropdown actually works + tabs persist across refresh
+
+- **Tab-list dropdown** — moved from `position: absolute` to `position: fixed` with coordinates computed from the trigger button's bounding rect. The old dropdown was being clipped by the tab-bar's `overflow: hidden`, so clicking the icon appeared to do nothing. Now it opens correctly with `z-index: 1200`.
+- **Open tabs persist across page refresh.** A `fep-tabs` localStorage snapshot (paths + active path) is saved on every tab open / close / switch and restored on boot. Refreshing the add-on no longer loses your working set.
+- **Refreshing with all tabs closed no longer opens a random file.** The boot's fallback used `Object.keys(FILES)[0]` after failing to find `configuration.yaml` at the root — on real HA installs files are prefixed (e.g. `config/…`), so it picked up the first alphabetical automations file instead. Auto-open is removed entirely: refresh restores whatever was open, or shows the empty-state message if nothing was. Predictable.
+
 ## 1.11.2 — Squeeze-to-fit tabs with hover-expand
 
 - Tabs now use `flex: 1 1 140px` with `min-width: 42 px` and `max-width: 180 px`, so when many are open they share the available space instead of spilling off-screen. When you hover a tab its width expands (up to 320 px) so the full filename is visible and you can click it to switch. The **active tab always keeps its natural width** (up to 360 px) so the file you're editing is never truncated. 180 ms transition on width so the effect feels smooth rather than twitchy. Filenames truncate with an ellipsis when squeezed.
