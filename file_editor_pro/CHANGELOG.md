@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.11.10 — Hidden-files toggle + "nothing to commit" treated as success
+
+- **Show / hide hidden files** toggle in the Explorer toolbar (the eye icon next to Refresh). Flip it to reveal dotfiles and dotdirs (`.gitignore`, `.storage`, `.env`, etc.) on demand — the state persists in preferences and also applies to cross-file search. Runtime toggle, no add-on restart. Command palette: *View: Toggle hidden files (dotfiles) in Explorer*.
+  - The add-on's `show_hidden` option still sets the default; the toolbar button overrides it per session.
+- **Backend**: `/api/files/tree` and `/api/files/search` now accept a `?hidden=1` query parameter.
+- **Commit**: *"nothing to commit, working tree clean"* no longer bubbles up as a red error toast. It's treated as a successful no-op with a neutral *"Nothing to commit — working tree is clean"* message. This often happened after auto-ignoring nested repositories, because `git rm --cached` already resolved the only pending change.
+
 ## 1.11.9 — One-click fix for nested git repositories
 
 Fixes *"'ha_vibecode_git/' does not have a commit checked out"* and *"adding embedded git repository: …"* — both symptoms of having folders inside `/config` that are themselves git repositories (cloned add-ons, experimental projects, etc.). Git refuses to add them directly, and if any of them has no commits, it aborts the whole `git add -A`.

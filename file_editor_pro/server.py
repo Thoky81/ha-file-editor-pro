@@ -98,9 +98,14 @@ def resolve_safe(relpath: str) -> Path:
     return target
 
 
-def build_tree(root: Path, prefix: str = "") -> list[dict]:
+def build_tree(root: Path, prefix: str = "", show_hidden: bool | None = None) -> list[dict]:
     """Walk `root`, returning nodes whose `path` includes `prefix` so
-    the client sends us back the same path and we can resolve it."""
+    the client sends us back the same path and we can resolve it.
+
+    `show_hidden=None` falls back to the add-on option; pass an explicit
+    bool to override (used by the Explorer's runtime toggle)."""
+    hidden = SHOW_HIDDEN if show_hidden is None else show_hidden
+
     def walk(dirpath: Path, relbase: str) -> list[dict]:
         out: list[dict] = []
         try:
@@ -113,7 +118,7 @@ def build_tree(root: Path, prefix: str = "") -> list[dict]:
         for p in entries:
             if p.name in SKIP_DIRS:
                 continue
-            if not SHOW_HIDDEN and p.name.startswith("."):
+            if not hidden and p.name.startswith("."):
                 continue
             rel = f"{relbase}/{p.name}" if relbase else p.name
             full = f"{prefix}/{rel}" if prefix else rel
@@ -170,17 +175,21 @@ async def list_roots():
 
 
 @app.get("/api/files/tree")
-async def tree():
+async def tree(hidden: int | None = None):
     """Top-level nodes are one per mapped root; children are that
     root's contents. The `path` on every node is root-prefixed so
-    all /api/files/* calls resolve unambiguously."""
+    all /api/files/* calls resolve unambiguously.
+
+    `hidden=1` (query) overrides the add-on option at runtime so the
+    Explorer's toggle button works without an add-on restart."""
+    show_hidden = bool(hidden) if hidden is not None else None
     nodes = []
     for name, root in ROOTS.items():
         nodes.append({
             "name": name,
             "type": "dir",
             "path": name,
-            "children": build_tree(root, prefix=name),
+            "children": build_tree(root, prefix=name, show_hidden=show_hidden),
         })
     return {"tree": nodes, "root": str(CONFIG_ROOT), "roots": list(ROOTS.keys())}
 
@@ -254,12 +263,16 @@ async def mkdir(body: PathBody):
 
 
 @app.get("/api/files/search")
-async def search_files(q: str, max_files: int = 100, max_per_file: int = 10):
+async def search_files(q: str, max_files: int = 100, max_per_file: int = 10,
+                        hidden: int | None = None):
     """Cross-file case-insensitive substring search under /config.
     Skips SKIP_DIRS and binary files. Returns matches with surrounding
-    line context so the sidebar can highlight them."""
+    line context so the sidebar can highlight them.
+
+    `hidden=1` includes dotfiles/dotdirs in the scan."""
     if not q:
         return {"results": []}
+    show_hidden = bool(hidden) if hidden is not None else SHOW_HIDDEN
     q_lower = q.lower()
     results = []
     for root_name, root in ROOTS.items():
@@ -267,7 +280,7 @@ async def search_files(q: str, max_files: int = 100, max_per_file: int = 10):
             if not p.is_file():
                 continue
             rel_parts = p.relative_to(root).parts
-            if any(part in SKIP_DIRS or (part.startswith(".") and not SHOW_HIDDEN)
+            if any(part in SKIP_DIRS or (part.startswith(".") and not show_hidden)
                    for part in rel_parts):
                 continue
             try:
@@ -477,6 +490,12 @@ async def git_commit(body: CommitBody):
     else:
         code, out, err = await run_git("commit", "-m", body.message)
     if code != 0:
+        # "nothing to commit" isn't really a failure — the working tree
+        # is already clean (common after auto-ignoring nested repos,
+        # since `git rm --cached` can resolve the only pending change).
+        combined = (out + err).lower()
+        if "nothing to commit" in combined or "no changes added to commit" in combined:
+            return {"ok": True, "nothing_to_commit": True, "output": out or err}
         _raise_git_error("git commit", err or out)
     return {"ok": True, "output": out}
 

@@ -189,6 +189,7 @@
     .sidebar-header-actions{display:flex;gap:4px}
     .icon-btn{width:22px;height:22px;display:flex;align-items:center;justify-content:center;border-radius:4px;cursor:pointer;color:var(--text-muted);transition:all .1s;background:none;border:none}
     .icon-btn:hover{color:var(--text-primary);background:var(--bg-hover)}
+    .icon-btn.active{color:var(--accent-blue);background:color-mix(in srgb, var(--accent-blue) 14%, transparent)}
     .icon-btn svg{width:14px;height:14px}
     .sidebar-content{flex:1;overflow-y:auto;overflow-x:hidden}
     .sidebar-content::-webkit-scrollbar{width:4px}
@@ -769,6 +770,10 @@
           </button>
           <button class="icon-btn" title="Upload File" onclick="uploadFilePrompt()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          </button>
+          <button class="icon-btn" id="btn-toggle-hidden" title="Show hidden files (dotfiles)" onclick="toggleShowHidden()">
+            <svg class="eye-on" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
+            <svg class="eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="display:none"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a19.4 19.4 0 0 1 4.22-5.38"/><path d="M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 8 11 8a19.58 19.58 0 0 1-3.31 4.29"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
           </button>
           <button class="icon-btn" title="Refresh" onclick="refreshTree()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.82"/></svg>
@@ -2658,7 +2663,8 @@ async function _performSearchNow(query) {
   if (API.available) {
     results.innerHTML = '<div class="search-match" style="color:var(--text-muted)">Searching…</div>';
     try {
-      const r = await fetch(API.url('/api/files/search?q=' + encodeURIComponent(query)));
+      const r = await fetch(API.url('/api/files/search?q=' + encodeURIComponent(query)
+        + (PREFS.showHidden ? '&hidden=1' : '')));
       if (!r.ok) throw new Error('search ' + r.status);
       const data = await r.json();
       renderSearchResults(data.results || []);
@@ -2932,7 +2938,8 @@ const API = {
     } catch { return false; }
   },
   async tree() {
-    const r = await fetch(this.url('/api/files/tree'), { cache: 'no-store' });
+    const qs = PREFS.showHidden ? '?hidden=1' : '';
+    const r = await fetch(this.url('/api/files/tree' + qs), { cache: 'no-store' });
     if (!r.ok) throw new Error('tree ' + r.status);
     return r.json();
   },
@@ -3112,8 +3119,9 @@ async function gitCommit() {
   const allSelected = paths.length === GIT_CHANGES.length;
   const body = allSelected ? { message: msg } : { message: msg, paths };
 
-  // Make one commit attempt. Throws a GitError with `.detail` set when
-  // the backend returned a structured error payload.
+  // Make one commit attempt. Returns the parsed JSON body on 2xx.
+  // Throws an Error with `.detail` set when the backend returned a
+  // structured error payload.
   async function attempt() {
     const r = await fetch(API.url('/api/git/commit'), {
       method: 'POST',
@@ -3122,7 +3130,7 @@ async function gitCommit() {
       // "add everything" (git add -A, picks up renames/deletes too).
       body: JSON.stringify(body),
     });
-    if (r.ok) return;
+    if (r.ok) { try { return await r.json(); } catch { return {}; } }
     let detail;
     try { detail = (await r.json()).detail; } catch { detail = r.statusText; }
     const msg = (detail && typeof detail === 'object') ? (detail.message || JSON.stringify(detail)) : String(detail);
@@ -3131,15 +3139,19 @@ async function gitCommit() {
     throw err;
   }
 
-  const commitSucceeded = () => {
-    showToast(`Committed ${paths.length} file${paths.length>1?'s':''}`);
-    box.value = '';
+  const commitSucceeded = (result) => {
+    if (result?.nothing_to_commit) {
+      showToast('Nothing to commit — working tree is clean');
+    } else {
+      showToast(`Committed ${paths.length} file${paths.length>1?'s':''}`);
+      box.value = '';
+    }
     refreshGit();
   };
 
   try {
-    await attempt();
-    commitSucceeded();
+    const res = await attempt();
+    commitSucceeded(res);
   } catch (e) {
     const d = e.detail && typeof e.detail === 'object' ? e.detail : null;
 
@@ -3153,8 +3165,8 @@ async function gitCommit() {
       if (!retry) return;
       try {
         await fetch(API.url('/api/git/clear-lock'), { method: 'POST' });
-        await attempt();
-        commitSucceeded();
+        const res = await attempt();
+        commitSucceeded(res);
       } catch (e2) { showToast('Commit failed: ' + e2.message); }
       return;
     }
@@ -3176,8 +3188,8 @@ async function gitCommit() {
           body: JSON.stringify({ paths: d.nested_repos }),
         });
         if (!r.ok) throw new Error((await r.json()).detail || r.status);
-        await attempt();
-        commitSucceeded();
+        const res = await attempt();
+        commitSucceeded(res);
       } catch (e2) { showToast('Commit failed: ' + e2.message); }
       return;
     }
@@ -3570,6 +3582,7 @@ const PREFS = {
   minimap: false,                // right-edge document overview
   sidebarVisible: true,          // Ctrl+B toggles the sidebar
   defaultFolder: '',             // drill into this path on startup (empty = full tree)
+  showHidden: false,             // dotfiles/dotdirs in Explorer + search
 };
 
 function loadPrefs() {
@@ -3649,6 +3662,7 @@ function applyPrefs() {
   applyIndentStyle();
   applyBracketColors();
   applyMinimap();
+  applyShowHiddenButton();
   editor.refresh();
 }
 
@@ -3857,6 +3871,28 @@ function toggleMinimap() {
   PREFS.minimap = !PREFS.minimap;
   savePrefs(); applyMinimap();
   showToast(`Minimap: ${PREFS.minimap ? 'on' : 'off'}`);
+}
+
+function toggleShowHidden() {
+  PREFS.showHidden = !PREFS.showHidden;
+  savePrefs();
+  applyShowHiddenButton();
+  showToast(`Hidden files: ${PREFS.showHidden ? 'shown' : 'hidden'}`);
+  // Re-fetch the tree so dotfiles appear or disappear. refreshTree()
+  // passes PREFS.showHidden via the API.tree() query string.
+  refreshTree();
+}
+
+function applyShowHiddenButton() {
+  const btn = document.getElementById('btn-toggle-hidden');
+  if (!btn) return;
+  const on = !!PREFS.showHidden;
+  btn.classList.toggle('active', on);
+  btn.title = on ? 'Hide hidden files (dotfiles)' : 'Show hidden files (dotfiles)';
+  const eyeOn = btn.querySelector('.eye-on');
+  const eyeOff = btn.querySelector('.eye-off');
+  if (eyeOn)  eyeOn.style.display  = on ? 'none'  : '';
+  if (eyeOff) eyeOff.style.display = on ? ''      : 'none';
 }
 // Minimap refactored to render per pane. Each pane = { cm, ids }.
 function _minimapPanes() {
@@ -5092,6 +5128,7 @@ const COMMANDS = [
   { cat: 'View',   title: 'Toggle visible whitespace (dots)',                   run: () => toggleWhitespace() },
   { cat: 'View',   title: 'Toggle rainbow brackets',                             run: () => toggleBracketColors() },
   { cat: 'View',   title: 'Toggle minimap',                                      run: () => toggleMinimap() },
+  { cat: 'View',   title: 'Toggle hidden files (dotfiles) in Explorer',          run: () => toggleShowHidden() },
   { cat: 'View',   title: 'Toggle line wrap',                                    run: () => toggleLineWrap() },
   { cat: 'View',   title: 'Font size: 11',                                       run: () => setFontSize(11) },
   { cat: 'View',   title: 'Font size: 13',                                       run: () => setFontSize(13) },
