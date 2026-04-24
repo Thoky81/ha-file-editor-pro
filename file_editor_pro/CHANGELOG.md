@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.11.4 — Clearer help icon + guided git setup
+
+- Help button in the activity bar swapped from a thin path-drawn `?` (which read as fuzzy at 18 px) to a bold italic `i` rendered as an SVG `<text>` element inside a circle. Same update applied to the Help modal header for consistency.
+- **Source Control onboarding.** When the config folder isn't a git repository yet, the Source Control panel now shows an explainer + an **"Initialise git repository"** button and an optional **GitHub URL field** to set up a remote at the same time. No more dropping to the terminal for the first-time setup.
+- When a repo exists but has no remote, the panel's header shows "no remote"; when it does, it shows the remote URL (trimmed). New backend endpoints `POST /api/git/remote-add` and `GET /api/git/remote`.
+
 ## 1.11.3 — Dropdown actually works + tabs persist across refresh
 
 - **Tab-list dropdown** — moved from `position: absolute` to `position: fixed` with coordinates computed from the trigger button's bounding rect. The old dropdown was being clipped by the tab-bar's `overflow: hidden`, so clicking the icon appeared to do nothing. Now it opens correctly with `z-index: 1200`.

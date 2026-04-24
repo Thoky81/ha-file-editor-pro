@@ -713,7 +713,10 @@
     </div>
     <div class="activity-spacer"></div>
     <div class="activity-item" id="act-help" onclick="openHelp()" title="Help &amp; shortcuts">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12" y2="17"/></svg>
+      <svg viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <text x="12" y="17" text-anchor="middle" font-size="15" font-weight="700" font-family="var(--font-ui),sans-serif" font-style="italic" fill="currentColor">i</text>
+      </svg>
     </div>
     <div class="activity-item" id="act-theme-toggle" onclick="toggleThemeMode()" title="Toggle light / dark theme">
       <!-- Content set dynamically by updateThemeToggleIcon() -->
@@ -1038,7 +1041,10 @@
 <div class="help-overlay" id="help-modal">
   <div class="help-modal">
     <div class="help-header">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" style="width:18px;height:18px"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12" y2="17"/></svg>
+      <svg viewBox="0 0 24 24" style="width:18px;height:18px">
+        <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <text x="12" y="17" text-anchor="middle" font-size="15" font-weight="700" font-style="italic" fill="currentColor">i</text>
+      </svg>
       <div class="help-title">Help &amp; keyboard shortcuts</div>
       <button class="help-close" onclick="closeHelp()">×</button>
     </div>
@@ -2884,6 +2890,40 @@ async function refreshGit() {
       document.getElementById('git-branch-name').textContent = 'no repo';
       document.getElementById('git-repo-state').textContent = 'not initialized';
     }
+    // Panel content for "no repo yet" — init + optional GitHub URL.
+    const changesEl = document.getElementById('git-changes');
+    if (changesEl && !data.repo) {
+      changesEl.innerHTML = `
+        <div style="padding:10px 8px;color:var(--text-secondary);font-size:12px;line-height:1.5">
+          Your config folder isn't tracked by git yet. Initialise a
+          repository here so your edits get <strong>M</strong>/<strong>A</strong>/<strong>U</strong>/<strong>D</strong>
+          badges and you can commit them.
+          <button class="git-btn" style="margin-top:10px;display:block;width:100%" onclick="gitInit()">Initialise git repository</button>
+          <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">Optional — connect to GitHub later:</div>
+            <input id="git-remote-url" type="text" placeholder="https://github.com/you/repo.git"
+                   style="width:100%;background:var(--bg-mid);border:1px solid var(--border-light);color:var(--text-primary);border-radius:5px;padding:6px 8px;font-family:var(--font-mono);font-size:11px;outline:none;box-sizing:border-box">
+            <button class="git-btn" style="margin-top:6px;display:block;width:100%;opacity:.85" onclick="gitAddRemoteFromInput()">Add remote (init first)</button>
+            <div style="margin-top:8px;font-size:10px;color:var(--text-muted)">
+              Tip: for HTTPS pushes you'll need a personal access token — use <code>https://&lt;token&gt;@github.com/you/repo.git</code> as the URL.
+            </div>
+          </div>
+        </div>`;
+      return;
+    }
+    // Panel content when repo exists but has no remote → offer to add one.
+    if (changesEl && data.repo) {
+      try {
+        const rr = await fetch(API.url('/api/git/remote'));
+        const rd = await rr.json();
+        const remotes = rd.remotes || [];
+        const stateEl = document.getElementById('git-repo-state');
+        if (stateEl) {
+          stateEl.textContent = remotes.length ? remotes[0].url.replace(/^https?:\/\//, '') : 'no remote';
+          stateEl.title = remotes[0]?.url || '';
+        }
+      } catch {}
+    }
   } catch (e) {
     console.warn('git status failed', e);
   }
@@ -2914,6 +2954,44 @@ async function gitCommit() {
   } catch (e) {
     showToast('Commit failed: ' + e.message);
   }
+}
+
+async function gitInit() {
+  if (!API.available) { showToast('Demo mode — no backend'); return; }
+  try {
+    const r = await fetch(API.url('/api/git/init'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ branch: 'main' }),
+    });
+    if (!r.ok) throw new Error((await r.json()).detail || r.status);
+    // After init, offer to add a remote if a URL was typed already.
+    const url = document.getElementById('git-remote-url')?.value?.trim();
+    if (url) await _gitAddRemote(url);
+    showToast('Git repository initialised');
+    refreshGit();
+    refreshTree();
+  } catch (e) { showToast('Init failed: ' + e.message); }
+}
+
+async function gitAddRemoteFromInput() {
+  const url = document.getElementById('git-remote-url')?.value?.trim();
+  if (!url) { showToast('Enter a repository URL first'); return; }
+  await _gitAddRemote(url);
+  refreshGit();
+}
+
+async function _gitAddRemote(url) {
+  if (!API.available) { showToast('Demo mode — no backend'); return; }
+  try {
+    const r = await fetch(API.url('/api/git/remote-add'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, name: 'origin' }),
+    });
+    if (!r.ok) throw new Error((await r.json()).detail || r.status);
+    showToast(`Remote "origin" set to ${url}`);
+  } catch (e) { showToast('Add remote failed: ' + e.message); }
 }
 
 async function gitPull() {
@@ -4775,6 +4853,7 @@ const COMMANDS = [
   { cat: 'Git',    title: 'Push',                                              run: () => gitPush() },
   { cat: 'Git',    title: 'Commit (focus message)',                            run: () => { switchPanel('git'); document.getElementById('git-commit-msg').focus(); } },
   { cat: 'Git',    title: 'Refresh status',                                    run: () => refreshGit() },
+  { cat: 'Git',    title: 'Initialise repository here',                         run: () => gitInit() },
   { cat: 'Git',    title: 'Diff current file vs HEAD',                         run: () => openDiffAgainstHead() },
   { cat: 'File',   title: 'Diff current file vs on disk',                      run: () => openDiffAgainstDisk() },
   { cat: 'HA',     title: 'Check Configuration',                               run: () => haCheckConfig() },

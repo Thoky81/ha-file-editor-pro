@@ -474,6 +474,42 @@ async def git_init(body: InitBody):
     return {"ok": True, "output": out}
 
 
+class RemoteBody(BaseModel):
+    url: str
+    name: str = "origin"
+
+
+@app.post("/api/git/remote-add")
+async def git_remote_add(body: RemoteBody):
+    if not has_git():
+        raise HTTPException(400, "Not a git repository")
+    # If the remote already exists, swap its URL instead of erroring.
+    code, out, _ = await run_git("remote")
+    existing = {line.strip() for line in out.splitlines() if line.strip()}
+    if body.name in existing:
+        code, out, err = await run_git("remote", "set-url", body.name, body.url)
+    else:
+        code, out, err = await run_git("remote", "add", body.name, body.url)
+    if code != 0:
+        raise HTTPException(500, err or out)
+    return {"ok": True, "output": out or err}
+
+
+@app.get("/api/git/remote")
+async def git_remote_list():
+    if not has_git():
+        return {"remotes": []}
+    code, out, _ = await run_git("remote", "-v")
+    seen = set()
+    remotes = []
+    for line in out.splitlines():
+        parts = line.split()
+        if len(parts) >= 2 and parts[0] not in seen:
+            seen.add(parts[0])
+            remotes.append({"name": parts[0], "url": parts[1]})
+    return {"remotes": remotes}
+
+
 # ──────────────────────────── HA API ──────────────────────────────────
 
 async def ha_call(method: str, path: str, json_body: dict | None = None) -> dict:
