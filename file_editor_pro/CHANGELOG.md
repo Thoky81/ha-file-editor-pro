@@ -1,10 +1,13 @@
 # Changelog
 
-## 1.10.5 — Default folder on startup, expanded-state preserved, delete confirm
+## 1.10.6 — Preserved expanded state + custom delete confirm
+
+- **Tree no longer collapses on create / delete / rename.** `ingestBackendTree` now snapshots every currently-open directory path and re-applies the expanded flag after the refresh, so you don't have to re-open folders every time you modify the filesystem.
+- **Custom delete confirm dialog.** Native `confirm()` put focus on OK or Cancel depending on the browser — inconsistent and sometimes one-Enter-accidental-delete. Replaced with a small modal: Cancel + Delete; **Cancel is the initial focus**, so Enter always cancels; the red Delete button requires a deliberate click.
+
+## 1.10.5 — Default folder on startup
 
 - Settings → Appearance → **Default folder on startup**. Enter a path (e.g. `config` or `config/packages`) and the app drills into that folder automatically on load. Empty = full tree as before. The *Use current* button next to the field fills it with whatever folder you're currently focused on. Also available from the command palette as *View: Set current folder as default startup folder*.
-- **Tree no longer collapses on create / delete / rename.** `ingestBackendTree` now snapshots every currently-open directory path and re-applies the expanded flag after the refresh, so you don't have to re-open folders every time you modify the filesystem.
-- **Custom delete confirm dialog.** Native `confirm()` put focus on OK/Cancel depending on the browser — on some it put focus on OK, giving a one-enter accidental delete. Replaced with a small modal with Cancel + Delete; **Cancel is the initial focus**, so pressing Enter always cancels; clicking Delete is a deliberate action (and it's red/danger-styled).
 
 ## 1.10.4 — Visible collapse button, context-aware new file/folder, folder drill-down
 
