@@ -2,6 +2,7 @@ import asyncio
 import json
 import mimetypes
 import os
+import re
 import shutil
 import struct
 import subprocess
@@ -466,7 +467,7 @@ async def git_commit(body: CommitBody):
     else:
         code, _, err = await run_git("add", "-A")
     if code != 0:
-        raise HTTPException(500, _friendly_git_err("git add", err))
+        _raise_git_error("git add", err)
 
     # Commit only the specified paths when given — otherwise commit
     # everything that was just staged.
@@ -476,17 +477,102 @@ async def git_commit(body: CommitBody):
     else:
         code, out, err = await run_git("commit", "-m", body.message)
     if code != 0:
-        raise HTTPException(500, _friendly_git_err("git commit", err or out))
+        _raise_git_error("git commit", err or out)
     return {"ok": True, "output": out}
 
 
-def _friendly_git_err(action: str, err: str) -> str:
-    """Turn raw git stderr into something an add-on user can act on."""
+_NESTED_NO_COMMIT_RE = re.compile(r"error:\s*'([^']+)' does not have a commit checked out")
+_EMBEDDED_REPO_RE = re.compile(r"adding embedded git repository:\s*(\S+)")
+
+
+def _raise_git_error(action: str, err: str) -> None:
+    """Raise HTTPException with a detail payload the UI can act on.
+
+    For well-known failure patterns we attach structured fields
+    (`kind`, and e.g. `nested_repos`) so the frontend can offer a
+    one-click recovery instead of just showing stderr. For anything
+    else we fall back to a plain string.
+    """
     e = (err or "").strip()
+
     if "index.lock" in e and "File exists" in e:
-        return (f"{action} failed: a stale .git/index.lock is blocking git. "
-                "Click the Source Control header → Clear lock, then retry.")
-    return f"{action} failed: {e}"
+        raise HTTPException(409, {
+            "kind": "stale_lock",
+            "message": (f"{action} failed: a stale .git/index.lock is "
+                        "blocking git. Click the Source Control header → "
+                        "padlock icon to clear it, then retry."),
+            "raw": e,
+        })
+
+    # Nested git repositories — two variants git may emit:
+    # 1) "error: 'path' does not have a commit checked out"  (hard failure)
+    # 2) "warning: adding embedded git repository: path"     (would be added as gitlink)
+    # If either appears, offer to gitignore them and retry.
+    nested = sorted(set(
+        _NESTED_NO_COMMIT_RE.findall(e) + _EMBEDDED_REPO_RE.findall(e)
+    ))
+    if nested:
+        raise HTTPException(409, {
+            "kind": "nested_repos",
+            "message": (f"{action} failed: {len(nested)} nested git "
+                        "repositor" + ("y is" if len(nested) == 1 else "ies are") +
+                        " blocking the commit. Add "
+                        + ("it" if len(nested) == 1 else "them")
+                        + " to .gitignore and retry?"),
+            "nested_repos": nested,
+            "raw": e,
+        })
+
+    raise HTTPException(500, f"{action} failed: {e}")
+
+
+class IgnorePathsBody(BaseModel):
+    paths: list[str]
+
+
+@app.post("/api/git/ignore-paths")
+async def git_ignore_paths(body: IgnorePathsBody):
+    """Append the given paths to /config/.gitignore as directory rules.
+
+    Also runs `git rm -r --cached` for any that were already tracked, so
+    a previous index entry doesn't keep the path showing up as a change.
+    Paths are expected to be repo-relative (the frontend strips its
+    "config/" prefix before calling).
+    """
+    if not has_git():
+        raise HTTPException(400, "Not a git repository")
+    paths = [_strip_config_prefix(p).rstrip("/") for p in body.paths if p.strip()]
+    paths = [p for p in paths if p]  # drop empties
+    if not paths:
+        raise HTTPException(400, "No paths supplied")
+
+    gi = CONFIG_ROOT / ".gitignore"
+    existing_lines = gi.read_text().splitlines() if gi.exists() else []
+    existing = {ln.strip() for ln in existing_lines}
+
+    added: list[str] = []
+    for p in paths:
+        rule = f"/{p}/"
+        if rule not in existing and p not in existing and f"/{p}" not in existing:
+            existing_lines.append(rule)
+            added.append(rule)
+
+    if added:
+        # Preserve the trailing newline convention.
+        text = "\n".join(existing_lines)
+        if not text.endswith("\n"):
+            text += "\n"
+        gi.write_text(text)
+
+    # If any of these paths were already tracked (e.g. as gitlinks from a
+    # prior commit), un-track them so the ignore rule actually takes effect.
+    removed: list[str] = []
+    for p in paths:
+        code, _, _ = await run_git("rm", "-r", "--cached", "--ignore-unmatch", "--", p)
+        if code == 0:
+            removed.append(p)
+
+    return {"ok": True, "added": added, "removed": removed}
 
 
 @app.post("/api/git/clear-lock")

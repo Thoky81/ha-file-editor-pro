@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.11.9 — One-click fix for nested git repositories
+
+Fixes *"'ha_vibecode_git/' does not have a commit checked out"* and *"adding embedded git repository: …"* — both symptoms of having folders inside `/config` that are themselves git repositories (cloned add-ons, experimental projects, etc.). Git refuses to add them directly, and if any of them has no commits, it aborts the whole `git add -A`.
+
+- **Automatic detection.** The backend now parses git stderr for both the hard-failure variant (*"does not have a commit checked out"*) and the warning variant (*"adding embedded git repository"*), and returns a structured `409` response listing the offending folders instead of an opaque stderr dump.
+- **Commit-time recovery dialog.** When the commit panel sees a nested-repo error, it lists the folders and asks *"Add them to /config/.gitignore and try the commit again?"* One click resolves it.
+- **New backend endpoint** `POST /api/git/ignore-paths` — appends `/<path>/` rules to `/config/.gitignore` (skipping any that already exist) and runs `git rm -r --cached` so previously-tracked gitlinks stop showing up as changes.
+- Stale-lock errors now also use the structured `409` flow, making the retry logic consistent across failure kinds.
+
 ## 1.11.8 — Stale git lock recovery
 
 Fixes *"fatal: Unable to create '/config/.git/index.lock': File exists"* — a recurring failure when a previous git operation was interrupted (container stop, OOM, browser refresh mid-commit) and left its lockfile behind. The add-on couldn't commit again until that file was removed by hand.

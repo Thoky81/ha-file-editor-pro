@@ -3112,6 +3112,8 @@ async function gitCommit() {
   const allSelected = paths.length === GIT_CHANGES.length;
   const body = allSelected ? { message: msg } : { message: msg, paths };
 
+  // Make one commit attempt. Throws a GitError with `.detail` set when
+  // the backend returned a structured error payload.
   async function attempt() {
     const r = await fetch(API.url('/api/git/commit'), {
       method: 'POST',
@@ -3120,18 +3122,29 @@ async function gitCommit() {
       // "add everything" (git add -A, picks up renames/deletes too).
       body: JSON.stringify(body),
     });
-    if (!r.ok) throw new Error((await r.json()).detail || r.status);
+    if (r.ok) return;
+    let detail;
+    try { detail = (await r.json()).detail; } catch { detail = r.statusText; }
+    const msg = (detail && typeof detail === 'object') ? (detail.message || JSON.stringify(detail)) : String(detail);
+    const err = new Error(msg);
+    err.detail = detail;
+    throw err;
   }
 
-  try {
-    await attempt();
+  const commitSucceeded = () => {
     showToast(`Committed ${paths.length} file${paths.length>1?'s':''}`);
     box.value = '';
     refreshGit();
+  };
+
+  try {
+    await attempt();
+    commitSucceeded();
   } catch (e) {
-    // If the failure is a stale git lock, offer a one-click recover-and-retry
-    // instead of leaving the user to find the unlock button themselves.
-    if (/index\.lock/i.test(e.message)) {
+    const d = e.detail && typeof e.detail === 'object' ? e.detail : null;
+
+    // Stale .git/index.lock — offer to clear and retry.
+    if (d?.kind === 'stale_lock' || /index\.lock/i.test(e.message)) {
       const retry = window.confirm(
         'A stale .git/index.lock is blocking git operations.\n\n' +
         'This usually means a previous git command was interrupted. ' +
@@ -3141,14 +3154,34 @@ async function gitCommit() {
       try {
         await fetch(API.url('/api/git/clear-lock'), { method: 'POST' });
         await attempt();
-        showToast(`Committed ${paths.length} file${paths.length>1?'s':''}`);
-        box.value = '';
-        refreshGit();
-      } catch (e2) {
-        showToast('Commit failed: ' + e2.message);
-      }
+        commitSucceeded();
+      } catch (e2) { showToast('Commit failed: ' + e2.message); }
       return;
     }
+
+    // Nested git repositories — offer to gitignore them and retry.
+    if (d?.kind === 'nested_repos' && Array.isArray(d.nested_repos) && d.nested_repos.length) {
+      const list = d.nested_repos.map(p => '  • ' + p).join('\n');
+      const retry = window.confirm(
+        'These folders are themselves git repositories and are blocking the commit:\n\n' +
+        list + '\n\n' +
+        'Add them to /config/.gitignore (so git stops trying to track them) ' +
+        'and try the commit again?'
+      );
+      if (!retry) return;
+      try {
+        const r = await fetch(API.url('/api/git/ignore-paths'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ paths: d.nested_repos }),
+        });
+        if (!r.ok) throw new Error((await r.json()).detail || r.status);
+        await attempt();
+        commitSucceeded();
+      } catch (e2) { showToast('Commit failed: ' + e2.message); }
+      return;
+    }
+
     showToast('Commit failed: ' + e.message);
   }
 }
