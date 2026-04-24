@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.11.14 — Auto-timestamped commits
+
+- **Commit with no message.** If the commit box is empty, the message defaults to the current local date and time in `YYYY-MM-DD HH:MM` form (e.g. `2026-04-24 14:32`). Hit the Commit button — or Ctrl+Enter — without typing anything and you get a clean, sortable entry in `git log`. Typing a message still works exactly as before.
+- Placeholder updated to make the behavior discoverable.
+
 ## 1.11.13 — Instant show/hide hidden-files toggle
 
 The hidden-files toggle used to take a few seconds in either direction — every click triggered a full backend filesystem walk followed by a complete tree re-render. Now it's a single DOM pass.

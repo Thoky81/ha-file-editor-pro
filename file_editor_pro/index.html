@@ -833,7 +833,7 @@
           <div class="git-section-title">Changes (<span id="git-count">0</span>)</div>
           <div id="git-changes"></div>
           <div class="git-commit-area">
-            <textarea class="git-commit-input" id="git-commit-msg" placeholder="Commit message (Ctrl+Enter)"></textarea>
+            <textarea class="git-commit-input" id="git-commit-msg" placeholder="Commit message — leave empty to auto-use today's date/time (Ctrl+Enter to commit)"></textarea>
             <button class="git-btn" onclick="gitCommit()">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:13px;height:13px"><circle cx="12" cy="12" r="3"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/></svg>
               <span id="git-commit-btn-label">Commit</span>
@@ -3248,10 +3248,20 @@ async function refreshGit() {
   renderFileTree();
 }
 
+function _autoCommitMessage() {
+  // Local date + time, short ISO-ish — reads well in git log.
+  const d = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ` +
+         `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 async function gitCommit() {
   const box = document.getElementById('git-commit-msg');
-  const msg = box.value.trim();
-  if (!msg) { box.style.borderColor = 'var(--accent-red)'; return; }
+  // Empty message → autogenerate a timestamp like "2026-04-24 14:32".
+  // Git rejects blank messages and so do we, but for quick saves the
+  // user shouldn't have to type anything.
+  const msg = box.value.trim() || _autoCommitMessage();
   box.style.borderColor = '';
   if (!API.available) {
     showToast(`Committed (demo): "${msg.substring(0,40)}"`);
