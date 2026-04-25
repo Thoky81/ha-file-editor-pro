@@ -1252,63 +1252,154 @@
       </div>
 
       <div class="te-preview-frame">
-        <div class="te-preview-label">YAML — 6 indent levels + 6 bracket depths</div>
-        <textarea id="syntax-preview-ta"># Sample HA automation — every YAML token type below.
-# (Trailing inline comments break number tokenisation in CM's
-# yaml mode, so notes are placed above the line they describe.)
+        <div class="te-preview-label">YAML — every token + 6-level indent + 6-deep brackets</div>
+        <textarea id="syntax-preview-ta"># Real-world HA automations — every YAML token type covered.
+# Notes go above the line they describe so values reach end-of-line
+# and CM's yaml mode tokenises numbers/booleans correctly.
 
-automation:                            # KEY: "automation"
-  # the next line shows a quoted STRING value
-  - alias: "Sunset lights"
+# Anchors &amp; aliases — reusable defaults
+notification_defaults: &amp;mobile
+  title: "Home Assistant"
+  data:
+    priority: high
 
-    # &workdays is an ANCHOR (cm-variable-2 → --syn-def)
-    condition: &amp;workdays
+automation:
 
-      # PUNCTUATION cm-meta: : - , [ ]
-      weekday: [mon, tue, wed]
-
-      # 6-level indent + 6-deep brackets — every --rb-N + --bp-N visible
-      data:
-        deep:
-          deeper:
-            even_deeper:
-              list: [1, [2, [3, [4, [5, [6]]]]]]
-
+  # 1) Sun trigger + template condition + light action
+  - id: sunset_lights
+    alias: "Sunset lights"
+    mode: single
+    trigger:
+      platform: sun
+      event: sunset
+      offset: "-00:30:00"
+    condition:
+      condition: template
+      value_template: &gt;
+        {% if is_state('person.tomas', 'home') %}
+          true
+        {% endif %}
     action:
       service: light.turn_on
-
-      # NUMBERS and BOOLEANS — kept on their own lines so YAML mode
-      # tokenises them (it requires nothing after the value).
+      target:
+        entity_id: light.living_room
       data:
-        brightness: 200
+        brightness_pct: 75
         transition: 2.5
-        enabled: true
-        flash: false
+        rgb_color: [255, 180, 100]
+        kelvin: 2700
 
-    # *workdays is an ALIAS — same colour as anchors
-    use: *workdays</textarea>
+  # 2) Numeric_state trigger + multi-condition + notify (uses *mobile)
+  - alias: "House too warm"
+    mode: queued
+    trigger:
+      platform: numeric_state
+      entity_id: sensor.indoor_temp
+      above: 26.5
+      for:
+        minutes: 5
+    condition:
+      - condition: state
+        entity_id: binary_sensor.someone_home
+        state: "on"
+      - condition: time
+        after: "07:00:00"
+        before: "23:00:00"
+    action:
+      - service: notify.mobile_app_phone
+        data:
+          title: *mobile
+          message: &gt;
+            It's
+            {{ states('sensor.indoor_temp') | float }}°C
+            inside — turning on the AC.
+      - service: climate.set_hvac_mode
+        target:
+          entity_id: climate.bedroom
+        data:
+          hvac_mode: cool
+
+  # 3) Choose-action with deep bracket pairs in coordinates
+  - alias: "Front door alert"
+    trigger:
+      platform: state
+      entity_id: binary_sensor.front_door
+      from: "off"
+      to: "on"
+    action:
+      - choose:
+          - conditions:
+              condition: time
+              after: "22:00:00"
+            sequence:
+              - service: light.turn_on
+                target:
+                  entity_id: light.entry
+                data:
+                  brightness_pct: 100
+                  flash: long
+                  enabled: true
+              - service: notify.mobile_app_phone
+                data:
+                  message: "Front door opened"
+                  data:
+                    geo:
+                      coords: [1, [2, [3, [4, [5, [6]]]]]]
+
+# Many integers on their own lines — every one is cm-number
+http:
+  server_port: 8123
+  ssl_profile: modern
+  trusted_proxies: [192, 10]
+  ip_ban_enabled: true
+
+logger:
+  default: warning
+  logs:
+    homeassistant.components.mqtt: info</textarea>
       </div>
 
       <div class="te-preview-frame">
-        <div class="te-preview-label">Python — identifiers, built-ins, 6-deep brackets</div>
-        <textarea id="syntax-preview-py-ta"># Sample Python file — covers IDENTIFIERS + BUILT-INS swatches.
+        <div class="te-preview-label">Python — class, async, decorators, type hints, built-ins</div>
+        <textarea id="syntax-preview-py-ta"># Sample HA custom_component skeleton.
 import asyncio
+import logging
+from typing import Any
 
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity import Entity
+
+_LOGGER = logging.getLogger(__name__)
+
+DOMAIN = "my_integration"
 DEFAULT_NAME = "sensor"
 TIMEOUT = 30
 
-def setup(hass, config):
-    # 6-level deep brackets demo every --bp-N
-    items = [1, [2, [3, [4, [5, [6]]]]]]
-    if items:
-        for x in items:
-            while x &gt; 0:
-                if x % 2 == 0:
-                    # print, len, str are BUILT-INS
-                    print(len(items), str(x))
-                else:
-                    return True
-    return False</textarea>
+class MySensor(Entity):
+    """Example HA sensor entity."""
+
+    def __init__(self, hass: HomeAssistant, name: str) -> None:
+        self.hass = hass
+        self._name = name
+        self._items = [1, [2, [3, [4, [5, [6]]]]]]
+        self._state: Any = None
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    async def async_update(self) -> None:
+        """Pull latest state from the API."""
+        if self._items:
+            for x in self._items:
+                while x &gt; 0:
+                    if x % 2 == 0:
+                        # print, len, str, bool, dict are BUILT-INS
+                        print(len(self._items), str(x), bool(x))
+                        x -= 1
+                    else:
+                        return None
+        return None</textarea>
       </div>
 
       <div class="te-help">

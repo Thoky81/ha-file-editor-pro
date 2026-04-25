@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.11.26 — Theme editor preview: realistic HA automations
+
+The YAML preview now shows three real-world HA automations (sun trigger + template condition + light action; numeric_state trigger + multi-condition + notify; state trigger + choose-action with nested data) — much closer to what users actually edit in `automations.yaml` than the previous abstract sample. Plus a more comprehensive Python preview using a typical custom_component class with `async`, `@property`, type hints, and built-ins. Every swatch from 1.11.25 still has visible feedback; the previews simply read like things you'd actually see in `/config`.
+
 ## 1.11.25 — Theme editor preview: scrollable + every token recolours
 
 Plus three tokeniser fixes from the same release.
