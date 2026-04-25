@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.11.17 — Unified Find & Replace with HA entity picker
+
+The previous *Replace* (Ctrl/Cmd+H) used CodeMirror's tiny built-in dialog, while *Rename entity* was a two-step input prompt — different mental models for the same job. Both now open the same proper modal.
+
+- **One Find & Replace modal** with two text fields, two checkboxes (*Whole entity* — `sensor.foo` won't match `sensor.foo_bar`; *Case sensitive*), live match counter (*"4 matches · at 2"*), and three actions: **Find next**, **Replace** (current match), **Replace all**.
+- **HA entity picker** next to **both** fields. Click the magnifying-glass icon and a searchable list of every registered HA entity drops below the field — filter by entity ID *or* friendly name (typing "kitchen" finds `light.kitchen_main` even if you don't remember the slug). Click an entry to fill the field. The picker is bias-sorted: prefix matches on `entity_id` first, then prefix matches on friendly name, then everything else.
+- **Picking a Find entity** with an empty Replace field auto-toggles *Whole entity* on (matches the rename-entity intent).
+- Entry points: right-click in editor → *Find & Replace…* or *Rename entity…*; **Ctrl+H** / **Cmd+H**; the FAB Replace button; command palette (*View: Find & Replace…* and *HA: Rename entity in this file…*).
+- All replacements happen inside one CodeMirror operation, so a single Cmd/Ctrl+Z reverts the whole batch.
+- **Right-click context menu width bumped** from `170px` to `230px` (with `white-space:nowrap`) so labels like *Find & Replace…* and *Rename entity…* don't get clipped.
+
 ## 1.11.16 — Upload fixes + rename-entity helper
 
 ### Upload

@@ -370,7 +370,7 @@
     .toast svg{width:14px;height:14px}
 
     /* ── CONTEXT MENU ── */
-    .context-menu{position:fixed;background:var(--bg-light);border:1px solid var(--border-light);border-radius:8px;padding:4px;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.6);min-width:170px;display:none}
+    .context-menu{position:fixed;background:var(--bg-light);border:1px solid var(--border-light);border-radius:8px;padding:4px;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.6);min-width:230px;white-space:nowrap;display:none}
     .context-menu.show{display:block}
     .context-item{padding:6px 12px;border-radius:4px;cursor:pointer;font-size:12px;color:var(--text-secondary);display:flex;align-items:center;gap:10px;transition:all .1s}
     .context-item:hover{background:var(--bg-hover);color:var(--text-primary)}
@@ -516,6 +516,40 @@
 
     /* Error toasts linger longer and use the red accent. */
     .toast.toast-error{border-color:var(--accent-red);color:var(--accent-red)}
+
+    /* ── FIND & REPLACE MODAL ── */
+    .fr-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1960;display:none;align-items:flex-start;justify-content:center;backdrop-filter:blur(2px);padding:8vh 3vw}
+    .fr-overlay.show{display:flex}
+    .fr-modal{width:min(620px,100%);background:var(--bg-light);border:1px solid var(--border-light);border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.55);display:flex;flex-direction:column;overflow:visible;position:relative}
+    .fr-header{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border)}
+    .fr-title{font-size:14px;font-weight:600;color:var(--text-primary)}
+    .fr-body{padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+    .fr-row{display:flex;align-items:center;gap:10px}
+    .fr-row label.fr-label{font-size:11px;color:var(--text-muted);width:64px;flex-shrink:0;text-transform:uppercase;letter-spacing:.05em}
+    .fr-input-wrap{flex:1;position:relative;display:flex;align-items:center}
+    .fr-input{flex:1;background:var(--bg-mid);border:1px solid var(--border-light);border-radius:6px;padding:7px 36px 7px 10px;color:var(--text-primary);font-family:var(--font-mono);font-size:12.5px;outline:none}
+    .fr-input:focus{border-color:var(--accent)}
+    .fr-pick{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:26px;height:26px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;color:var(--text-muted);border-radius:4px;cursor:pointer}
+    .fr-pick:hover{background:var(--bg-hover);color:var(--text-primary)}
+    .fr-pick svg{width:14px;height:14px}
+    .fr-options{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--text-secondary)}
+    .fr-options label{display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none}
+    .fr-options input[type=checkbox]{accent-color:var(--accent)}
+    .fr-status{font-size:11px;color:var(--text-muted);font-family:var(--font-mono);min-height:14px}
+    .fr-status.error{color:var(--accent-red)}
+    .fr-status.match{color:var(--accent)}
+    .fr-actions{display:flex;gap:8px;justify-content:flex-end;padding:10px 16px 14px}
+    /* Entity picker dropdown anchored to the active field */
+    .fr-picker{position:absolute;background:var(--bg-light);border:1px solid var(--border-light);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,.55);width:min(420px,90%);max-height:340px;display:none;flex-direction:column;z-index:5;overflow:hidden}
+    .fr-picker.show{display:flex}
+    .fr-picker-search{margin:8px;background:var(--bg-mid);border:1px solid var(--border-light);border-radius:5px;padding:7px 10px;color:var(--text-primary);font-family:var(--font-mono);font-size:12px;outline:none}
+    .fr-picker-search:focus{border-color:var(--accent)}
+    .fr-picker-list{flex:1;overflow-y:auto;padding:0 4px 8px;min-height:0}
+    .fr-picker-item{padding:6px 10px;border-radius:4px;cursor:pointer;display:flex;flex-direction:column;gap:1px}
+    .fr-picker-item:hover,.fr-picker-item.selected{background:var(--bg-hover)}
+    .fr-picker-eid{font-family:var(--font-mono);font-size:12px;color:var(--text-primary)}
+    .fr-picker-name{font-size:10.5px;color:var(--text-muted)}
+    .fr-picker-empty{padding:12px;text-align:center;color:var(--text-muted);font-size:11px}
 
     /* ── HELP MODAL ── */
     .help-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1950;display:none;align-items:center;justify-content:center;backdrop-filter:blur(2px);padding:6vh 3vw}
@@ -1102,6 +1136,53 @@
   </div>
 </div>
 
+<!-- Find & Replace modal — unified for plain text and entity rename. -->
+<div class="fr-overlay" id="fr-modal">
+  <div class="fr-modal">
+    <div class="fr-header">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:16px;height:16px"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+      <div class="fr-title">Find &amp; Replace</div>
+      <button class="help-close" onclick="closeFindReplace()" style="margin-left:auto">×</button>
+    </div>
+    <div class="fr-body">
+      <div class="fr-row">
+        <label class="fr-label">Find</label>
+        <div class="fr-input-wrap">
+          <input type="text" class="fr-input" id="fr-find" autocomplete="off" spellcheck="false" placeholder="Text or entity ID…">
+          <button class="fr-pick" id="fr-find-pick" title="Search HA entities…" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="fr-row">
+        <label class="fr-label">Replace</label>
+        <div class="fr-input-wrap">
+          <input type="text" class="fr-input" id="fr-replace" autocomplete="off" spellcheck="false" placeholder="New text or entity ID…">
+          <button class="fr-pick" id="fr-replace-pick" title="Search HA entities…" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="fr-options">
+        <label><input type="checkbox" id="fr-whole"> Whole entity (sensor.foo ≠ sensor.foo_bar)</label>
+        <label><input type="checkbox" id="fr-case"> Case sensitive</label>
+      </div>
+      <div class="fr-status" id="fr-status">Type to find…</div>
+    </div>
+    <div class="fr-actions">
+      <button class="confirm-btn" id="fr-find-next" type="button">Find next</button>
+      <button class="confirm-btn" id="fr-replace-one" type="button">Replace</button>
+      <button class="confirm-btn primary" id="fr-replace-all" type="button">Replace all</button>
+    </div>
+
+    <!-- Entity picker dropdown. Positioned by openEntityPicker(). -->
+    <div class="fr-picker" id="fr-picker">
+      <input type="text" class="fr-picker-search" id="fr-picker-search" autocomplete="off" spellcheck="false" placeholder="Search by entity ID or friendly name…">
+      <div class="fr-picker-list" id="fr-picker-list"></div>
+    </div>
+  </div>
+</div>
+
 <!-- Help modal — shortcuts + what each activity-bar icon does. -->
 <div class="help-overlay" id="help-modal">
   <div class="help-modal">
@@ -1453,13 +1534,13 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
     Find <span class="context-shortcut">⌘F</span>
   </div>
-  <div class="context-item" onclick="editor&&editor.execCommand('replace')">
+  <div class="context-item" onclick="openFindReplace()">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
-    Replace <span class="context-shortcut">⌘H</span>
+    Find &amp; Replace… <span class="context-shortcut">⌘H</span>
   </div>
-  <div class="context-item" onclick="renameEntityInFile()">
+  <div class="context-item" onclick="renameEntityInFile()" title="Whole-entity replace across this file">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14.06 9 15 9.94 5.92 19H5v-.92zM17.66 3a.997.997 0 0 0-.7.29l-1.83 1.83 3.75 3.75 1.83-1.83a.996.996 0 0 0 0-1.41l-2.34-2.34c-.2-.2-.45-.29-.71-.29zm-3.6 3.19L3 17.25V21h3.75L17.81 9.94z"/></svg>
-    Rename entity in this file…
+    Rename entity…
   </div>
   <div class="context-divider"></div>
   <div class="context-item" onclick="saveCurrentFile()">
@@ -1819,8 +1900,10 @@ function initEditor() {
       'Cmd-/':   'toggleComment',
       'Ctrl-F':  'findPersistent',
       'Cmd-F':   'findPersistent',
-      'Ctrl-H':  'replace',
-      'Cmd-H':   'replace',
+      // Ctrl-H / Cmd-H is handled by the unified Find & Replace modal,
+      // wired in the document keydown handler so it works whether or
+      // not the editor has focus. CodeMirror's default replace dialog
+      // is intentionally not bound here.
       'Alt-G':   'jumpToLine',
       // Multi-cursor (VS Code-style)
       'Ctrl-D':        selectNextOccurrence,
@@ -2947,103 +3030,303 @@ function ctxPaste() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// ENTITY RENAME (single-file, word-bounded)
+// FIND & REPLACE  (unified — plain text + entity-bounded mode)
 // ═══════════════════════════════════════════════════════════════
-// Replaces every occurrence of an entity ID like
-// "sensor.motion_sensor_vzadu_bok_illuminance" with a new one across
-// the active editor only. Match is bounded by non-entity-id characters
-// so e.g. "sensor.foo" does not also match "sensor.foo_bar".
 const _ENTITY_RX = /^[a-z][a-z0-9_]*\.[a-z0-9_]+$/i;
+const _ENTITY_TOKEN_RX = /[a-z0-9_.]/i;
 
 function _entityAtCursor() {
   if (!editor) return '';
   const sel = editor.getSelection().trim();
   if (sel && _ENTITY_RX.test(sel)) return sel;
-  // Try to grab the entity ID under the cursor: scan back/forward
-  // for [a-z0-9_.] characters and check if the result looks like one.
   const pos = editor.getCursor();
   const line = editor.getLine(pos.line) || '';
-  const tok = /[a-z0-9_.]/i;
   let s = pos.ch, e = pos.ch;
-  while (s > 0 && tok.test(line[s - 1])) s--;
-  while (e < line.length && tok.test(line[e])) e++;
+  while (s > 0 && _ENTITY_TOKEN_RX.test(line[s - 1])) s--;
+  while (e < line.length && _ENTITY_TOKEN_RX.test(line[e])) e++;
   const word = line.slice(s, e);
   return _ENTITY_RX.test(word) ? word : '';
 }
 
-async function renameEntityInFile() {
+// Modal state. Matches recompute on every input change, so we don't
+// keep a stale list — but we cache the last computed list to drive
+// "Find next" / "Replace" without re-walking the doc each time.
+const FR = {
+  matches: [],     // [{from:{line,ch}, to:{line,ch}}, …]
+  idx: -1,         // currently-selected match index
+  pickerTarget: null, // 'fr-find' or 'fr-replace'
+};
+
+function openFindReplace(opts = {}) {
   if (!editor) { showToast('No file open'); return; }
-  const tab = tabs.find(t => t.id === activeTabId);
-  if (!tab) { showToast('No file open'); return; }
+  const find    = opts.find    !== undefined ? opts.find    : (editor.getSelection() || _entityAtCursor() || '');
+  const replace = opts.replace !== undefined ? opts.replace : '';
+  const whole   = !!opts.wholeEntity;
+  const cases   = !!opts.caseSensitive;
 
-  const guess = _entityAtCursor();
+  document.getElementById('fr-find').value    = find;
+  document.getElementById('fr-replace').value = replace;
+  document.getElementById('fr-whole').checked = whole;
+  document.getElementById('fr-case').checked  = cases;
 
-  const oldId = await promptInput({
-    title: 'Rename entity in this file',
-    message: `In ${tab.name}. Match is whole-entity-only; ` +
-             `"sensor.foo" will not match "sensor.foo_bar".`,
-    label: 'Find entity',
-    placeholder: 'sensor.example_old',
-    defaultValue: guess,
-    okLabel: 'Next',
-  });
-  if (!oldId) return;
-  if (!_ENTITY_RX.test(oldId)) {
-    showToast('Not a valid entity ID (expected domain.name)');
-    return;
+  document.getElementById('fr-modal').classList.add('show');
+  closeEntityPicker();
+  frUpdateMatches();
+  // If we have a current match, highlight it; advance cursor onto it
+  // so "Find next" cycles forward predictably.
+  if (FR.matches.length) {
+    FR.idx = _frFirstMatchAfter(editor.getCursor());
+    _frSelectCurrent();
   }
+  setTimeout(() => {
+    const f = document.getElementById('fr-' + (opts.focus || 'find'));
+    f?.focus(); f?.select();
+  }, 30);
 
-  const newId = await promptInput({
-    title: 'Rename entity in this file',
-    message: `Replace "${oldId}" with:`,
-    label: 'New entity',
-    placeholder: 'sensor.example_new',
-    defaultValue: oldId,
-    okLabel: 'Replace all',
-  });
-  if (!newId) return;
-  if (!_ENTITY_RX.test(newId)) {
-    showToast('Not a valid entity ID (expected domain.name)');
-    return;
-  }
-  if (newId === oldId) { showToast('Old and new are the same'); return; }
+  // Pre-load HA entity cache so the picker is instant on first click.
+  if (API.available && !HA_CACHE.loaded) loadHAData().catch(() => {});
+}
 
-  const escaped = oldId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  // Bounded by anything that is not part of an entity id (letters,
-  // digits, underscore, dot). Lookbehind + lookahead keep replacements
-  // surgical without consuming surrounding chars.
-  const rx = new RegExp(`(?<![A-Za-z0-9_.])${escaped}(?![A-Za-z0-9_.])`, 'g');
+function closeFindReplace() {
+  document.getElementById('fr-modal').classList.remove('show');
+  closeEntityPicker();
+}
 
-  // Collect every match position, then replace from end to start so
-  // earlier positions don't shift. Wrapped in editor.operation() for
-  // a single undo entry.
-  const positions = [];
+function _frBuildRegex() {
+  const find = document.getElementById('fr-find').value;
+  if (!find) return null;
+  const whole = document.getElementById('fr-whole').checked;
+  const cases = document.getElementById('fr-case').checked;
+  const escaped = find.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const body = whole
+    ? `(?<![A-Za-z0-9_.])${escaped}(?![A-Za-z0-9_.])`
+    : escaped;
+  return new RegExp(body, 'g' + (cases ? '' : 'i'));
+}
+
+function frUpdateMatches() {
+  const status = document.getElementById('fr-status');
+  let rx;
+  try { rx = _frBuildRegex(); }
+  catch (e) { FR.matches = []; FR.idx = -1; status.textContent = 'Invalid pattern'; status.className = 'fr-status error'; return; }
+  if (!rx) { FR.matches = []; FR.idx = -1; status.textContent = 'Type to find…'; status.className = 'fr-status'; return; }
+
+  const matches = [];
   const lines = editor.getValue().split('\n');
   lines.forEach((line, i) => {
     rx.lastIndex = 0;
     let m;
     while ((m = rx.exec(line))) {
-      positions.push({ line: i, ch: m.index });
+      matches.push({
+        from: CodeMirror.Pos(i, m.index),
+        to:   CodeMirror.Pos(i, m.index + m[0].length),
+      });
+      if (m[0].length === 0) rx.lastIndex++;   // guard against zero-length
     }
   });
-
-  if (!positions.length) {
-    showToast(`"${oldId}" not found in this file`);
+  FR.matches = matches;
+  if (!matches.length) {
+    FR.idx = -1;
+    status.textContent = 'No matches';
+    status.className = 'fr-status error';
     return;
   }
+  if (FR.idx < 0 || FR.idx >= matches.length) FR.idx = 0;
+  status.textContent = `${matches.length} match${matches.length > 1 ? 'es' : ''} · at ${FR.idx + 1}`;
+  status.className = 'fr-status match';
+}
 
+function _frFirstMatchAfter(pos) {
+  for (let i = 0; i < FR.matches.length; i++) {
+    const m = FR.matches[i].from;
+    if (m.line > pos.line || (m.line === pos.line && m.ch >= pos.ch)) return i;
+  }
+  return 0;   // wrap
+}
+
+function _frSelectCurrent() {
+  if (FR.idx < 0 || !FR.matches[FR.idx]) return;
+  const m = FR.matches[FR.idx];
+  editor.setSelection(m.from, m.to);
+  editor.scrollIntoView(m.from, 80);
+  const status = document.getElementById('fr-status');
+  if (status) status.textContent = `${FR.matches.length} match${FR.matches.length > 1 ? 'es' : ''} · at ${FR.idx + 1}`;
+}
+
+function frFindNext() {
+  if (!FR.matches.length) { frUpdateMatches(); if (!FR.matches.length) return; }
+  FR.idx = (FR.idx + 1) % FR.matches.length;
+  _frSelectCurrent();
+}
+
+function frReplace() {
+  if (!FR.matches.length) { frUpdateMatches(); if (!FR.matches.length) return; }
+  const m = FR.matches[FR.idx];
+  if (!m) return;
+  const replace = document.getElementById('fr-replace').value;
+  editor.replaceRange(replace, m.from, m.to);
+  // Recompute matches after the edit; positions shift unpredictably
+  // when the replacement length differs from the find length.
+  frUpdateMatches();
+  if (FR.matches.length) {
+    // Stay near where we were — advance to the next remaining match
+    // at or after the position we just edited.
+    FR.idx = _frFirstMatchAfter(m.from);
+    _frSelectCurrent();
+  }
+}
+
+function frReplaceAll() {
+  if (!FR.matches.length) { frUpdateMatches(); if (!FR.matches.length) return; }
+  const replace = document.getElementById('fr-replace').value;
+  const matches = FR.matches.slice();   // snapshot — replace from end to start
   editor.operation(() => {
-    for (let i = positions.length - 1; i >= 0; i--) {
-      const p = positions[i];
-      editor.replaceRange(
-        newId,
-        CodeMirror.Pos(p.line, p.ch),
-        CodeMirror.Pos(p.line, p.ch + oldId.length)
-      );
+    for (let i = matches.length - 1; i >= 0; i--) {
+      const m = matches[i];
+      editor.replaceRange(replace, m.from, m.to);
     }
   });
-  showToast(`Replaced ${positions.length} occurrence${positions.length > 1 ? 's' : ''} of ${oldId}`);
+  showToast(`Replaced ${matches.length} occurrence${matches.length > 1 ? 's' : ''}`);
+  frUpdateMatches();
 }
+
+// ── Entity picker dropdown ────────────────────────────────────
+function openEntityPicker(targetFieldId) {
+  if (!API.available) { showToast('Demo mode — entity list unavailable'); return; }
+  const field = document.getElementById(targetFieldId);
+  const picker = document.getElementById('fr-picker');
+  if (!field || !picker) return;
+
+  FR.pickerTarget = targetFieldId;
+
+  // Position the picker just below the target field, anchored to the
+  // wrapping fr-input-wrap. Both live inside .fr-modal (position:relative).
+  const modal = document.querySelector('.fr-modal');
+  const wrap = field.closest('.fr-input-wrap');
+  const m = modal.getBoundingClientRect();
+  const w = wrap.getBoundingClientRect();
+  picker.style.top  = (w.bottom - m.top + 4) + 'px';
+  picker.style.left = (w.left - m.left) + 'px';
+  picker.style.width = w.width + 'px';
+
+  // Pre-fill the search with the current field value so the list is
+  // already focused on the user's intent.
+  const search = document.getElementById('fr-picker-search');
+  search.value = field.value;
+  picker.classList.add('show');
+  renderEntityPickerList();
+  setTimeout(() => { search.focus(); search.select(); }, 20);
+
+  if (!HA_CACHE.loaded) loadHAData().then(() => renderEntityPickerList()).catch(() => {});
+}
+
+function closeEntityPicker() {
+  document.getElementById('fr-picker')?.classList.remove('show');
+  FR.pickerTarget = null;
+}
+
+function renderEntityPickerList() {
+  const list = document.getElementById('fr-picker-list');
+  if (!list) return;
+  if (!HA_CACHE.loaded) {
+    list.innerHTML = '<div class="fr-picker-empty">Loading entities…</div>';
+    return;
+  }
+  const q = document.getElementById('fr-picker-search').value.trim().toLowerCase();
+  let items = HA_CACHE.entities;
+  if (q) {
+    items = items.filter(e =>
+      e.entity_id.toLowerCase().includes(q) ||
+      (e.name && e.name.toLowerCase().includes(q))
+    );
+  }
+  // Bias: results matching the start of the entity_id come first,
+  // then friendly-name hits, then everywhere-else hits.
+  if (q) {
+    items.sort((a, b) => {
+      const ax = a.entity_id.toLowerCase().startsWith(q) ? 0
+               : (a.name||'').toLowerCase().startsWith(q) ? 1 : 2;
+      const bx = b.entity_id.toLowerCase().startsWith(q) ? 0
+               : (b.name||'').toLowerCase().startsWith(q) ? 1 : 2;
+      return ax - bx || a.entity_id.localeCompare(b.entity_id);
+    });
+  }
+  if (!items.length) {
+    list.innerHTML = '<div class="fr-picker-empty">No entities match.</div>';
+    return;
+  }
+  list.innerHTML = items.slice(0, 200).map(e => `
+    <div class="fr-picker-item" data-eid="${escapeHtml(e.entity_id)}">
+      <span class="fr-picker-eid">${escapeHtml(e.entity_id)}</span>
+      ${e.name && e.name !== e.entity_id ? `<span class="fr-picker-name">${escapeHtml(e.name)}</span>` : ''}
+    </div>`).join('');
+  list.querySelectorAll('.fr-picker-item').forEach(el => {
+    el.addEventListener('click', () => _frPickEntity(el.dataset.eid));
+  });
+}
+
+function _frPickEntity(eid) {
+  const target = FR.pickerTarget;
+  closeEntityPicker();
+  if (!target) return;
+  const f = document.getElementById(target);
+  if (!f) return;
+  f.value = eid;
+  // If the user picked a "Find" entity and the Replace field is empty,
+  // assume entity-rename mode and turn on whole-entity matching.
+  if (target === 'fr-find' && !document.getElementById('fr-replace').value) {
+    document.getElementById('fr-whole').checked = true;
+  }
+  f.focus();
+  frUpdateMatches();
+}
+
+// Backward-compatible alias used by the right-click menu and palette.
+function renameEntityInFile() {
+  openFindReplace({ wholeEntity: true });
+}
+
+// Wire the modal once the DOM is ready.
+document.addEventListener('DOMContentLoaded', () => {
+  const find = document.getElementById('fr-find');
+  const repl = document.getElementById('fr-replace');
+  const whole = document.getElementById('fr-whole');
+  const cases = document.getElementById('fr-case');
+  if (!find) return;
+
+  find.addEventListener('input', frUpdateMatches);
+  whole.addEventListener('change', frUpdateMatches);
+  cases.addEventListener('change', frUpdateMatches);
+  find.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); frFindNext(); }
+  });
+  repl.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); frReplace(); }
+  });
+
+  document.getElementById('fr-find-next').addEventListener('click', frFindNext);
+  document.getElementById('fr-replace-one').addEventListener('click', frReplace);
+  document.getElementById('fr-replace-all').addEventListener('click', frReplaceAll);
+  document.getElementById('fr-find-pick').addEventListener('click', () => openEntityPicker('fr-find'));
+  document.getElementById('fr-replace-pick').addEventListener('click', () => openEntityPicker('fr-replace'));
+
+  document.getElementById('fr-picker-search')
+    .addEventListener('input', renderEntityPickerList);
+
+  // Click outside the modal closes it; click outside the picker
+  // (but inside the modal) closes only the picker.
+  document.getElementById('fr-modal').addEventListener('click', e => {
+    if (e.target.id === 'fr-modal') closeFindReplace();
+  });
+  document.querySelector('.fr-modal').addEventListener('click', e => {
+    const picker = document.getElementById('fr-picker');
+    if (picker.classList.contains('show') &&
+        !picker.contains(e.target) &&
+        !e.target.closest('.fr-pick')) {
+      closeEntityPicker();
+    }
+  });
+});
 
 // ═══════════════════════════════════════════════════════════════
 // TOAST
@@ -3156,6 +3439,24 @@ document.addEventListener('keydown', e => {
     document.getElementById('context-menu').classList.remove('show');
     if (document.getElementById('logs-modal')?.classList.contains('show')) closeLogs();
     if (document.getElementById('jinja-errors-modal')?.classList.contains('show')) closeJinjaErrorsModal();
+    const fr = document.getElementById('fr-modal');
+    if (fr?.classList.contains('show')) {
+      // First Escape closes the entity picker if it's open; second
+      // Escape closes the modal itself.
+      if (document.getElementById('fr-picker')?.classList.contains('show')) {
+        closeEntityPicker();
+      } else {
+        closeFindReplace();
+      }
+    }
+  }
+  // Ctrl/Cmd+H opens the unified Find & Replace modal. Keep it
+  // outside CodeMirror's extraKeys so it works whether the editor
+  // has focus or not (toggle from inside the modal would otherwise
+  // re-open infinitely).
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === 'h' || e.key === 'H')) {
+    e.preventDefault();
+    openFindReplace();
   }
 });
 
@@ -4472,7 +4773,7 @@ function fabAction(cmd) {
     case 'foldAll':   editor.execCommand('foldAll'); break;
     case 'unfoldAll': editor.execCommand('unfoldAll'); break;
     case 'find':      editor.execCommand('find'); break;
-    case 'replace':   editor.execCommand('replace'); break;
+    case 'replace':   openFindReplace(); break;
   }
 }
 
@@ -5489,6 +5790,7 @@ const COMMANDS = [
   { cat: 'HA',     title: 'Validate Jinja in current file',                    run: () => validateJinjaNow() },
   { cat: 'HA',     title: 'Show Jinja error list',                              run: () => openJinjaErrorsModal() },
   { cat: 'HA',     title: 'Rename entity in this file…',                         run: () => renameEntityInFile() },
+  { cat: 'View',   title: 'Find & Replace…',          shortcut: 'Ctrl+H',         run: () => openFindReplace() },
   { cat: 'HA',     title: 'Refresh entity/service cache',                      run: () => loadHAData(true).then(() => showToast('HA cache refreshed')) },
   { cat: 'Snippet',title: 'Insert: Automation skeleton',                       run: () => insertSnippet('automation') },
   { cat: 'Snippet',title: 'Insert: Script skeleton',                           run: () => insertSnippet('script') },
