@@ -35,6 +35,19 @@
        Default = github-light.
        ────────────────────────────────────────────────────── */
 
+    /* ── Decoration palettes (shared across themes by default).
+       Indent rainbow + bars use the same six base colours; the rule
+       itself sets the alpha (~14% for rainbow, ~75% for bars). Bracket
+       pair uses solid hex. All 12 are customisable per-theme via the
+       Theme editor — overrides land as inline `--rb-N`/`--bp-N` on
+       <html>, taking precedence over these :root defaults. ── */
+    :root {
+      --rb-0:#ff5c5c; --rb-1:#ffa550; --rb-2:#e6c846;
+      --rb-3:#5ac878; --rb-4:#5aa0ff; --rb-5:#b46ee6;
+      --bp-0:#e06c75; --bp-1:#d19a66; --bp-2:#e5c07b;
+      --bp-3:#98c379; --bp-4:#61afef; --bp-5:#c678dd;
+    }
+
     /* ── GitHub Light (default) ── */
     :root, [data-theme="github-light"] {
       --bg-darkest:#ffffff; --bg-dark:#f6f8fa; --bg-mid:#eef1f4;
@@ -631,11 +644,14 @@
     .te-label{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;width:64px;flex-shrink:0}
     .te-select{flex:1;background:var(--bg-mid);border:1px solid var(--border-light);color:var(--text-primary);border-radius:5px;padding:6px 9px;font-family:var(--font-ui);font-size:12px;outline:none}
     .te-help{font-size:11px;color:var(--text-muted)}
-    .te-preview-frame{border:1px solid var(--border-light);border-radius:6px;overflow:hidden;background:var(--bg-darkest)}
+    .te-preview-frame{border:1px solid var(--border-light);border-radius:6px;overflow:hidden;background:var(--bg-darkest);margin-bottom:8px}
+    .te-preview-label{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;padding:6px 10px;background:var(--bg-dark);border-bottom:1px solid var(--border)}
     .te-preview-frame .CodeMirror{height:auto;font-family:var(--font-mono);font-size:12px;line-height:1.55;background:var(--bg-darkest) !important;color:var(--text-primary) !important;padding:6px 0}
     .te-preview-frame .CodeMirror-lines{padding:6px 0}
     .te-preview-frame .CodeMirror-cursor{display:none !important}
     .syntax-swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px}
+    .syntax-section-title{grid-column:1/-1;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin-top:8px;padding-bottom:4px;border-bottom:1px solid var(--border);font-weight:600}
+    .syntax-section-title:first-child{margin-top:0}
     .syntax-swatch{display:flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid var(--border-light);border-radius:5px;background:var(--bg-mid);font-size:11.5px;color:var(--text-secondary);transition:all .1s}
     .syntax-swatch:hover{background:var(--bg-hover);border-color:var(--accent)}
     .syntax-swatch.customised{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent-dim)}
@@ -691,12 +707,12 @@
        .cm-ws-space background-image layer still shows through. */
 
     /* ── BRACKET PAIR COLORIZATION ── */
-    .cm-s-ha .cm-bp-0{color:#e06c75 !important}
-    .cm-s-ha .cm-bp-1{color:#d19a66 !important}
-    .cm-s-ha .cm-bp-2{color:#e5c07b !important}
-    .cm-s-ha .cm-bp-3{color:#98c379 !important}
-    .cm-s-ha .cm-bp-4{color:#61afef !important}
-    .cm-s-ha .cm-bp-5{color:#c678dd !important}
+    .cm-s-ha .cm-bp-0{color:var(--bp-0) !important}
+    .cm-s-ha .cm-bp-1{color:var(--bp-1) !important}
+    .cm-s-ha .cm-bp-2{color:var(--bp-2) !important}
+    .cm-s-ha .cm-bp-3{color:var(--bp-3) !important}
+    .cm-s-ha .cm-bp-4{color:var(--bp-4) !important}
+    .cm-s-ha .cm-bp-5{color:var(--bp-5) !important}
 
     /* Marker spans (rainbow/bars/gradient/guides). Let them take
        their NATURAL content width — CodeMirror merges adjacent
@@ -721,20 +737,20 @@
     }
 
     /* ── INDENT RAINBOW ── */
-    .cm-s-ha .cm-ir-0{background-color:rgba(255, 92, 92, .14)}
-    .cm-s-ha .cm-ir-1{background-color:rgba(255,165, 80, .14)}
-    .cm-s-ha .cm-ir-2{background-color:rgba(230,200, 70, .16)}
-    .cm-s-ha .cm-ir-3{background-color:rgba( 90,200,120, .14)}
-    .cm-s-ha .cm-ir-4{background-color:rgba( 90,160,255, .14)}
-    .cm-s-ha .cm-ir-5{background-color:rgba(180,110,230, .14)}
+    .cm-s-ha .cm-ir-0{background-color:color-mix(in srgb, var(--rb-0) 14%, transparent)}
+    .cm-s-ha .cm-ir-1{background-color:color-mix(in srgb, var(--rb-1) 14%, transparent)}
+    .cm-s-ha .cm-ir-2{background-color:color-mix(in srgb, var(--rb-2) 16%, transparent)}
+    .cm-s-ha .cm-ir-3{background-color:color-mix(in srgb, var(--rb-3) 14%, transparent)}
+    .cm-s-ha .cm-ir-4{background-color:color-mix(in srgb, var(--rb-4) 14%, transparent)}
+    .cm-s-ha .cm-ir-5{background-color:color-mix(in srgb, var(--rb-5) 14%, transparent)}
 
     /* ── COLORED LEVEL BARS ── */
-    .cm-s-ha .cm-ib-0{box-shadow:inset 2px 0 0 rgba(255, 92, 92, .75)}
-    .cm-s-ha .cm-ib-1{box-shadow:inset 2px 0 0 rgba(255,165, 80, .75)}
-    .cm-s-ha .cm-ib-2{box-shadow:inset 2px 0 0 rgba(230,200, 70, .8)}
-    .cm-s-ha .cm-ib-3{box-shadow:inset 2px 0 0 rgba( 90,200,120, .75)}
-    .cm-s-ha .cm-ib-4{box-shadow:inset 2px 0 0 rgba( 90,160,255, .75)}
-    .cm-s-ha .cm-ib-5{box-shadow:inset 2px 0 0 rgba(180,110,230, .75)}
+    .cm-s-ha .cm-ib-0{box-shadow:inset 2px 0 0 color-mix(in srgb, var(--rb-0) 75%, transparent)}
+    .cm-s-ha .cm-ib-1{box-shadow:inset 2px 0 0 color-mix(in srgb, var(--rb-1) 75%, transparent)}
+    .cm-s-ha .cm-ib-2{box-shadow:inset 2px 0 0 color-mix(in srgb, var(--rb-2) 80%, transparent)}
+    .cm-s-ha .cm-ib-3{box-shadow:inset 2px 0 0 color-mix(in srgb, var(--rb-3) 75%, transparent)}
+    .cm-s-ha .cm-ib-4{box-shadow:inset 2px 0 0 color-mix(in srgb, var(--rb-4) 75%, transparent)}
+    .cm-s-ha .cm-ib-5{box-shadow:inset 2px 0 0 color-mix(in srgb, var(--rb-5) 75%, transparent)}
 
     /* ── GRADIENT RAMP ── */
     .cm-s-ha .cm-ig-0{background-color:color-mix(in srgb, var(--accent) 5%,  transparent)}
@@ -1233,27 +1249,50 @@
       </div>
 
       <div class="te-preview-frame">
-        <textarea id="syntax-preview-ta"># ← THIS WHOLE LINE is a COMMENT
-automation:                        # ← "automation" is a KEY (the colon is PUNCTUATION)
-  - alias: "Sunset lights"         # ← "Sunset lights" is a quoted STRING
+        <div class="te-preview-label">YAML — automations &amp; configs</div>
+        <textarea id="syntax-preview-ta"># ← THIS LINE is a COMMENT
+automation:                          # ← "automation" is a KEY (colon = PUNCTUATION)
+  - alias: "Sunset lights"           # ← quoted text is a STRING
     trigger:
-      platform: sun                 # ← "sun" is a plain unquoted value (uses editor text colour)
-      event: sunset
-    condition: &amp;workdays            # ← &amp;workdays is an ANCHOR
-      weekday: [mon, tue, wed]      # ← [, ] and , are PUNCTUATION
+      platform: sun                   # ← "sun" plain value (editor text colour)
+      offset: -00:30:00
+      data:
+        nested:
+          deep:
+            list: [1, [2, [3, 4]]]    # ← brackets nest → BRACKET PAIR colours
+    condition: &amp;workdays              # ← &amp;workdays is an ANCHOR
+      weekday: [mon, tue, wed]
     action:
       service: light.turn_on
       data:
-        brightness: 200             # ← 200 is a NUMBER
-        transition: 2.5             # ← 2.5 is a NUMBER (float)
-        enabled: true               # ← true is a BOOLEAN
-        flash: false                # ← false is a BOOLEAN
-    use: *workdays                  # ← *workdays is an ALIAS (same colour as anchors)</textarea>
+        brightness: 200               # ← 200 is a NUMBER
+        transition: 2.5               # ← 2.5 is a NUMBER (float)
+        enabled: true                 # ← true is a BOOLEAN
+        flash: false
+    use: *workdays                    # ← *workdays is an ALIAS</textarea>
+      </div>
+
+      <div class="te-preview-frame">
+        <div class="te-preview-label">Python — custom components &amp; scripts</div>
+        <textarea id="syntax-preview-py-ta"># ← Comment in a Python file
+import asyncio
+
+DEFAULT_NAME = "sensor"               # ← DEFAULT_NAME is an IDENTIFIER
+TIMEOUT = 30                          # ← 30 is a NUMBER
+
+def setup(hass, config):              # ← def is a KEYWORD; setup, hass, config are IDENTIFIERS
+    items = [1, 2, [3, 4]]            # ← print/len are BUILT-INS; brackets nest
+    print(len(items))
+    if items and DEFAULT_NAME == "sensor":
+        return True                   # ← True is a BOOLEAN; return is a KEYWORD
+    return False</textarea>
       </div>
 
       <div class="te-help">
         Click the colour square for the OS picker, or type a hex into the field. Changes apply live and persist per theme.
-        <br>The first 7 swatches affect YAML; the last two affect Python / JS files (HA scripts and custom_components).
+        <br><strong>Syntax</strong>: token colours used by the YAML / Python / JS modes.
+        <br><strong>Indent rainbow / bars</strong>: the six base colours used for the indent overlays (Settings → Indent style). Same colours feed the bars overlay; the rule sets a translucent fill for the rainbow and a left-border for bars.
+        <br><strong>Bracket pair colours</strong>: the six colours used by the rainbow brackets overlay (Settings → Rainbow brackets).
         <br>Plain unquoted YAML values like <code>sun</code> use the editor's text colour and aren't separately recolourable.
       </div>
       <div class="syntax-swatches" id="syntax-preview-swatches"></div>
@@ -4749,15 +4788,34 @@ const THEME_OVERRIDES_KEY = 'fep-theme-overrides';
 // YAML mode — they render in editor text colour and aren't
 // separately re-colourable.
 const _SYN_VARS = [
-  { v: '--syn-atom',     label: 'Keys (YAML)' },
-  { v: '--syn-string',   label: 'Strings (quoted)' },
-  { v: '--syn-number',   label: 'Numbers' },
-  { v: '--syn-keyword',  label: 'Booleans / language keywords' },
-  { v: '--syn-def',      label: 'Anchors & aliases (&name, *name)' },
-  { v: '--syn-meta',     label: 'Punctuation ( : - , [ ] { } )' },
-  { v: '--syn-comment',  label: 'Comments' },
-  { v: '--syn-builtin',  label: 'Built-ins (print, len) — Python / JS' },
-  { v: '--syn-variable', label: 'Identifiers / variable names' },
+  // ── Syntax tokens ─────────────────────────────────────────────
+  { v: '--syn-atom',     label: 'Keys (YAML)',                      section: 'Syntax' },
+  { v: '--syn-string',   label: 'Strings (quoted)',                 section: 'Syntax' },
+  { v: '--syn-number',   label: 'Numbers',                          section: 'Syntax' },
+  { v: '--syn-keyword',  label: 'Booleans / language keywords',     section: 'Syntax' },
+  { v: '--syn-def',      label: 'Anchors & aliases (&name, *name)', section: 'Syntax' },
+  { v: '--syn-meta',     label: 'Punctuation ( : - , [ ] { } )',    section: 'Syntax' },
+  { v: '--syn-comment',  label: 'Comments',                         section: 'Syntax' },
+  { v: '--syn-builtin',  label: 'Built-ins (print, len) — Py/JS',   section: 'Syntax' },
+  { v: '--syn-variable', label: 'Identifiers / variable names',     section: 'Syntax' },
+
+  // ── Indent rainbow / bars ─────────────────────────────────────
+  // Same six base colours feed both the rainbow (translucent fill)
+  // and the bars (left border). Indent style is chosen in Settings.
+  { v: '--rb-0', label: 'Indent level 1', section: 'Indent rainbow / bars' },
+  { v: '--rb-1', label: 'Indent level 2', section: 'Indent rainbow / bars' },
+  { v: '--rb-2', label: 'Indent level 3', section: 'Indent rainbow / bars' },
+  { v: '--rb-3', label: 'Indent level 4', section: 'Indent rainbow / bars' },
+  { v: '--rb-4', label: 'Indent level 5', section: 'Indent rainbow / bars' },
+  { v: '--rb-5', label: 'Indent level 6+ (cycles)', section: 'Indent rainbow / bars' },
+
+  // ── Bracket pair colorisation ─────────────────────────────────
+  { v: '--bp-0', label: 'Bracket depth 1', section: 'Bracket pair colours' },
+  { v: '--bp-1', label: 'Bracket depth 2', section: 'Bracket pair colours' },
+  { v: '--bp-2', label: 'Bracket depth 3', section: 'Bracket pair colours' },
+  { v: '--bp-3', label: 'Bracket depth 4', section: 'Bracket pair colours' },
+  { v: '--bp-4', label: 'Bracket depth 5', section: 'Bracket pair colours' },
+  { v: '--bp-5', label: 'Bracket depth 6+ (cycles)', section: 'Bracket pair colours' },
 ];
 
 function _readThemeOverrides() {
@@ -4790,7 +4848,8 @@ function setSyntaxOverride(varName, value) {
   all[active][varName] = value;
   _writeThemeOverrides(all);
   document.documentElement.style.setProperty(varName, value);
-  if (_previewCM) _previewCM.refresh();
+  if (_previewCM)   _previewCM.refresh();
+  if (_previewPyCM) _previewPyCM.refresh();
   if (editor) editor.refresh();
   if (_rightEditor) _rightEditor.refresh();
   // Update the affected swatch in-place rather than re-rendering the
@@ -4813,7 +4872,8 @@ function resetThemeOverrides() {
   delete all[active];
   _writeThemeOverrides(all);
   applyThemeOverrides();
-  if (_previewCM) _previewCM.refresh();
+  if (_previewCM)   _previewCM.refresh();
+  if (_previewPyCM) _previewPyCM.refresh();
   if (editor) editor.refresh();
   if (_rightEditor) _rightEditor.refresh();
   refreshSyntaxPreview();
@@ -4839,43 +4899,88 @@ function closeThemeEditor() {
   document.getElementById('theme-editor-modal')?.classList.remove('show');
 }
 
-// ── Preview CM + swatch render ─────────────────────────────────
+// ── Preview CMs + swatch render ────────────────────────────────
+// Two read-only CodeMirror instances stack inside the modal — YAML
+// (covers most token types + indent rainbow + brackets) and Python
+// (covers identifiers + built-ins). Both have the indent-rainbow and
+// bracket-pair overlays force-enabled so all nine + twelve swatches
+// have something visible to recolour, regardless of the user's actual
+// editor prefs (Settings → Indent style / Rainbow brackets).
 let _previewCM = null;
+let _previewPyCM = null;
+
+function _attachPreviewOverlays(cm) {
+  if (!cm) return;
+  try {
+    if (typeof _irOverlay !== 'undefined') cm.addOverlay(_irOverlay);
+    if (typeof _bpOverlay !== 'undefined') cm.addOverlay(_bpOverlay);
+  } catch (e) { console.warn('[theme preview] overlay attach failed:', e); }
+}
 
 function initSyntaxPreview() {
-  if (_previewCM) return;
-  const ta = document.getElementById('syntax-preview-ta');
-  if (!ta || typeof CodeMirror === 'undefined') return;
-  _previewCM = CodeMirror.fromTextArea(ta, {
-    mode: 'yaml',
-    theme: 'ha',                  // wires --syn-* via .cm-s-ha rules
-    lineNumbers: false,
-    readOnly: 'nocursor',
-    indentUnit: 2,
-    tabSize: 2,
-    lineWrapping: false,
-    viewportMargin: Infinity,
-  });
-  _previewCM.setSize('100%', 'auto');
+  if (typeof CodeMirror === 'undefined') return;
+  if (!_previewCM) {
+    const ta = document.getElementById('syntax-preview-ta');
+    if (ta) {
+      _previewCM = CodeMirror.fromTextArea(ta, {
+        mode: 'yaml',
+        theme: 'ha',
+        lineNumbers: false,
+        readOnly: 'nocursor',
+        indentUnit: 2,
+        tabSize: 2,
+        lineWrapping: false,
+        viewportMargin: Infinity,
+      });
+      _previewCM.setSize('100%', 'auto');
+      _attachPreviewOverlays(_previewCM);
+    }
+  }
+  if (!_previewPyCM) {
+    const ta = document.getElementById('syntax-preview-py-ta');
+    if (ta) {
+      _previewPyCM = CodeMirror.fromTextArea(ta, {
+        mode: 'python',
+        theme: 'ha',
+        lineNumbers: false,
+        readOnly: 'nocursor',
+        indentUnit: 4,
+        tabSize: 4,
+        lineWrapping: false,
+        viewportMargin: Infinity,
+      });
+      _previewPyCM.setSize('100%', 'auto');
+      _attachPreviewOverlays(_previewPyCM);
+    }
+  }
 }
 
 function refreshSyntaxPreview() {
-  if (!_previewCM) initSyntaxPreview();
-  if (_previewCM) _previewCM.refresh();
+  initSyntaxPreview();
+  if (_previewCM)   _previewCM.refresh();
+  if (_previewPyCM) _previewPyCM.refresh();
   const wrap = document.getElementById('syntax-preview-swatches');
   if (!wrap) return;
   const root = getComputedStyle(document.documentElement);
   const overrides = _readThemeOverrides()[PREFS.theme || 'github-light'] || {};
-  wrap.innerHTML = _SYN_VARS.map(t => {
+  // Group swatches by section and emit a header before each group.
+  let currentSection = null;
+  const html = [];
+  for (const t of _SYN_VARS) {
+    if (t.section && t.section !== currentSection) {
+      currentSection = t.section;
+      html.push(`<div class="syntax-section-title">${escapeHtml(currentSection)}</div>`);
+    }
     const c = (root.getPropertyValue(t.v) || '').trim() || '#000000';
     const isCustom = !!overrides[t.v];
-    return `<div class="syntax-swatch ${isCustom ? 'customised' : ''}" data-var="${t.v}">
+    html.push(`<div class="syntax-swatch ${isCustom ? 'customised' : ''}" data-var="${t.v}">
       <span class="syntax-swatch-color" style="background:${c}" title="${t.v} — click to open colour picker"></span>
-      <span class="syntax-swatch-label">${t.label}</span>
+      <span class="syntax-swatch-label">${escapeHtml(t.label)}</span>
       <input type="text" class="syntax-swatch-hex" value="${c}" data-var="${t.v}" maxlength="7" spellcheck="false" autocomplete="off" title="Type a hex value like #1a73e8">
       <span class="syntax-swatch-dot" title="Customised"></span>
-    </div>`;
-  }).join('');
+    </div>`);
+  }
+  wrap.innerHTML = html.join('');
   // Colour-square click → native picker; hex input → typed entry.
   wrap.querySelectorAll('.syntax-swatch').forEach(el => {
     const sq  = el.querySelector('.syntax-swatch-color');

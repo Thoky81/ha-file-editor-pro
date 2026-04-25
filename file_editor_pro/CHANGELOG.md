@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.11.23 — Theme editor: indent rainbow + bracket palettes + Python preview
+
+The Theme editor now lets you recolour the indent overlays and bracket-pair colours, and the preview shows them — plus a Python sample so the *Built-ins* and *Identifiers* swatches are visible too. **Twenty-one categories total**, all with live preview.
+
+### Newly customisable
+- **Indent rainbow / bars (6 colours).** The base palette previously hard-wired into the CSS as `rgba(255, 92, 92, .14)` etc. is now driven by `--rb-0` through `--rb-5`, and the rules apply the alpha (`color-mix(... 14% / 75% transparent)`) so the rainbow stays translucent and the bars stay solid even when you swap colours. Same six colours feed both overlays.
+- **Bracket pair colours (6 colours).** `--bp-0` through `--bp-5` now drive the rainbow brackets overlay (Settings → *Rainbow brackets*).
+
+### Preview improvements
+- **Two stacked previews** in the modal: a YAML sample on top (covers keys, strings, numbers, booleans, anchors, punctuation, comments, deeply-nested brackets to demo bracket-pair colours, multi-level indentation to demo rainbow) and a Python sample below (covers built-ins like `print` / `len`, identifiers, keywords like `def` / `import` / `return`).
+- **Indent rainbow + bracket-pair overlays force-enabled** on both previews regardless of your editor preferences, so every swatch has something visible to recolour.
+
+### Theme editor UI
+- Swatches now group under section headers — *Syntax* / *Indent rainbow / bars* / *Bracket pair colours* — so it's clear what each block controls.
+- Reset still works per-theme (resets all sections).
+
 ## 1.11.22 — Theme editor: every syntax type is now reachable
 
 The previous swatches were mislabelled relative to what CodeMirror's YAML mode actually emits, so changing one swatch sometimes recoloured a different category in the preview — exactly the *"not everything updates live"* symptom.
