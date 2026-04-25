@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.11.27 — Theme editor: every swatch verified against the previews
+
+Audited each of the 21 customisable variables to confirm the previews actually demonstrate them, then tightened two labels that were misleading users:
+
+- **`--syn-def` was labelled "Anchors & aliases"** but it also colours **Python class names and function definition names** via CodeMirror's `cm-def` token (`class MySensor`, `def __init__`). Renamed to *"Definitions (anchors, class & fn names)"* so changing it doesn't surprise Python editors.
+- **`--syn-variable` was labelled "Identifiers / variable names"** without indicating which file types use it. Now shows *"... — Py/JS"* alongside Built-ins.
+- **Help text** in the modal now lists exactly which preview each swatch type appears in:
+  - Keys / Strings / Numbers / Booleans / Punctuation / Comments / Anchors → YAML preview (top)
+  - Built-ins / Identifiers / class & fn names → Python preview (bottom)
+  - Indent rainbow + Bracket pairs → both
+- Verified all 21 swatches (9 syntax + 6 indent rainbow + 6 bracket pair) have at least one visible token in the previews.
+
 ## 1.11.26 — Theme editor preview: realistic HA automations
 
 The YAML preview now shows three real-world HA automations (sun trigger + template condition + light action; numeric_state trigger + multi-condition + notify; state trigger + choose-action with nested data) — much closer to what users actually edit in `automations.yaml` than the previous abstract sample. Plus a more comprehensive Python preview using a typical custom_component class with `async`, `@property`, type hints, and built-ins. Every swatch from 1.11.25 still has visible feedback; the previews simply read like things you'd actually see in `/config`.

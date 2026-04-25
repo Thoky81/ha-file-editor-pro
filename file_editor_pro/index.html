@@ -1404,9 +1404,10 @@ class MySensor(Entity):
 
       <div class="te-help">
         Click the colour square for the OS picker, or type a hex into the field. Changes apply live and persist per theme.
-        <br><strong>Syntax</strong>: token colours used by the YAML / Python / JS modes.
-        <br><strong>Indent rainbow / bars</strong>: the six base colours used for the indent overlays (Settings → Indent style). Same colours feed the bars overlay; the rule sets a translucent fill for the rainbow and a left-border for bars.
-        <br><strong>Bracket pair colours</strong>: the six colours used by the rainbow brackets overlay (Settings → Rainbow brackets).
+        <br><strong>Where each swatch shows up:</strong>
+        Keys / Strings / Numbers / Booleans / Punctuation / Comments / Anchors → <em>YAML preview</em> (top).
+        Built-ins / Identifiers / class &amp; fn names → <em>Python preview</em> (bottom).
+        Indent rainbow + Bracket pairs → both previews.
         <br>Plain unquoted YAML values like <code>sun</code> use the editor's text colour and aren't separately recolourable.
       </div>
       <div class="syntax-swatches" id="syntax-preview-swatches"></div>
@@ -4903,15 +4904,15 @@ const THEME_OVERRIDES_KEY = 'fep-theme-overrides';
 // separately re-colourable.
 const _SYN_VARS = [
   // ── Syntax tokens ─────────────────────────────────────────────
-  { v: '--syn-atom',     label: 'Keys (YAML)',                      section: 'Syntax' },
-  { v: '--syn-string',   label: 'Strings (quoted)',                 section: 'Syntax' },
-  { v: '--syn-number',   label: 'Numbers',                          section: 'Syntax' },
-  { v: '--syn-keyword',  label: 'Booleans / language keywords',     section: 'Syntax' },
-  { v: '--syn-def',      label: 'Anchors & aliases (&name, *name)', section: 'Syntax' },
-  { v: '--syn-meta',     label: 'Punctuation ( : - , [ ] { } )',    section: 'Syntax' },
-  { v: '--syn-comment',  label: 'Comments',                         section: 'Syntax' },
-  { v: '--syn-builtin',  label: 'Built-ins (print, len) — Py/JS',   section: 'Syntax' },
-  { v: '--syn-variable', label: 'Identifiers / variable names',     section: 'Syntax' },
+  { v: '--syn-atom',     label: 'Keys (YAML)',                              section: 'Syntax' },
+  { v: '--syn-string',   label: 'Strings (quoted)',                         section: 'Syntax' },
+  { v: '--syn-number',   label: 'Numbers',                                  section: 'Syntax' },
+  { v: '--syn-keyword',  label: 'Booleans / language keywords',             section: 'Syntax' },
+  { v: '--syn-def',      label: 'Definitions (anchors, class & fn names)',  section: 'Syntax' },
+  { v: '--syn-meta',     label: 'Punctuation ( : - , [ ] { } )',            section: 'Syntax' },
+  { v: '--syn-comment',  label: 'Comments',                                 section: 'Syntax' },
+  { v: '--syn-builtin',  label: 'Built-ins (print, len, str) — Py/JS',      section: 'Syntax' },
+  { v: '--syn-variable', label: 'Identifiers / variable names — Py/JS',     section: 'Syntax' },
 
   // ── Indent rainbow / bars ─────────────────────────────────────
   // Same six base colours feed both the rainbow (translucent fill)
