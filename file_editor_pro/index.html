@@ -620,6 +620,18 @@
     .settings-toggle.on{background:var(--accent)}
     .settings-toggle.on::after{left:17px;background:#fff}
 
+    /* ── SYNTAX PREVIEW (in Settings modal) ── */
+    .syntax-preview{display:block;width:100%;padding:8px 0}
+    .syntax-preview-frame{border:1px solid var(--border-light);border-radius:6px;overflow:hidden;background:var(--bg-darkest)}
+    .syntax-preview-frame .CodeMirror{height:auto;font-family:var(--font-mono);font-size:12px;line-height:1.55;background:var(--bg-darkest) !important;color:var(--text-primary) !important;padding:6px 0}
+    .syntax-preview-frame .CodeMirror-lines{padding:6px 0}
+    .syntax-preview-frame .CodeMirror-cursor{display:none !important}   /* readOnly:'nocursor' already hides, but be safe */
+    .syntax-swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:6px;margin-top:10px}
+    .syntax-swatch{display:flex;align-items:center;gap:8px;padding:6px 9px;border:1px solid var(--border-light);border-radius:5px;background:var(--bg-mid);font-size:11px;color:var(--text-secondary)}
+    .syntax-swatch-color{width:14px;height:14px;border-radius:3px;border:1px solid rgba(0,0,0,.18);flex-shrink:0}
+    .syntax-swatch-label{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .syntax-swatch-hex{font-family:var(--font-mono);font-size:10.5px;color:var(--text-muted);letter-spacing:.02em}
+
     /* ── VISIBLE WHITESPACE ── */
     /* CodeMirror wraps each space in a span with class .cm-ws-space
        (and .cm-ws-tab for tabs) via the overlay we register in JS.
@@ -1434,6 +1446,36 @@
           <div class="settings-control">
             <div class="settings-toggle" id="set-minimap" onclick="toggleMinimap(); refreshSettingsUI()"></div>
           </div>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-title">Syntax preview</div>
+        <div class="settings-help" style="margin-bottom:10px">
+          Live render of the active theme. Switch the <em>Theme</em> dropdown above to compare. Hover a swatch for the CSS variable name.
+        </div>
+        <div class="syntax-preview">
+          <div class="syntax-preview-frame">
+            <textarea id="syntax-preview-ta"># Sample HA automation
+automation:
+  - alias: "Sunset lights"
+    trigger:
+      platform: sun
+      event: sunset
+      offset: -00:30:00
+    condition: &amp;workdays
+      weekday: [mon, tue, wed, thu, fri]
+    action:
+      service: light.turn_on
+      data:
+        entity_id: light.kitchen
+        brightness: 200
+        transition: 2.5
+        enabled: true
+        flash: false
+    use: *workdays</textarea>
+          </div>
+          <div class="syntax-swatches" id="syntax-preview-swatches"></div>
         </div>
       </div>
 
@@ -4293,6 +4335,11 @@ function setTheme(id) {
   if (t.kind === 'light') PREFS.defaultLight = id; else PREFS.defaultDark = id;
   savePrefs(); applyPrefs();
   updateThemeToggleIcon();
+  // Keep the syntax-preview block in Settings in lockstep with the
+  // active theme so users can compare without closing the modal.
+  if (document.getElementById('settings-modal')?.classList.contains('show')) {
+    try { refreshSyntaxPreview(); } catch (e) { console.error(e); }
+  }
   showToast(`Theme: ${t.name}`);
 }
 
@@ -4613,9 +4660,64 @@ function openSettings() {
   modal.classList.add('show');
   try { buildSettingsUI(); }   catch (e) { console.error('[settings] buildSettingsUI failed:', e); }
   try { refreshSettingsUI(); } catch (e) { console.error('[settings] refreshSettingsUI failed:', e); }
+  try { initSyntaxPreview(); refreshSyntaxPreview(); }
+  catch (e) { console.error('[settings] syntax preview failed:', e); }
 }
 function closeSettings() {
   document.getElementById('settings-modal').classList.remove('show');
+}
+
+// ── Syntax preview ─────────────────────────────────────────────
+// Lightweight read-only CodeMirror inside the Settings modal that
+// renders a sample HA YAML using the active theme's colors. Plus a
+// row of swatches showing each token category's hex value.
+let _previewCM = null;
+
+function initSyntaxPreview() {
+  if (_previewCM) return;
+  const ta = document.getElementById('syntax-preview-ta');
+  if (!ta || typeof CodeMirror === 'undefined') return;
+  _previewCM = CodeMirror.fromTextArea(ta, {
+    mode: 'yaml',
+    theme: 'ha',                  // wires --syn-* via .cm-s-ha rules
+    lineNumbers: false,
+    readOnly: 'nocursor',         // no cursor, no focus
+    indentUnit: 2,
+    tabSize: 2,
+    lineWrapping: false,
+    viewportMargin: Infinity,     // small doc — render all lines
+  });
+  _previewCM.setSize('100%', 'auto');
+}
+
+function refreshSyntaxPreview() {
+  if (!_previewCM) initSyntaxPreview();
+  if (_previewCM) {
+    // CSS variables changed (theme switch) — repaint the gutter/bg.
+    _previewCM.refresh();
+  }
+  const wrap = document.getElementById('syntax-preview-swatches');
+  if (!wrap) return;
+  const root = getComputedStyle(document.documentElement);
+  // Order matches what the user sees scanning a YAML file: keys,
+  // strings, numbers, booleans, anchors, comments, then values.
+  const tokens = [
+    { v: '--syn-atom',    label: 'Keys' },
+    { v: '--syn-string',  label: 'Strings' },
+    { v: '--syn-number',  label: 'Numbers' },
+    { v: '--syn-keyword', label: 'Booleans / yes-no / null' },
+    { v: '--syn-meta',    label: 'Anchors / !tags' },
+    { v: '--syn-comment', label: 'Comments' },
+    { v: '--syn-def',     label: 'Values after :' },
+  ];
+  wrap.innerHTML = tokens.map(t => {
+    const c = (root.getPropertyValue(t.v) || '').trim() || '—';
+    return `<div class="syntax-swatch" title="${t.v}">
+      <span class="syntax-swatch-color" style="background:${c}"></span>
+      <span class="syntax-swatch-label">${t.label}</span>
+      <span class="syntax-swatch-hex">${c}</span>
+    </div>`;
+  }).join('');
 }
 
 function buildSettingsUI() {

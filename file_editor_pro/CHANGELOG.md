@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.11.18 — Live syntax preview in Settings
+
+A new **Syntax preview** section in the Settings modal renders a small HA YAML sample using whatever theme is currently active, plus a row of swatches showing each token category's exact hex value. Switch the *Theme* dropdown above and the preview repaints instantly — no more guessing what a theme does to comments vs. anchors vs. booleans.
+
+- Sample covers every category that has its own colour: keys, strings, numbers, booleans, anchors / aliases / `!tags`, comments, and "values after `:`".
+- Swatches are labelled with the category name, the hex value, and the underlying CSS variable on hover (e.g. `--syn-atom`).
+- Read-only CodeMirror instance with no cursor or gutters, so the preview doesn't interfere with the editor.
+
 ## 1.11.17 — Unified Find & Replace with HA entity picker
 
 The previous *Replace* (Ctrl/Cmd+H) used CodeMirror's tiny built-in dialog, while *Rename entity* was a two-step input prompt — different mental models for the same job. Both now open the same proper modal.
