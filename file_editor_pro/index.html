@@ -331,7 +331,7 @@
     .cm-s-ha .cm-number{color:var(--syn-number) !important}
     .cm-s-ha .cm-keyword{color:var(--syn-keyword) !important}
     .cm-s-ha .cm-def{color:var(--syn-def) !important}
-    .cm-s-ha .cm-variable{color:var(--text-primary) !important}
+    .cm-s-ha .cm-variable{color:var(--syn-variable, var(--text-primary)) !important}
     .cm-s-ha .cm-variable-2{color:var(--syn-def) !important}
     .cm-s-ha .cm-string{color:var(--syn-string) !important}
     .cm-s-ha .cm-string-2{color:var(--syn-def) !important}
@@ -1233,27 +1233,29 @@
       </div>
 
       <div class="te-preview-frame">
-        <textarea id="syntax-preview-ta"># ← THIS WHOLE LINE is a comment
-automation:                       # ← "automation" is a KEY
-  - alias: "Sunset lights"        # ← quoted text is a STRING
+        <textarea id="syntax-preview-ta"># ← THIS WHOLE LINE is a COMMENT
+automation:                        # ← "automation" is a KEY (the colon is PUNCTUATION)
+  - alias: "Sunset lights"         # ← "Sunset lights" is a quoted STRING
     trigger:
-      platform: sun                # ← unquoted value (string-2)
+      platform: sun                 # ← "sun" is a plain unquoted value (uses editor text colour)
       event: sunset
-      offset: -00:30:00
     condition: &amp;workdays            # ← &amp;workdays is an ANCHOR
-      weekday: [mon, tue, wed]
+      weekday: [mon, tue, wed]      # ← [, ] and , are PUNCTUATION
     action:
       service: light.turn_on
       data:
-        brightness: 200            # ← 200 is a NUMBER
-        transition: 2.5            # ← 2.5 is a NUMBER (float)
-        enabled: true              # ← true is a BOOLEAN
-        flash: false               # ← false is a BOOLEAN
-        priority: null             # ← null is a BOOLEAN-like atom
-    use: *workdays                 # ← *workdays is an ALIAS (meta)</textarea>
+        brightness: 200             # ← 200 is a NUMBER
+        transition: 2.5             # ← 2.5 is a NUMBER (float)
+        enabled: true               # ← true is a BOOLEAN
+        flash: false                # ← false is a BOOLEAN
+    use: *workdays                  # ← *workdays is an ALIAS (same colour as anchors)</textarea>
       </div>
 
-      <div class="te-help">Click any swatch to pick a new colour. Changes apply live and are remembered per theme.</div>
+      <div class="te-help">
+        Click the colour square for the OS picker, or type a hex into the field. Changes apply live and persist per theme.
+        <br>The first 7 swatches affect YAML; the last two affect Python / JS files (HA scripts and custom_components).
+        <br>Plain unquoted YAML values like <code>sun</code> use the editor's text colour and aren't separately recolourable.
+      </div>
       <div class="syntax-swatches" id="syntax-preview-swatches"></div>
     </div>
 
@@ -4726,14 +4728,36 @@ function closeSettings() {
 // ones for the newly active theme.
 const THEME_OVERRIDES_KEY = 'fep-theme-overrides';
 
+// Mapping is grounded in what CodeMirror's YAML / Python / JS modes
+// actually emit. Editing any of these updates the active editor and
+// the preview live.
+//   YAML
+//     keys              → cm-atom
+//     quoted strings    → cm-string
+//     numbers           → cm-number
+//     true/false/yes/no → cm-keyword
+//     &anchor / *alias  → cm-variable-2  (we route to --syn-def)
+//     :, -, [], {}, ,  → cm-meta
+//     ---, ...          → cm-def         (also routed to --syn-def)
+//     comments          → cm-comment
+//   Python / JS / Shell
+//     identifiers       → cm-variable    (--syn-variable, fallback to text-primary)
+//     built-ins         → cm-builtin     (--syn-builtin)
+//     keywords          → cm-keyword     (same as YAML booleans)
+//     strings/numbers/comments → same as YAML
+// Plain unquoted YAML values (e.g. "sun") get NO class from CM's
+// YAML mode — they render in editor text colour and aren't
+// separately re-colourable.
 const _SYN_VARS = [
-  { v: '--syn-atom',    label: 'Keys' },
-  { v: '--syn-string',  label: 'Strings' },
-  { v: '--syn-number',  label: 'Numbers' },
-  { v: '--syn-keyword', label: 'Booleans / yes-no / null' },
-  { v: '--syn-meta',    label: 'Anchors / !tags' },
-  { v: '--syn-comment', label: 'Comments' },
-  { v: '--syn-def',     label: 'Values after :' },
+  { v: '--syn-atom',     label: 'Keys (YAML)' },
+  { v: '--syn-string',   label: 'Strings (quoted)' },
+  { v: '--syn-number',   label: 'Numbers' },
+  { v: '--syn-keyword',  label: 'Booleans / language keywords' },
+  { v: '--syn-def',      label: 'Anchors & aliases (&name, *name)' },
+  { v: '--syn-meta',     label: 'Punctuation ( : - , [ ] { } )' },
+  { v: '--syn-comment',  label: 'Comments' },
+  { v: '--syn-builtin',  label: 'Built-ins (print, len) — Python / JS' },
+  { v: '--syn-variable', label: 'Identifiers / variable names' },
 ];
 
 function _readThemeOverrides() {

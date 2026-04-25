@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.11.22 — Theme editor: every syntax type is now reachable
+
+The previous swatches were mislabelled relative to what CodeMirror's YAML mode actually emits, so changing one swatch sometimes recoloured a different category in the preview — exactly the *"not everything updates live"* symptom.
+
+Audited against the CodeMirror 5.65.16 YAML mode source and reorganised:
+
+- **Anchors & aliases** (`&workdays`, `*workdays`) — were wrongly labelled "Values after :", routed via `cm-variable-2` → `--syn-def`. Now correctly labelled.
+- **Punctuation** (`:`, `-`, `[`, `]`, `{`, `}`, `,`, list dashes) — were wrongly labelled "Anchors / !tags", routed via `cm-meta` → `--syn-meta`. Now correctly labelled.
+- **Booleans** label clarified as *"Booleans / language keywords"* since `cm-keyword` covers Python/JS keywords too.
+- **Plain unquoted YAML values** (e.g. `sun`, `light.kitchen`) get no class from CodeMirror's YAML mode — documented in the in-modal help text. They render in the editor's text colour and aren't separately recolourable.
+- **Two new swatches** for users editing Python / JS files (HA scripts, custom_components):
+  - **Built-ins** (`print`, `len`, `range`) → `--syn-builtin`
+  - **Identifiers / variable names** → `--syn-variable` (newly customisable; previously hard-wired to `--text-primary`)
+- The CSS rule for `cm-variable` now uses `var(--syn-variable, var(--text-primary))` so undefined themes still fall back to the readable default.
+- Inline notes in the preview YAML rewritten so each comment correctly identifies its line's token type.
+
+**Total: 9 syntax categories, all live-updating, all editable by colour-picker or hex.**
+
 ## 1.11.21 — Theme editor: typeable hex + correct picker placement
 
 Two fixes to the Theme editor.
