@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.11.24 — Theme editor: scrollable body so the YAML preview is fully visible
+
+The Theme editor body got tall enough that its bottom (the YAML preview's last lines, plus the Python preview, plus the swatches below) was clipping off-screen. The modal is `display:flex; flex-direction:column; max-height:88vh`, but `.te-body` was missing `flex:1; min-height:0` so it didn't bound itself to the modal height — meaning `overflow-y:auto` on the body never engaged. Added those two declarations; the body scrolls properly now and everything is reachable.
+
 ## 1.11.23 — Theme editor: indent rainbow + bracket palettes + Python preview
 
 The Theme editor now lets you recolour the indent overlays and bracket-pair colours, and the preview shows them — plus a Python sample so the *Built-ins* and *Identifiers* swatches are visible too. **Twenty-one categories total**, all with live preview.
