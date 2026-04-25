@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.11.20 — Sidebar header height matches editor tab bar
+
+The sidebar header (Explorer, Source Control, Search, etc.) used asymmetric vertical padding that rendered roughly 28–30 px tall, while the editor tab bar is exactly `var(--tab-height)` = 36 px. The bottom borders didn't line up, which read as a small visual "step" between the sidebar and the editor. The header now uses the same `--tab-height` so the two horizontal lines are perfectly continuous across all panels.
+
 ## 1.11.19 — Standalone Theme editor with click-to-recolour
 
 The syntax preview from 1.11.18 graduates into a dedicated **Theme editor** modal you open from the **Theme** button in the bottom status bar (or the command palette → *Theme: Open Theme editor…*). Removed from Settings — one home, not two.
