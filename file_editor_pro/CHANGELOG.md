@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.11.16 — Upload fixes + rename-entity helper
+
+### Upload
+- **Bug fix**: uploads into folders outside `/config` (e.g. `share/`, `ssl/`, `addons/`, `media/`) were rejected with *"Upload escapes config directory"* even though `resolve_safe()` had already validated the destination. The backend now re-validates against every mapped root, so uploads work in all roots that the add-on has mounted.
+- **Default destination follows the Explorer focus.** If you've drilled into a folder via double-click, *Upload File* uploads there. Right-clicking a folder → *Upload* still wins. Previously every upload went to the config root regardless of context.
+- **Overwrite confirmation.** When a file with the same name already exists, the backend returns a structured `"exists"` response instead of silently overwriting. The UI shows the existing file's size and asks *"Replace it with the file you're uploading?"*. For multi-file uploads, the first answer applies to the rest of the batch (one prompt, not N).
+
+### Entity rename helper
+- New command **Rename entity in this file…** — finds every occurrence of an entity ID (e.g. `sensor.motion_sensor_vzadu_bok_illuminance`) in the active editor and replaces it with another, with **whole-entity-only matching** so `sensor.foo` doesn't accidentally also match `sensor.foo_bar`.
+- Available from: the editor right-click menu, the command palette (*HA: Rename entity in this file…*).
+- If the cursor is on an entity ID (or the selection is one), the find field is pre-filled. Validates that both old and new follow the `domain.name` shape. The replacement is one undo step, so Cmd/Ctrl+Z reverts the whole rename.
+
 ## 1.11.15 — Visible timestamp prefill in the commit box
 
 Follow-up to 1.11.14: the auto-timestamp now appears **inside the commit-message textarea** so you can see it before hitting Commit and edit it if you want. Previously the timestamp only kicked in as a hidden fallback when the box was empty.

@@ -335,17 +335,43 @@ async def download_file(path: str):
 
 
 @app.post("/api/files/upload")
-async def upload_file(path: str, file: UploadFile = File(...)):
-    # `path` is a directory (relative to /config) to upload into
-    dest_dir = resolve_safe(path)
-    dest_dir.mkdir(parents=True, exist_ok=True)
-    if not dest_dir.is_dir():
+async def upload_file(path: str, file: UploadFile = File(...), overwrite: int = 0):
+    """Upload a file into the directory at `path` (root-prefixed).
+
+    If a file with the same name already exists, returns a 409 with
+    `kind: "exists"` so the UI can ask before overwriting; pass
+    `overwrite=1` to replace it.
+    """
+    # `path` is a directory under any configured root (config/ssl/share/...)
+    if path:
+        dest_dir = resolve_safe(path)
+    else:
+        dest_dir = CONFIG_ROOT
+    if dest_dir.exists() and not dest_dir.is_dir():
         raise HTTPException(400, "Upload path is not a directory")
-    target = (dest_dir / Path(file.filename).name).resolve()
-    try:
-        target.relative_to(CONFIG_ROOT)
-    except ValueError:
-        raise HTTPException(400, "Upload escapes config directory")
+    dest_dir.mkdir(parents=True, exist_ok=True)
+
+    # Strip any path components from the supplied filename — we only
+    # accept the bare basename, anchored to dest_dir.
+    fname = Path(file.filename or "").name
+    if not fname:
+        raise HTTPException(400, "Filename is required")
+    target = (dest_dir / fname).resolve()
+
+    # Re-validate the resolved target lives under one of the mapped
+    # roots (resolve_safe checked the directory; this catches symlink
+    # weirdness on the final filename too).
+    if not any(_is_within(target, r) for r in ROOTS.values()):
+        raise HTTPException(400, "Upload escapes mapped roots")
+
+    if target.exists() and not overwrite:
+        return {
+            "ok": False,
+            "kind": "exists",
+            "name": fname,
+            "size": target.stat().st_size,
+        }
+
     written = 0
     with target.open("wb") as fp:
         while chunk := await file.read(1024 * 64):
@@ -355,7 +381,24 @@ async def upload_file(path: str, file: UploadFile = File(...)):
                 target.unlink(missing_ok=True)
                 raise HTTPException(413, "Upload too large")
             fp.write(chunk)
-    return {"ok": True, "path": str(target.relative_to(CONFIG_ROOT)), "size": written}
+
+    # Best-effort root-relative path for the response. Falls back to
+    # the absolute path if the target isn't under any known root
+    # (shouldn't happen given the check above).
+    rel = str(target)
+    for name, root in ROOTS.items():
+        if _is_within(target, root):
+            rel = f"{name}/{target.relative_to(root)}".replace("\\", "/")
+            break
+    return {"ok": True, "path": rel, "size": written, "overwritten": bool(overwrite)}
+
+
+def _is_within(child: Path, parent: Path) -> bool:
+    try:
+        child.relative_to(parent)
+        return True
+    except ValueError:
+        return False
 
 
 # ──────────────────────────── Git ─────────────────────────────────────

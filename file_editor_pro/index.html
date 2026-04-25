@@ -1457,6 +1457,10 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
     Replace <span class="context-shortcut">⌘H</span>
   </div>
+  <div class="context-item" onclick="renameEntityInFile()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14.06 9 15 9.94 5.92 19H5v-.92zM17.66 3a.997.997 0 0 0-.7.29l-1.83 1.83 3.75 3.75 1.83-1.83a.996.996 0 0 0 0-1.41l-2.34-2.34c-.2-.2-.45-.29-.71-.29zm-3.6 3.19L3 17.25V21h3.75L17.81 9.94z"/></svg>
+    Rename entity in this file…
+  </div>
   <div class="context-divider"></div>
   <div class="context-item" onclick="saveCurrentFile()">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
@@ -2943,6 +2947,105 @@ function ctxPaste() {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// ENTITY RENAME (single-file, word-bounded)
+// ═══════════════════════════════════════════════════════════════
+// Replaces every occurrence of an entity ID like
+// "sensor.motion_sensor_vzadu_bok_illuminance" with a new one across
+// the active editor only. Match is bounded by non-entity-id characters
+// so e.g. "sensor.foo" does not also match "sensor.foo_bar".
+const _ENTITY_RX = /^[a-z][a-z0-9_]*\.[a-z0-9_]+$/i;
+
+function _entityAtCursor() {
+  if (!editor) return '';
+  const sel = editor.getSelection().trim();
+  if (sel && _ENTITY_RX.test(sel)) return sel;
+  // Try to grab the entity ID under the cursor: scan back/forward
+  // for [a-z0-9_.] characters and check if the result looks like one.
+  const pos = editor.getCursor();
+  const line = editor.getLine(pos.line) || '';
+  const tok = /[a-z0-9_.]/i;
+  let s = pos.ch, e = pos.ch;
+  while (s > 0 && tok.test(line[s - 1])) s--;
+  while (e < line.length && tok.test(line[e])) e++;
+  const word = line.slice(s, e);
+  return _ENTITY_RX.test(word) ? word : '';
+}
+
+async function renameEntityInFile() {
+  if (!editor) { showToast('No file open'); return; }
+  const tab = tabs.find(t => t.id === activeTabId);
+  if (!tab) { showToast('No file open'); return; }
+
+  const guess = _entityAtCursor();
+
+  const oldId = await promptInput({
+    title: 'Rename entity in this file',
+    message: `In ${tab.name}. Match is whole-entity-only; ` +
+             `"sensor.foo" will not match "sensor.foo_bar".`,
+    label: 'Find entity',
+    placeholder: 'sensor.example_old',
+    defaultValue: guess,
+    okLabel: 'Next',
+  });
+  if (!oldId) return;
+  if (!_ENTITY_RX.test(oldId)) {
+    showToast('Not a valid entity ID (expected domain.name)');
+    return;
+  }
+
+  const newId = await promptInput({
+    title: 'Rename entity in this file',
+    message: `Replace "${oldId}" with:`,
+    label: 'New entity',
+    placeholder: 'sensor.example_new',
+    defaultValue: oldId,
+    okLabel: 'Replace all',
+  });
+  if (!newId) return;
+  if (!_ENTITY_RX.test(newId)) {
+    showToast('Not a valid entity ID (expected domain.name)');
+    return;
+  }
+  if (newId === oldId) { showToast('Old and new are the same'); return; }
+
+  const escaped = oldId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // Bounded by anything that is not part of an entity id (letters,
+  // digits, underscore, dot). Lookbehind + lookahead keep replacements
+  // surgical without consuming surrounding chars.
+  const rx = new RegExp(`(?<![A-Za-z0-9_.])${escaped}(?![A-Za-z0-9_.])`, 'g');
+
+  // Collect every match position, then replace from end to start so
+  // earlier positions don't shift. Wrapped in editor.operation() for
+  // a single undo entry.
+  const positions = [];
+  const lines = editor.getValue().split('\n');
+  lines.forEach((line, i) => {
+    rx.lastIndex = 0;
+    let m;
+    while ((m = rx.exec(line))) {
+      positions.push({ line: i, ch: m.index });
+    }
+  });
+
+  if (!positions.length) {
+    showToast(`"${oldId}" not found in this file`);
+    return;
+  }
+
+  editor.operation(() => {
+    for (let i = positions.length - 1; i >= 0; i--) {
+      const p = positions[i];
+      editor.replaceRange(
+        newId,
+        CodeMirror.Pos(p.line, p.ch),
+        CodeMirror.Pos(p.line, p.ch + oldId.length)
+      );
+    }
+  });
+  showToast(`Replaced ${positions.length} occurrence${positions.length > 1 ? 's' : ''} of ${oldId}`);
+}
+
+// ═══════════════════════════════════════════════════════════════
 // TOAST
 // ═══════════════════════════════════════════════════════════════
 // In-memory ring buffer of the last N toast messages so the user
@@ -3502,27 +3605,65 @@ async function promptNewFolder() {
 
 function uploadFilePrompt() {
   if (!API.available) { showToast('Demo mode — no backend'); return; }
-  _uploadTargetDir = '';
+  // Default to the user's current focus folder (drilled-into folder
+  // shown in the tree breadcrumb). Falls back to the config root if
+  // nothing is focused. Right-clicking a folder still wins via the
+  // context-menu handler that sets _uploadTargetDir directly.
+  _uploadTargetDir = _treeFocusPath || '';
   document.getElementById('upload-input').click();
 }
 
 let _uploadTargetDir = '';
+
+async function _doUpload(file, dirPath, overwrite) {
+  const fd = new FormData();
+  fd.append('file', file);
+  const r = await fetch(
+    API.url('/api/files/upload?path=' + encodeURIComponent(dirPath || '')
+            + (overwrite ? '&overwrite=1' : '')),
+    { method: 'POST', body: fd }
+  );
+  let data; try { data = await r.json(); } catch { data = {}; }
+  if (!r.ok) throw new Error(data.detail || r.status);
+  return data;
+}
+
 document.getElementById('upload-input').addEventListener('change', async (e) => {
   const files = Array.from(e.target.files || []);
+  const dir = _uploadTargetDir;
+  // Snapshot of "yes to all / no to all" so multi-file uploads don't
+  // ping the user for every duplicate.
+  let bulkOverwrite = null;   // null → ask each time, true/false → apply to rest
   for (const f of files) {
-    const fd = new FormData();
-    fd.append('file', f);
     try {
-      const r = await fetch(API.url('/api/files/upload?path=' + encodeURIComponent(_uploadTargetDir)), {
-        method: 'POST', body: fd,
-      });
-      if (!r.ok) throw new Error((await r.json()).detail || r.status);
-      showToast(`Uploaded ${f.name}`);
+      let res = await _doUpload(f, dir, false);
+      if (res.kind === 'exists') {
+        let ow = bulkOverwrite;
+        if (ow === null) {
+          const where = dir ? `/${dir}` : '/config';
+          const more = files.length > 1 ? '\n\n(Cancel applies to the rest of this batch.)' : '';
+          ow = window.confirm(
+            `"${f.name}" already exists in ${where} (${_humanSize(res.size)}).\n\n` +
+            `Replace it with the file you're uploading?` + more
+          );
+          if (files.length > 1) bulkOverwrite = ow;   // remember for the rest
+        }
+        if (!ow) { showToast(`Skipped ${f.name}`); continue; }
+        res = await _doUpload(f, dir, true);
+      }
+      showToast(res.overwritten ? `Replaced ${f.name}` : `Uploaded ${f.name}`);
     } catch (err) { showToast(`Upload failed: ${f.name} – ${err.message}`); }
   }
   e.target.value = '';
   refreshTree();
 });
+
+function _humanSize(n) {
+  if (!Number.isFinite(n)) return '?';
+  const u = ['B','KB','MB','GB'];
+  let i = 0; while (n >= 1024 && i < u.length-1) { n /= 1024; i++; }
+  return (i === 0 ? n.toFixed(0) : n.toFixed(1)) + ' ' + u[i];
+}
 
 // ═══════════════════════════════════════════════════════════════
 // TREE CONTEXT MENU
@@ -5347,6 +5488,7 @@ const COMMANDS = [
   { cat: 'HA',     title: 'Preview Jinja template…',  shortcut: 'Ctrl+Alt+J', run: () => openTemplatePreview() },
   { cat: 'HA',     title: 'Validate Jinja in current file',                    run: () => validateJinjaNow() },
   { cat: 'HA',     title: 'Show Jinja error list',                              run: () => openJinjaErrorsModal() },
+  { cat: 'HA',     title: 'Rename entity in this file…',                         run: () => renameEntityInFile() },
   { cat: 'HA',     title: 'Refresh entity/service cache',                      run: () => loadHAData(true).then(() => showToast('HA cache refreshed')) },
   { cat: 'Snippet',title: 'Insert: Automation skeleton',                       run: () => insertSnippet('automation') },
   { cat: 'Snippet',title: 'Insert: Script skeleton',                           run: () => insertSnippet('script') },
