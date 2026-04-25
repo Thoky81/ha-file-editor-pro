@@ -635,13 +635,17 @@
     .te-preview-frame .CodeMirror{height:auto;font-family:var(--font-mono);font-size:12px;line-height:1.55;background:var(--bg-darkest) !important;color:var(--text-primary) !important;padding:6px 0}
     .te-preview-frame .CodeMirror-lines{padding:6px 0}
     .te-preview-frame .CodeMirror-cursor{display:none !important}
-    .syntax-swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px}
-    .syntax-swatch{display:flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid var(--border-light);border-radius:5px;background:var(--bg-mid);font-size:11.5px;color:var(--text-secondary);cursor:pointer;transition:all .1s}
+    .syntax-swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px}
+    .syntax-swatch{display:flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid var(--border-light);border-radius:5px;background:var(--bg-mid);font-size:11.5px;color:var(--text-secondary);transition:all .1s}
     .syntax-swatch:hover{background:var(--bg-hover);border-color:var(--accent)}
     .syntax-swatch.customised{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent-dim)}
-    .syntax-swatch-color{width:18px;height:18px;border-radius:3px;border:1px solid rgba(0,0,0,.20);flex-shrink:0;box-shadow:0 0 0 1px rgba(255,255,255,.04) inset}
+    .syntax-swatch-color{width:18px;height:18px;border-radius:3px;border:1px solid rgba(0,0,0,.20);flex-shrink:0;box-shadow:0 0 0 1px rgba(255,255,255,.04) inset;cursor:pointer}
+    .syntax-swatch-color:hover{outline:2px solid var(--accent);outline-offset:1px}
     .syntax-swatch-label{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text-primary)}
-    .syntax-swatch-hex{font-family:var(--font-mono);font-size:10.5px;color:var(--text-muted);letter-spacing:.02em}
+    .syntax-swatch-hex{font-family:var(--font-mono);font-size:10.5px;color:var(--text-muted);letter-spacing:.02em;background:transparent;border:1px solid transparent;border-radius:3px;padding:2px 5px;width:78px;text-align:center;outline:none;text-transform:lowercase}
+    .syntax-swatch-hex:hover{background:var(--bg-darkest);border-color:var(--border-light);color:var(--text-primary)}
+    .syntax-swatch-hex:focus{background:var(--bg-darkest);border-color:var(--accent);color:var(--text-primary)}
+    .syntax-swatch-hex.invalid{border-color:var(--accent-red);color:var(--accent-red)}
     .syntax-swatch-dot{width:5px;height:5px;border-radius:50%;background:var(--accent);flex-shrink:0;display:none}
     .syntax-swatch.customised .syntax-swatch-dot{display:inline-block}
 
@@ -1253,8 +1257,10 @@ automation:                       # ← "automation" is a KEY
       <div class="syntax-swatches" id="syntax-preview-swatches"></div>
     </div>
 
-    <!-- Hidden native colour picker, anchored at the click site. -->
-    <input type="color" id="te-color-input" style="position:absolute;width:0;height:0;padding:0;border:0;opacity:0;pointer-events:none">
+    <!-- Hidden native colour picker, anchored at the click site.
+         position:fixed so the viewport-relative coordinates from
+         getBoundingClientRect() in _openColorPickerFor() match. -->
+    <input type="color" id="te-color-input" style="position:fixed;width:1px;height:1px;padding:0;border:0;opacity:0;pointer-events:none;z-index:2000">
   </div>
 </div>
 
@@ -4763,7 +4769,17 @@ function setSyntaxOverride(varName, value) {
   if (_previewCM) _previewCM.refresh();
   if (editor) editor.refresh();
   if (_rightEditor) _rightEditor.refresh();
-  refreshSyntaxPreview();
+  // Update the affected swatch in-place rather than re-rendering the
+  // whole list, so the user's cursor / hex-input focus is preserved
+  // while they type.
+  const swatch = document.querySelector(`.syntax-swatch[data-var="${CSS.escape(varName)}"]`);
+  if (swatch) {
+    swatch.classList.add('customised');
+    const sq  = swatch.querySelector('.syntax-swatch-color');
+    if (sq) sq.style.background = value;
+    const inp = swatch.querySelector('.syntax-swatch-hex');
+    if (inp && document.activeElement !== inp) inp.value = value;
+  }
 }
 
 function resetThemeOverrides() {
@@ -4827,17 +4843,52 @@ function refreshSyntaxPreview() {
   const root = getComputedStyle(document.documentElement);
   const overrides = _readThemeOverrides()[PREFS.theme || 'github-light'] || {};
   wrap.innerHTML = _SYN_VARS.map(t => {
-    const c = (root.getPropertyValue(t.v) || '').trim() || '—';
+    const c = (root.getPropertyValue(t.v) || '').trim() || '#000000';
     const isCustom = !!overrides[t.v];
-    return `<div class="syntax-swatch ${isCustom ? 'customised' : ''}" title="${t.v} — click to recolour" data-var="${t.v}">
-      <span class="syntax-swatch-color" style="background:${c}"></span>
+    return `<div class="syntax-swatch ${isCustom ? 'customised' : ''}" data-var="${t.v}">
+      <span class="syntax-swatch-color" style="background:${c}" title="${t.v} — click to open colour picker"></span>
       <span class="syntax-swatch-label">${t.label}</span>
-      <span class="syntax-swatch-hex">${c}</span>
-      <span class="syntax-swatch-dot"></span>
+      <input type="text" class="syntax-swatch-hex" value="${c}" data-var="${t.v}" maxlength="7" spellcheck="false" autocomplete="off" title="Type a hex value like #1a73e8">
+      <span class="syntax-swatch-dot" title="Customised"></span>
     </div>`;
   }).join('');
+  // Colour-square click → native picker; hex input → typed entry.
   wrap.querySelectorAll('.syntax-swatch').forEach(el => {
-    el.addEventListener('click', () => _openColorPickerFor(el.dataset.var, el));
+    const sq  = el.querySelector('.syntax-swatch-color');
+    const inp = el.querySelector('.syntax-swatch-hex');
+    sq?.addEventListener('click', () => _openColorPickerFor(el.dataset.var, sq));
+    if (!inp) return;
+    inp.addEventListener('focus', () => inp.select());
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Enter')  { e.preventDefault(); inp.blur(); }
+      if (e.key === 'Escape') {
+        const cur = getComputedStyle(document.documentElement).getPropertyValue(inp.dataset.var).trim();
+        inp.value = cur; inp.classList.remove('invalid'); inp.blur();
+      }
+    });
+    inp.addEventListener('input', () => {
+      // Auto-prepend # if user types raw hex digits.
+      let v = inp.value.trim();
+      if (v && !v.startsWith('#') && /^[0-9a-f]+$/i.test(v)) {
+        v = '#' + v; inp.value = v;
+      }
+      // Live apply only when the value is fully valid; otherwise just
+      // mark invalid until they fix it (so partial typing doesn't flicker).
+      if (/^#[0-9a-f]{3}$|^#[0-9a-f]{6}$/i.test(v)) {
+        inp.classList.remove('invalid');
+        setSyntaxOverride(inp.dataset.var, _normaliseHex(v));
+      } else {
+        inp.classList.add('invalid');
+      }
+    });
+    inp.addEventListener('blur', () => {
+      const v = inp.value.trim();
+      if (!/^#[0-9a-f]{3}$|^#[0-9a-f]{6}$/i.test(v)) {
+        // Revert silently to the currently-applied value.
+        const cur = getComputedStyle(document.documentElement).getPropertyValue(inp.dataset.var).trim();
+        inp.value = cur; inp.classList.remove('invalid');
+      }
+    });
   });
 }
 
@@ -4858,12 +4909,14 @@ function _openColorPickerFor(varName, swatchEl) {
   if (!input) return;
   const current = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
   input.value = _normaliseHex(current);
-  // Anchor the (invisible) picker over the clicked swatch so the
-  // OS picker pops up next to it on most platforms.
+  // Anchor the (invisible) picker over the clicked swatch — the OS
+  // colour picker pops up adjacent to wherever the input lives, so
+  // placing it under the swatch puts the picker next to the click.
+  // input is position:fixed, so use viewport-relative coords directly.
   if (swatchEl) {
     const r = swatchEl.getBoundingClientRect();
-    input.style.left = (r.left) + 'px';
-    input.style.top  = (r.bottom + window.scrollY) + 'px';
+    input.style.left = Math.round(r.left + r.width / 2) + 'px';
+    input.style.top  = Math.round(r.bottom) + 'px';
   }
   input.oninput  = e => setSyntaxOverride(varName, e.target.value);
   input.onchange = e => setSyntaxOverride(varName, e.target.value);

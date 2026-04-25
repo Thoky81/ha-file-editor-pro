@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.11.21 — Theme editor: typeable hex + correct picker placement
+
+Two fixes to the Theme editor.
+
+- **Colour picker now opens next to the swatch** instead of in the bottom-left corner. The hidden `<input type="color">` was `position:absolute` inside the modal but was being placed using viewport-relative coordinates from `getBoundingClientRect()` — different coordinate systems. Switched to `position:fixed` so the coords match.
+- **Hex value is now editable.** The hex displayed next to each swatch is a real input — click it and type. Accepts `#rrggbb` and `#rgb` shorthands; auto-prepends `#` if you paste raw digits. Changes apply live as you type a valid value (invalid intermediate values are flagged red but don't apply, so partial typing doesn't flicker the editor). Press Enter to confirm or Escape to cancel.
+- Live updates no longer rebuild the whole swatch list, so the input doesn't lose focus while you're typing.
+
 ## 1.11.20 — Sidebar header height matches editor tab bar
 
 The sidebar header (Explorer, Source Control, Search, etc.) used asymmetric vertical padding that rendered roughly 28–30 px tall, while the editor tab bar is exactly `var(--tab-height)` = 36 px. The bottom borders didn't line up, which read as a small visual "step" between the sidebar and the editor. The header now uses the same `--tab-height` so the two horizontal lines are perfectly continuous across all panels.
