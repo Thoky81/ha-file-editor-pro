@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.11.19 — Standalone Theme editor with click-to-recolour
+
+The syntax preview from 1.11.18 graduates into a dedicated **Theme editor** modal you open from the **Theme** button in the bottom status bar (or the command palette → *Theme: Open Theme editor…*). Removed from Settings — one home, not two.
+
+- **Click any swatch** to open the OS colour picker. Pick a colour and it applies live to the editor, the right pane, and the preview.
+- **Inline labels in the preview YAML** so each token type is self-documenting — e.g. `# ← THIS WHOLE LINE is a comment`, `# ← 200 is a NUMBER`, `# ← &workdays is an ANCHOR`. No more guessing what's what.
+- **Per-theme overrides persist** in `localStorage[fep-theme-overrides]` keyed by theme id. Customise GitHub Light, switch to HA Dark, switch back — your GitHub Light tweaks are still there.
+- **Customised tokens are highlighted** with a blue border + dot so you can see at a glance what you've changed.
+- **Reset to defaults** button restores the active theme's original colours.
+- **Theme dropdown inside the editor** so you can flip themes (and tweak each one) without leaving the modal.
+- Boot-time apply: `applyPrefs()` calls `applyThemeOverrides()` so customisations survive page refreshes.
+
 ## 1.11.18 — Live syntax preview in Settings
 
 A new **Syntax preview** section in the Settings modal renders a small HA YAML sample using whatever theme is currently active, plus a row of swatches showing each token category's exact hex value. Switch the *Theme* dropdown above and the preview repaints instantly — no more guessing what a theme does to comments vs. anchors vs. booleans.

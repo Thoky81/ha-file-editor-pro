@@ -620,17 +620,30 @@
     .settings-toggle.on{background:var(--accent)}
     .settings-toggle.on::after{left:17px;background:#fff}
 
-    /* ── SYNTAX PREVIEW (in Settings modal) ── */
-    .syntax-preview{display:block;width:100%;padding:8px 0}
-    .syntax-preview-frame{border:1px solid var(--border-light);border-radius:6px;overflow:hidden;background:var(--bg-darkest)}
-    .syntax-preview-frame .CodeMirror{height:auto;font-family:var(--font-mono);font-size:12px;line-height:1.55;background:var(--bg-darkest) !important;color:var(--text-primary) !important;padding:6px 0}
-    .syntax-preview-frame .CodeMirror-lines{padding:6px 0}
-    .syntax-preview-frame .CodeMirror-cursor{display:none !important}   /* readOnly:'nocursor' already hides, but be safe */
-    .syntax-swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:6px;margin-top:10px}
-    .syntax-swatch{display:flex;align-items:center;gap:8px;padding:6px 9px;border:1px solid var(--border-light);border-radius:5px;background:var(--bg-mid);font-size:11px;color:var(--text-secondary)}
-    .syntax-swatch-color{width:14px;height:14px;border-radius:3px;border:1px solid rgba(0,0,0,.18);flex-shrink:0}
-    .syntax-swatch-label{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    /* ── THEME EDITOR MODAL ── */
+    .te-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1955;display:none;align-items:flex-start;justify-content:center;backdrop-filter:blur(2px);padding:6vh 3vw}
+    .te-overlay.show{display:flex}
+    .te-modal{width:min(720px,100%);max-height:88vh;background:var(--bg-light);border:1px solid var(--border-light);border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.55);display:flex;flex-direction:column;overflow:hidden;position:relative}
+    .te-header{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border);flex-shrink:0}
+    .te-title{font-size:14px;font-weight:600;color:var(--text-primary)}
+    .te-body{padding:14px 16px;overflow-y:auto;display:flex;flex-direction:column;gap:12px}
+    .te-row{display:flex;align-items:center;gap:10px}
+    .te-label{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;width:64px;flex-shrink:0}
+    .te-select{flex:1;background:var(--bg-mid);border:1px solid var(--border-light);color:var(--text-primary);border-radius:5px;padding:6px 9px;font-family:var(--font-ui);font-size:12px;outline:none}
+    .te-help{font-size:11px;color:var(--text-muted)}
+    .te-preview-frame{border:1px solid var(--border-light);border-radius:6px;overflow:hidden;background:var(--bg-darkest)}
+    .te-preview-frame .CodeMirror{height:auto;font-family:var(--font-mono);font-size:12px;line-height:1.55;background:var(--bg-darkest) !important;color:var(--text-primary) !important;padding:6px 0}
+    .te-preview-frame .CodeMirror-lines{padding:6px 0}
+    .te-preview-frame .CodeMirror-cursor{display:none !important}
+    .syntax-swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px}
+    .syntax-swatch{display:flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid var(--border-light);border-radius:5px;background:var(--bg-mid);font-size:11.5px;color:var(--text-secondary);cursor:pointer;transition:all .1s}
+    .syntax-swatch:hover{background:var(--bg-hover);border-color:var(--accent)}
+    .syntax-swatch.customised{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent-dim)}
+    .syntax-swatch-color{width:18px;height:18px;border-radius:3px;border:1px solid rgba(0,0,0,.20);flex-shrink:0;box-shadow:0 0 0 1px rgba(255,255,255,.04) inset}
+    .syntax-swatch-label{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text-primary)}
     .syntax-swatch-hex{font-family:var(--font-mono);font-size:10.5px;color:var(--text-muted);letter-spacing:.02em}
+    .syntax-swatch-dot{width:5px;height:5px;border-radius:50%;background:var(--accent);flex-shrink:0;display:none}
+    .syntax-swatch.customised .syntax-swatch-dot{display:inline-block}
 
     /* ── VISIBLE WHITESPACE ── */
     /* CodeMirror wraps each space in a span with class .cm-ws-space
@@ -1004,6 +1017,10 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
     Logs<span class="logs-badge" id="status-logs-badge"></span>
   </div>
+  <div class="status-item status-clickable" id="status-theme" onclick="openThemeEditor()" title="Theme editor — recolour syntax tokens">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="13.5" cy="6.5" r="2"/><circle cx="17.5" cy="11" r="2"/><circle cx="8.5" cy="7.5" r="2"/><circle cx="6.5" cy="12.5" r="2"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c1.4 0 1.5-1.5.5-2.5-.7-.7-.7-2 0-2.7l1-1c.7-.7 2-.7 2.7 0 1 1 2.5 1 2.5-.5C18.7 14 22 11 22 12 22 6.5 17.5 2 12 2z"/></svg>
+    Theme
+  </div>
   <div class="status-item status-clickable" id="status-settings" onclick="openSettings()" title="Settings">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 10v6M4.22 4.22l4.24 4.24m7.08 7.08l4.24 4.24M1 12h6m10 0h6M4.22 19.78l4.24-4.24m7.08-7.08l4.24-4.24"/></svg>
     Settings
@@ -1192,6 +1209,52 @@
       <input type="text" class="fr-picker-search" id="fr-picker-search" autocomplete="off" spellcheck="false" placeholder="Search by entity ID or friendly name…">
       <div class="fr-picker-list" id="fr-picker-list"></div>
     </div>
+  </div>
+</div>
+
+<!-- Theme editor — standalone modal, click any swatch to recolour the active theme. -->
+<div class="te-overlay" id="theme-editor-modal">
+  <div class="te-modal">
+    <div class="te-header">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:16px;height:16px"><circle cx="13.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="10.5" r="2.5"/><circle cx="8.5" cy="7.5" r="2.5"/><circle cx="6.5" cy="12.5" r="2.5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c1.4 0 1.5-1.5.5-2.5-.7-.7-.7-2 0-2.7l1-1c.7-.7 2-.7 2.7 0 1 1 2.5 1 2.5-.5C18.7 14 22 11 22 12 22 6.5 17.5 2 12 2z"/></svg>
+      <div class="te-title">Theme editor</div>
+      <button class="help-close" onclick="closeThemeEditor()" style="margin-left:auto">×</button>
+    </div>
+
+    <div class="te-body">
+      <div class="te-row">
+        <label class="te-label">Theme</label>
+        <select id="te-theme-select" class="te-select" onchange="setTheme(this.value)"></select>
+        <button class="confirm-btn" id="te-reset" type="button" title="Restore the active theme's original colours">Reset to defaults</button>
+      </div>
+
+      <div class="te-preview-frame">
+        <textarea id="syntax-preview-ta"># ← THIS WHOLE LINE is a comment
+automation:                       # ← "automation" is a KEY
+  - alias: "Sunset lights"        # ← quoted text is a STRING
+    trigger:
+      platform: sun                # ← unquoted value (string-2)
+      event: sunset
+      offset: -00:30:00
+    condition: &amp;workdays            # ← &amp;workdays is an ANCHOR
+      weekday: [mon, tue, wed]
+    action:
+      service: light.turn_on
+      data:
+        brightness: 200            # ← 200 is a NUMBER
+        transition: 2.5            # ← 2.5 is a NUMBER (float)
+        enabled: true              # ← true is a BOOLEAN
+        flash: false               # ← false is a BOOLEAN
+        priority: null             # ← null is a BOOLEAN-like atom
+    use: *workdays                 # ← *workdays is an ALIAS (meta)</textarea>
+      </div>
+
+      <div class="te-help">Click any swatch to pick a new colour. Changes apply live and are remembered per theme.</div>
+      <div class="syntax-swatches" id="syntax-preview-swatches"></div>
+    </div>
+
+    <!-- Hidden native colour picker, anchored at the click site. -->
+    <input type="color" id="te-color-input" style="position:absolute;width:0;height:0;padding:0;border:0;opacity:0;pointer-events:none">
   </div>
 </div>
 
@@ -1446,36 +1509,6 @@
           <div class="settings-control">
             <div class="settings-toggle" id="set-minimap" onclick="toggleMinimap(); refreshSettingsUI()"></div>
           </div>
-        </div>
-      </div>
-
-      <div class="settings-section">
-        <div class="settings-section-title">Syntax preview</div>
-        <div class="settings-help" style="margin-bottom:10px">
-          Live render of the active theme. Switch the <em>Theme</em> dropdown above to compare. Hover a swatch for the CSS variable name.
-        </div>
-        <div class="syntax-preview">
-          <div class="syntax-preview-frame">
-            <textarea id="syntax-preview-ta"># Sample HA automation
-automation:
-  - alias: "Sunset lights"
-    trigger:
-      platform: sun
-      event: sunset
-      offset: -00:30:00
-    condition: &amp;workdays
-      weekday: [mon, tue, wed, thu, fri]
-    action:
-      service: light.turn_on
-      data:
-        entity_id: light.kitchen
-        brightness: 200
-        transition: 2.5
-        enabled: true
-        flash: false
-    use: *workdays</textarea>
-          </div>
-          <div class="syntax-swatches" id="syntax-preview-swatches"></div>
         </div>
       </div>
 
@@ -3481,6 +3514,7 @@ document.addEventListener('keydown', e => {
     document.getElementById('context-menu').classList.remove('show');
     if (document.getElementById('logs-modal')?.classList.contains('show')) closeLogs();
     if (document.getElementById('jinja-errors-modal')?.classList.contains('show')) closeJinjaErrorsModal();
+    if (document.getElementById('theme-editor-modal')?.classList.contains('show')) closeThemeEditor();
     const fr = document.getElementById('fr-modal');
     if (fr?.classList.contains('show')) {
       // First Escape closes the entity picker if it's open; second
@@ -4294,6 +4328,10 @@ function applyPrefs() {
   // Theme: live on <html> via data-theme so :root vars re-resolve
   const themeId = THEMES.some(t => t.id === PREFS.theme) ? PREFS.theme : 'github-light';
   document.documentElement.setAttribute('data-theme', themeId);
+  // Layer the user's per-theme syntax-colour customisations on top of
+  // the base theme. Defined later in the file but safe to call here
+  // because the function only touches <html>.style which always exists.
+  if (typeof applyThemeOverrides === 'function') applyThemeOverrides();
 
   // Font size
   const fs = Math.max(10, Math.min(24, Number(PREFS.fontSize) || 13));
@@ -4335,10 +4373,14 @@ function setTheme(id) {
   if (t.kind === 'light') PREFS.defaultLight = id; else PREFS.defaultDark = id;
   savePrefs(); applyPrefs();
   updateThemeToggleIcon();
-  // Keep the syntax-preview block in Settings in lockstep with the
-  // active theme so users can compare without closing the modal.
-  if (document.getElementById('settings-modal')?.classList.contains('show')) {
-    try { refreshSyntaxPreview(); } catch (e) { console.error(e); }
+  // Keep the Theme-editor preview in lockstep with the active theme
+  // so users can compare without closing the modal.
+  if (document.getElementById('theme-editor-modal')?.classList.contains('show')) {
+    try {
+      const sel = document.getElementById('te-theme-select');
+      if (sel) sel.value = id;
+      refreshSyntaxPreview();
+    } catch (e) { console.error(e); }
   }
   showToast(`Theme: ${t.name}`);
 }
@@ -4660,17 +4702,104 @@ function openSettings() {
   modal.classList.add('show');
   try { buildSettingsUI(); }   catch (e) { console.error('[settings] buildSettingsUI failed:', e); }
   try { refreshSettingsUI(); } catch (e) { console.error('[settings] refreshSettingsUI failed:', e); }
-  try { initSyntaxPreview(); refreshSyntaxPreview(); }
-  catch (e) { console.error('[settings] syntax preview failed:', e); }
 }
 function closeSettings() {
   document.getElementById('settings-modal').classList.remove('show');
 }
 
-// ── Syntax preview ─────────────────────────────────────────────
-// Lightweight read-only CodeMirror inside the Settings modal that
-// renders a sample HA YAML using the active theme's colors. Plus a
-// row of swatches showing each token category's hex value.
+// ═══════════════════════════════════════════════════════════════
+// THEME EDITOR (standalone modal)
+// ═══════════════════════════════════════════════════════════════
+// Per-theme override storage:
+//   localStorage[THEME_OVERRIDES_KEY] = {
+//     "github-light": { "--syn-atom": "#000000", … },
+//     "ha-dark":      { … },
+//   }
+// On theme change we strip any --syn-* inline styles from <html>
+// (so the previous theme's overrides don't bleed) and re-apply the
+// ones for the newly active theme.
+const THEME_OVERRIDES_KEY = 'fep-theme-overrides';
+
+const _SYN_VARS = [
+  { v: '--syn-atom',    label: 'Keys' },
+  { v: '--syn-string',  label: 'Strings' },
+  { v: '--syn-number',  label: 'Numbers' },
+  { v: '--syn-keyword', label: 'Booleans / yes-no / null' },
+  { v: '--syn-meta',    label: 'Anchors / !tags' },
+  { v: '--syn-comment', label: 'Comments' },
+  { v: '--syn-def',     label: 'Values after :' },
+];
+
+function _readThemeOverrides() {
+  try { return JSON.parse(localStorage.getItem(THEME_OVERRIDES_KEY) || '{}'); }
+  catch { return {}; }
+}
+function _writeThemeOverrides(o) {
+  try { localStorage.setItem(THEME_OVERRIDES_KEY, JSON.stringify(o)); } catch {}
+}
+
+function applyThemeOverrides() {
+  // Strip every known --syn-* inline override from <html>, then
+  // apply only the ones for the active theme. This prevents stale
+  // values from a previously-active theme leaking through.
+  const root = document.documentElement;
+  for (const t of _SYN_VARS) root.style.removeProperty(t.v);
+  const all = _readThemeOverrides();
+  const active = PREFS.theme || 'github-light';
+  const ov = all[active];
+  if (!ov) return;
+  for (const [k, v] of Object.entries(ov)) {
+    if (typeof v === 'string' && v) root.style.setProperty(k, v);
+  }
+}
+
+function setSyntaxOverride(varName, value) {
+  const all = _readThemeOverrides();
+  const active = PREFS.theme || 'github-light';
+  if (!all[active]) all[active] = {};
+  all[active][varName] = value;
+  _writeThemeOverrides(all);
+  document.documentElement.style.setProperty(varName, value);
+  if (_previewCM) _previewCM.refresh();
+  if (editor) editor.refresh();
+  if (_rightEditor) _rightEditor.refresh();
+  refreshSyntaxPreview();
+}
+
+function resetThemeOverrides() {
+  const all = _readThemeOverrides();
+  const active = PREFS.theme || 'github-light';
+  if (!all[active]) { showToast('No customisations to reset'); return; }
+  delete all[active];
+  _writeThemeOverrides(all);
+  applyThemeOverrides();
+  if (_previewCM) _previewCM.refresh();
+  if (editor) editor.refresh();
+  if (_rightEditor) _rightEditor.refresh();
+  refreshSyntaxPreview();
+  showToast('Theme colours reset to defaults');
+}
+
+// ── Modal open/close ───────────────────────────────────────────
+function openThemeEditor() {
+  const m = document.getElementById('theme-editor-modal');
+  if (!m) return;
+  m.classList.add('show');
+  // Populate the theme dropdown lazily (THEMES is built later at boot).
+  const sel = document.getElementById('te-theme-select');
+  if (sel && !sel.options.length) {
+    sel.innerHTML = THEMES.map(t =>
+      `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('');
+  }
+  if (sel) sel.value = PREFS.theme || 'github-light';
+  initSyntaxPreview();
+  refreshSyntaxPreview();
+}
+function closeThemeEditor() {
+  document.getElementById('theme-editor-modal')?.classList.remove('show');
+}
+
+// ── Preview CM + swatch render ─────────────────────────────────
 let _previewCM = null;
 
 function initSyntaxPreview() {
@@ -4681,44 +4810,73 @@ function initSyntaxPreview() {
     mode: 'yaml',
     theme: 'ha',                  // wires --syn-* via .cm-s-ha rules
     lineNumbers: false,
-    readOnly: 'nocursor',         // no cursor, no focus
+    readOnly: 'nocursor',
     indentUnit: 2,
     tabSize: 2,
     lineWrapping: false,
-    viewportMargin: Infinity,     // small doc — render all lines
+    viewportMargin: Infinity,
   });
   _previewCM.setSize('100%', 'auto');
 }
 
 function refreshSyntaxPreview() {
   if (!_previewCM) initSyntaxPreview();
-  if (_previewCM) {
-    // CSS variables changed (theme switch) — repaint the gutter/bg.
-    _previewCM.refresh();
-  }
+  if (_previewCM) _previewCM.refresh();
   const wrap = document.getElementById('syntax-preview-swatches');
   if (!wrap) return;
   const root = getComputedStyle(document.documentElement);
-  // Order matches what the user sees scanning a YAML file: keys,
-  // strings, numbers, booleans, anchors, comments, then values.
-  const tokens = [
-    { v: '--syn-atom',    label: 'Keys' },
-    { v: '--syn-string',  label: 'Strings' },
-    { v: '--syn-number',  label: 'Numbers' },
-    { v: '--syn-keyword', label: 'Booleans / yes-no / null' },
-    { v: '--syn-meta',    label: 'Anchors / !tags' },
-    { v: '--syn-comment', label: 'Comments' },
-    { v: '--syn-def',     label: 'Values after :' },
-  ];
-  wrap.innerHTML = tokens.map(t => {
+  const overrides = _readThemeOverrides()[PREFS.theme || 'github-light'] || {};
+  wrap.innerHTML = _SYN_VARS.map(t => {
     const c = (root.getPropertyValue(t.v) || '').trim() || '—';
-    return `<div class="syntax-swatch" title="${t.v}">
+    const isCustom = !!overrides[t.v];
+    return `<div class="syntax-swatch ${isCustom ? 'customised' : ''}" title="${t.v} — click to recolour" data-var="${t.v}">
       <span class="syntax-swatch-color" style="background:${c}"></span>
       <span class="syntax-swatch-label">${t.label}</span>
       <span class="syntax-swatch-hex">${c}</span>
+      <span class="syntax-swatch-dot"></span>
     </div>`;
   }).join('');
+  wrap.querySelectorAll('.syntax-swatch').forEach(el => {
+    el.addEventListener('click', () => _openColorPickerFor(el.dataset.var, el));
+  });
 }
+
+// ── Native colour picker ───────────────────────────────────────
+function _normaliseHex(c) {
+  // <input type="color"> only accepts #rrggbb. Best-effort: if c is
+  // already a hex, use it; otherwise let the picker default to black.
+  c = (c || '').trim();
+  if (/^#[0-9a-f]{6}$/i.test(c)) return c.toLowerCase();
+  if (/^#[0-9a-f]{3}$/i.test(c)) {
+    return ('#' + c[1]+c[1]+c[2]+c[2]+c[3]+c[3]).toLowerCase();
+  }
+  return '#000000';
+}
+
+function _openColorPickerFor(varName, swatchEl) {
+  const input = document.getElementById('te-color-input');
+  if (!input) return;
+  const current = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+  input.value = _normaliseHex(current);
+  // Anchor the (invisible) picker over the clicked swatch so the
+  // OS picker pops up next to it on most platforms.
+  if (swatchEl) {
+    const r = swatchEl.getBoundingClientRect();
+    input.style.left = (r.left) + 'px';
+    input.style.top  = (r.bottom + window.scrollY) + 'px';
+  }
+  input.oninput  = e => setSyntaxOverride(varName, e.target.value);
+  input.onchange = e => setSyntaxOverride(varName, e.target.value);
+  input.click();
+}
+
+// ── Wire DOM hooks once ────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('te-reset')?.addEventListener('click', resetThemeOverrides);
+  document.getElementById('theme-editor-modal')?.addEventListener('click', e => {
+    if (e.target.id === 'theme-editor-modal') closeThemeEditor();
+  });
+});
 
 function buildSettingsUI() {
   // Theme dropdown — build once
@@ -5861,6 +6019,8 @@ const COMMANDS = [
   { cat: 'View',   title: 'Font size: 15',                                       run: () => setFontSize(15) },
   { cat: 'View',   title: 'Font size: 17',                                       run: () => setFontSize(17) },
   { cat: 'View',   title: 'Open Settings…',          shortcut: '',               run: () => openSettings() },
+  { cat: 'Theme',  title: 'Open Theme editor…',                                    run: () => openThemeEditor() },
+  { cat: 'Theme',  title: 'Reset current theme colours to defaults',                run: () => resetThemeOverrides() },
   { cat: 'View',   title: 'Show Help & shortcuts',   shortcut: 'F1',             run: () => openHelp() },
   { cat: 'View',   title: 'Show Logs (notification history)', shortcut: 'F12',   run: () => openLogs() },
   { cat: 'Theme',  title: 'GitHub Light (default)',                              run: () => setTheme('github-light') },
