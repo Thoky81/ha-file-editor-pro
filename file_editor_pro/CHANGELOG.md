@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.11.25 — Theme editor preview: scrollable + every token recolours
+
+Plus three tokeniser fixes from the same release.
+
+Three tokeniser-related issues meant some swatches weren't actually visible in the preview, even though the underlying CSS variable was being applied correctly to real files.
+
+- **Numbers and booleans on commented lines weren't being tokenised.** CodeMirror's YAML mode requires the *value* to be at end-of-line (its number regex is `^\s*-?[0-9\.\,]+\s?$`), so `brightness: 200            # ← 200 is a NUMBER` returned no class for `200`. Moved every inline note above its line so values reach end-of-line cleanly. Numbers and booleans now respond to swatch changes.
+- **`offset: -00:30:00` is not a number to YAML mode** — the colons defeat the regex. Removed; the line was misleading.
+- **6-level indent + 6-deep bracket nesting in both previews.** Previously the preview only went 3 levels deep, so changing `--rb-3..5` or `--bp-3..5` had nothing to recolour. Now both YAML and Python contain `[1, [2, [3, [4, [5, [6]]]]]]` and matching indent depth, so every rainbow + bracket-pair swatch shows visible feedback.
+- **Identifiers swatch now displays its true colour.** `--syn-variable` has no `:root` default — the CSS rule resolves it via `var(--syn-variable, var(--text-primary))` at paint time, but the swatch's `getPropertyValue('--syn-variable')` returned empty and was falling back to `#000000`. Added a fallback map so the swatch reads `--text-primary` when its primary variable is unset.
+- **Each preview frame caps at 240 px and CodeMirror handles its own scrollbar** when the content overflows. The YAML preview's bottom no longer cuts off; long previews scroll inside the frame, so the swatches below remain on screen.
+
 ## 1.11.24 — Theme editor: scrollable body so the YAML preview is fully visible
 
 The Theme editor body got tall enough that its bottom (the YAML preview's last lines, plus the Python preview, plus the swatches below) was clipping off-screen. The modal is `display:flex; flex-direction:column; max-height:88vh`, but `.te-body` was missing `flex:1; min-height:0` so it didn't bound itself to the modal height — meaning `overflow-y:auto` on the body never engaged. Added those two declarations; the body scrolls properly now and everything is reachable.

@@ -646,7 +646,10 @@
     .te-help{font-size:11px;color:var(--text-muted)}
     .te-preview-frame{border:1px solid var(--border-light);border-radius:6px;overflow:hidden;background:var(--bg-darkest);margin-bottom:8px}
     .te-preview-label{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;padding:6px 10px;background:var(--bg-dark);border-bottom:1px solid var(--border)}
-    .te-preview-frame .CodeMirror{height:auto;font-family:var(--font-mono);font-size:12px;line-height:1.55;background:var(--bg-darkest) !important;color:var(--text-primary) !important;padding:6px 0}
+    /* CodeMirror's fromTextArea sets an inline height; we override it
+       in JS via setSize(...). Frame caps the preview and lets CM
+       scroll internally for long samples. */
+    .te-preview-frame .CodeMirror{font-family:var(--font-mono);font-size:12px;line-height:1.55;background:var(--bg-darkest) !important;color:var(--text-primary) !important;padding:6px 0}
     .te-preview-frame .CodeMirror-lines{padding:6px 0}
     .te-preview-frame .CodeMirror-cursor{display:none !important}
     .syntax-swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px}
@@ -1249,42 +1252,62 @@
       </div>
 
       <div class="te-preview-frame">
-        <div class="te-preview-label">YAML — automations &amp; configs</div>
-        <textarea id="syntax-preview-ta"># ← THIS LINE is a COMMENT
-automation:                          # ← "automation" is a KEY (colon = PUNCTUATION)
-  - alias: "Sunset lights"           # ← quoted text is a STRING
-    trigger:
-      platform: sun                   # ← "sun" plain value (editor text colour)
-      offset: -00:30:00
-      data:
-        nested:
-          deep:
-            list: [1, [2, [3, 4]]]    # ← brackets nest → BRACKET PAIR colours
-    condition: &amp;workdays              # ← &amp;workdays is an ANCHOR
+        <div class="te-preview-label">YAML — 6 indent levels + 6 bracket depths</div>
+        <textarea id="syntax-preview-ta"># Sample HA automation — every YAML token type below.
+# (Trailing inline comments break number tokenisation in CM's
+# yaml mode, so notes are placed above the line they describe.)
+
+automation:                            # KEY: "automation"
+  # the next line shows a quoted STRING value
+  - alias: "Sunset lights"
+
+    # &workdays is an ANCHOR (cm-variable-2 → --syn-def)
+    condition: &amp;workdays
+
+      # PUNCTUATION cm-meta: : - , [ ]
       weekday: [mon, tue, wed]
+
+      # 6-level indent + 6-deep brackets — every --rb-N + --bp-N visible
+      data:
+        deep:
+          deeper:
+            even_deeper:
+              list: [1, [2, [3, [4, [5, [6]]]]]]
+
     action:
       service: light.turn_on
+
+      # NUMBERS and BOOLEANS — kept on their own lines so YAML mode
+      # tokenises them (it requires nothing after the value).
       data:
-        brightness: 200               # ← 200 is a NUMBER
-        transition: 2.5               # ← 2.5 is a NUMBER (float)
-        enabled: true                 # ← true is a BOOLEAN
+        brightness: 200
+        transition: 2.5
+        enabled: true
         flash: false
-    use: *workdays                    # ← *workdays is an ALIAS</textarea>
+
+    # *workdays is an ALIAS — same colour as anchors
+    use: *workdays</textarea>
       </div>
 
       <div class="te-preview-frame">
-        <div class="te-preview-label">Python — custom components &amp; scripts</div>
-        <textarea id="syntax-preview-py-ta"># ← Comment in a Python file
+        <div class="te-preview-label">Python — identifiers, built-ins, 6-deep brackets</div>
+        <textarea id="syntax-preview-py-ta"># Sample Python file — covers IDENTIFIERS + BUILT-INS swatches.
 import asyncio
 
-DEFAULT_NAME = "sensor"               # ← DEFAULT_NAME is an IDENTIFIER
-TIMEOUT = 30                          # ← 30 is a NUMBER
+DEFAULT_NAME = "sensor"
+TIMEOUT = 30
 
-def setup(hass, config):              # ← def is a KEYWORD; setup, hass, config are IDENTIFIERS
-    items = [1, 2, [3, 4]]            # ← print/len are BUILT-INS; brackets nest
-    print(len(items))
-    if items and DEFAULT_NAME == "sensor":
-        return True                   # ← True is a BOOLEAN; return is a KEYWORD
+def setup(hass, config):
+    # 6-level deep brackets demo every --bp-N
+    items = [1, [2, [3, [4, [5, [6]]]]]]
+    if items:
+        for x in items:
+            while x &gt; 0:
+                if x % 2 == 0:
+                    # print, len, str are BUILT-INS
+                    print(len(items), str(x))
+                else:
+                    return True
     return False</textarea>
       </div>
 
@@ -4917,6 +4940,21 @@ function _attachPreviewOverlays(cm) {
   } catch (e) { console.warn('[theme preview] overlay attach failed:', e); }
 }
 
+// Each preview is capped to this many pixels — CodeMirror falls back
+// to its built-in vertical scrollbar when the content exceeds the cap,
+// so the swatches below stay reachable without making the modal huge.
+const _PREVIEW_HEIGHT_PX = 240;
+
+function _sizePreview(cm) {
+  if (!cm) return;
+  // Fit-to-content up to the cap. lineHeight × line count gives the
+  // natural height; clamp at _PREVIEW_HEIGHT_PX so longer samples scroll.
+  const wrap = cm.getWrapperElement();
+  const lh = parseFloat(getComputedStyle(wrap).lineHeight) || 18;
+  const natural = Math.ceil(cm.lineCount() * lh) + 16;   // padding
+  cm.setSize('100%', Math.min(_PREVIEW_HEIGHT_PX, natural));
+}
+
 function initSyntaxPreview() {
   if (typeof CodeMirror === 'undefined') return;
   if (!_previewCM) {
@@ -4930,10 +4968,9 @@ function initSyntaxPreview() {
         indentUnit: 2,
         tabSize: 2,
         lineWrapping: false,
-        viewportMargin: Infinity,
       });
-      _previewCM.setSize('100%', 'auto');
       _attachPreviewOverlays(_previewCM);
+      _sizePreview(_previewCM);
     }
   }
   if (!_previewPyCM) {
@@ -4947,10 +4984,9 @@ function initSyntaxPreview() {
         indentUnit: 4,
         tabSize: 4,
         lineWrapping: false,
-        viewportMargin: Infinity,
       });
-      _previewPyCM.setSize('100%', 'auto');
       _attachPreviewOverlays(_previewPyCM);
+      _sizePreview(_previewPyCM);
     }
   }
 }
@@ -4966,12 +5002,23 @@ function refreshSyntaxPreview() {
   // Group swatches by section and emit a header before each group.
   let currentSection = null;
   const html = [];
+  // CSS rules for some tokens (currently just cm-variable) intentionally
+  // declare `var(--syn-X, var(--text-primary))` — the fallback resolves
+  // at paint time but getPropertyValue('--syn-X') returns empty when
+  // unset, so the swatch would mislead users by showing black. Map
+  // each such variable to its fallback source so the swatch reads
+  // the actual rendered colour.
+  const _FALLBACK_FROM = { '--syn-variable': '--text-primary' };
   for (const t of _SYN_VARS) {
     if (t.section && t.section !== currentSection) {
       currentSection = t.section;
       html.push(`<div class="syntax-section-title">${escapeHtml(currentSection)}</div>`);
     }
-    const c = (root.getPropertyValue(t.v) || '').trim() || '#000000';
+    let c = (root.getPropertyValue(t.v) || '').trim();
+    if (!c && _FALLBACK_FROM[t.v]) {
+      c = (root.getPropertyValue(_FALLBACK_FROM[t.v]) || '').trim();
+    }
+    c = c || '#000000';
     const isCustom = !!overrides[t.v];
     html.push(`<div class="syntax-swatch ${isCustom ? 'customised' : ''}" data-var="${t.v}">
       <span class="syntax-swatch-color" style="background:${c}" title="${t.v} — click to open colour picker"></span>
