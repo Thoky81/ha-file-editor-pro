@@ -1,5 +1,5 @@
 name: File Editor Pro
-version: "1.11.31"
+version: "1.11.32"
 slug: file_editor_pro
 description: Modern multi-tab editor for Home Assistant config (YAML, Python, JSON) with real git, upload/download, HA restart/reload, config check, YAML validation and cross-file search.
 url: https://github.com/Thoky81/ha-file-editor-pro

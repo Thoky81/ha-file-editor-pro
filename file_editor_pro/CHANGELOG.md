@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.11.32 — Smarter Jinja validator + fix hints in the errors modal
+
+Two false-positive sources fixed plus inline "how to fix it" suggestions in the Jinja errors panel.
+
+### False-positive fixes
+- **Skip expressions that reference HA runtime context vars** — `trigger`, `this`, `wait`, `repeat`, `value`, `value_json`, `event`. These only exist inside their parent scope (trigger handler, `repeat:` block, `wait_template`, template entity self-reference, MQTT payload, event handler). Sending `{{ repeat.item }}` to `/api/template` standalone always returned *"'repeat' is undefined"*. Now silently skipped.
+- **Retry on YAML-escaped quotes.** When a Jinja expression sits inside a single-quoted YAML scalar (`'…'`), single quotes inside double up to `''` per YAML spec — the raw text is `selectattr(''state'', ''eq'', ''on'')` even though the rendered template the user wrote is `selectattr('state', 'eq', 'on')`. The validator now retries the failing template with `''` → `'` unescaped; if that succeeds, no error is reported.
+
+### Fix hints in the Jinja errors modal
+Each error now shows a `Fix` line below it with a tailored suggestion when the message matches a known pattern:
+
+- *"X is undefined"* — explains scope, calls out HA-only vars by name when applicable.
+- *"expected token / unexpected"* with `''` in the body — explains YAML escape and suggests block-scalar (`>` / `|`) or double-quoted YAML.
+- *"no filter / test named X"* — suggests checking common HA template typos.
+
+Hints render with monospace inline code spans for symbols, and a subtle blue accent strip on the left so they're visually distinct from the raw error.
+
 ## 1.11.31 — Tab bar: hover only expands tabs that are actually squeezed
 
 Two related fixes for the tab bar.

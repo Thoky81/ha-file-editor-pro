@@ -549,6 +549,11 @@
     .logs-row.info .lvl{color:var(--accent-blue)}
     .logs-row.error .lvl{color:var(--accent-red)}
     .logs-row .msg{color:var(--text-primary);font-size:12px;user-select:text;-webkit-user-select:text}
+    /* Inline fix hint shown below a Jinja error message */
+    .jinja-hint-row{margin-top:6px;padding:6px 8px;background:color-mix(in srgb, var(--accent) 7%, transparent);border-left:2px solid var(--accent);border-radius:3px;display:flex;gap:8px;align-items:flex-start;font-family:var(--font-ui);font-size:11.5px;line-height:1.45;color:var(--text-secondary)}
+    .jinja-hint-label{font-size:9.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);padding-top:1px;flex-shrink:0}
+    .jinja-hint-text{flex:1}
+    .jinja-hint-code{font-family:var(--font-mono);font-size:11px;padding:1px 4px;border-radius:3px;background:var(--bg-darkest);color:var(--text-primary);border:1px solid var(--border-light)}
     .logs-empty{padding:30px;text-align:center;color:var(--text-muted);font-size:12px;font-family:var(--font-ui)}
     .logs-badge{display:none;background:var(--accent-red);color:#fff;border-radius:8px;padding:0 5px;font-family:var(--font-mono);font-size:10px;margin-left:2px}
 
@@ -3023,6 +3028,44 @@ function _fileHasJinjaContext(text) {
   return _JINJA_STATEMENT_RX.test(text);
 }
 
+// HA template runtime variables. They only exist within their parent
+// scope (trigger handler, repeat block, wait result, template entity
+// self-reference, MQTT payload, event handler), so an expression that
+// references one cannot be validated standalone — /api/template would
+// always return "'<name>' is undefined".
+const _HA_CONTEXT_VARS = ['trigger', 'this', 'wait', 'repeat', 'value', 'value_json', 'event'];
+const _HA_CONTEXT_RX = new RegExp(`\\b(?:${_HA_CONTEXT_VARS.join('|')})\\b`);
+
+function _usesHAContextVar(body) {
+  return _HA_CONTEXT_RX.test(body);
+}
+
+// Build a human-readable hint for known error patterns. Returns null
+// when we don't have a useful suggestion (the raw error stands alone).
+function jinjaErrorHint(message, body) {
+  const m = message || '';
+  // 1) Undefined-variable hints, with extra context for HA-only vars
+  let mm = m.match(/'([\w]+)'\s+is\s+undefined/i);
+  if (mm) {
+    const name = mm[1];
+    if (_HA_CONTEXT_VARS.includes(name)) {
+      return `\`${name}\` is an HA runtime variable — only defined inside its parent scope (trigger / repeat / wait / template entity / MQTT payload). Templates that use it can only be tested with HA's *Developer Tools → Template* in the right context.`;
+    }
+    return `\`${name}\` is not in scope. Check the spelling, or ensure the template is rendered in a context where it's defined.`;
+  }
+  // 2) Doubled single quotes (YAML-escaped) — the validator now retries
+  // with unescaping, so this should rarely surface; still useful as a hint.
+  if (/expected token|unexpected/i.test(m) && /''/.test(body)) {
+    return `Looks like YAML quote escaping. When a Jinja expression sits inside a single-quoted YAML scalar (\`'…'\`), each \`'\` inside doubles to \`''\`. Either move the expression to a \`>\`/\`|\` block scalar, or wrap the YAML value in double quotes \`"…"\`.`;
+  }
+  // 3) Generic 'no filter named X' / 'no test named X'
+  mm = m.match(/no\s+(filter|test)\s+named\s+'?(\w+)'?/i);
+  if (mm) {
+    return `Unknown ${mm[1]} \`${mm[2]}\`. Check Jinja docs or HA template docs — common typos: \`states\` (function) vs \`state_attr\`, \`is_state\` vs \`states\`.`;
+  }
+  return null;
+}
+
 function scheduleJinjaValidation() {
   clearTimeout(_jinjaDebounce);
   _jinjaDebounce = setTimeout(validateJinjaNow, 1500);
@@ -3065,20 +3108,39 @@ async function validateJinjaNow() {
   const errors = [];
   for (const e of exprs) {
     if (signal.aborted) return;
+
+    // Skip expressions that reference HA-only runtime context vars —
+    // they can never validate standalone (would always be "undefined").
+    if (_usesHAContextVar(e.body)) continue;
+
     if (!seen.has(e.body)) {
+      let msg = '';
       try {
-        const r = await fetch(API.url('/api/ha/template'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ template: e.body }),
-          signal,
+        // First attempt: as-is.
+        let r = await fetch(API.url('/api/ha/template'), {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ template: e.body }), signal,
         });
-        const data = await r.json();
-        seen.set(e.body, data.ok ? '' : (data.error || 'Template error').split('\n')[0]);
+        let data = await r.json();
+        // Second attempt: if the first failed and the body has doubled
+        // single quotes, retry with YAML escape undone (`''` → `'`).
+        // This catches expressions that live inside a single-quoted
+        // YAML scalar — the raw text contains the YAML escaping but
+        // the rendered template doesn't.
+        if (!data.ok && e.body.includes("''")) {
+          const unesc = e.body.replace(/''/g, "'");
+          r = await fetch(API.url('/api/ha/template'), {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ template: unesc }), signal,
+          });
+          data = await r.json();
+        }
+        msg = data.ok ? '' : (data.error || 'Template error').split('\n')[0];
       } catch (err) {
         if (err.name === 'AbortError') return;
-        seen.set(e.body, '');   // network error — don't flag the expression
+        msg = '';   // network error — don't flag the expression
       }
+      seen.set(e.body, msg);
     }
     const msg = seen.get(e.body);
     if (msg) errors.push({ from: e.from, to: e.to, message: msg, severity: 'error', body: e.body });
@@ -3151,6 +3213,14 @@ function revalidateJinja() {
   validateJinjaNow().then(() => renderJinjaErrors());
 }
 
+// Tiny inline-code renderer: escapes the input, then converts
+// backtick-delimited fragments to <code> spans. Used for the hint
+// strings produced by jinjaErrorHint().
+function _renderInlineCode(s) {
+  const esc = escapeHtml(String(s || ''));
+  return esc.replace(/`([^`]+)`/g, '<code class="jinja-hint-code">$1</code>');
+}
+
 function renderJinjaErrors() {
   const body = document.getElementById('jinja-errors-body');
   if (!body) return;
@@ -3162,11 +3232,22 @@ function renderJinjaErrors() {
   // to the start of the offending expression when clicked.
   const sorted = _jinjaCache.slice().sort((a, b) =>
     a.from.line - b.from.line || a.from.ch - b.from.ch);
-  body.innerHTML = sorted.map((e, i) => `
-    <div class="logs-row error" data-i="${i}" style="grid-template-columns:90px 1fr;cursor:pointer">
+  body.innerHTML = sorted.map((e, i) => {
+    const hint = jinjaErrorHint(e.message, e.body || '');
+    const snippet = e.body ? `<div style="color:var(--text-muted);font-size:11px;margin-top:3px">${escapeHtml(e.body.length > 140 ? e.body.slice(0, 140) + '…' : e.body)}</div>` : '';
+    // Hint rendered with a "Fix:" prefix and minimal markdown for inline
+    // code (`x` → <code>x</code>) so suggestions read clearly.
+    const hintHtml = hint
+      ? `<div class="jinja-hint-row">
+           <span class="jinja-hint-label">Fix</span>
+           <span class="jinja-hint-text">${_renderInlineCode(hint)}</span>
+         </div>`
+      : '';
+    return `<div class="logs-row error" data-i="${i}" style="grid-template-columns:90px 1fr;cursor:pointer">
       <span class="ts">Ln ${e.from.line + 1}:${e.from.ch + 1}</span>
-      <span class="msg">${escapeHtml(e.message)}${e.body ? `<div style="color:var(--text-muted);font-size:11px;margin-top:3px">${escapeHtml(e.body.length > 140 ? e.body.slice(0, 140) + '…' : e.body)}</div>` : ''}</span>
-    </div>`).join('');
+      <span class="msg">${escapeHtml(e.message)}${snippet}${hintHtml}</span>
+    </div>`;
+  }).join('');
   body.querySelectorAll('.logs-row').forEach(row => {
     row.addEventListener('click', () => {
       const e = sorted[Number(row.dataset.i)];
