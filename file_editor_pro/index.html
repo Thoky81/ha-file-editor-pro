@@ -385,6 +385,26 @@
     .cm-s-ha .CodeMirror-cursor{border-left-color:var(--text-primary) !important}
     .cm-s-ha .CodeMirror-activeline-background{background:var(--accent-dim) !important}
     .cm-s-ha .CodeMirror-linenumber{color:var(--text-muted) !important}
+    /* Folded-line indicator: when a fold collapses below this line,
+       its number tints in the accent colour and gets a small ▸ glyph
+       so the collapse is visible even at a glance. Class is added by
+       attachFoldIndicator() in JS via fold/unfold events. The two
+       selectors cover both possible DOM placements (gutter wrapper vs
+       linenumber elt) since CodeMirror moves the class location
+       depending on the line's gutter setup. */
+    .cm-s-ha .CodeMirror-gutter-wrapper.cm-line-folded .CodeMirror-linenumber,
+    .cm-s-ha .CodeMirror-linenumber.cm-line-folded{
+      color:var(--accent) !important;
+      font-weight:600;
+    }
+    .cm-s-ha .CodeMirror-gutter-wrapper.cm-line-folded .CodeMirror-linenumber::after,
+    .cm-s-ha .CodeMirror-linenumber.cm-line-folded::after{
+      content:'▸';
+      margin-left:3px;
+      font-size:9px;
+      color:var(--accent);
+      vertical-align:middle;
+    }
     .cm-s-ha .CodeMirror-matchingbracket{color:var(--accent) !important;border-bottom:1px solid var(--accent)}
 
     /* ── STATUS BAR ── */
@@ -2249,6 +2269,7 @@ function initEditor() {
   });
 
   editor.on('scroll', () => { updateStickyScroll(); updateMinimapViewport(); });
+  attachFoldIndicator(editor);
   let _outlineDebounce = null;
   editor.on('change', () => {
     if (!activeTabId) return;
@@ -5370,6 +5391,18 @@ function renderMinimap() {
   }
 }
 
+// ── FOLD INDICATOR ON LINE NUMBERS ─────────────────────────────
+// When a region is folded, the line where the fold starts gets the
+// `cm-line-folded` class on its gutter wrapper, which CSS uses to tint
+// the line number and tag it with a small ▸ glyph. This is in addition
+// to the foldgutter column's own marker — folded sections are visible
+// even when the foldgutter is partially hidden.
+function attachFoldIndicator(cm) {
+  if (!cm) return;
+  cm.on('fold',   (cm, from) => cm.addLineClass(from.line,    'gutter', 'cm-line-folded'));
+  cm.on('unfold', (cm, from) => cm.removeLineClass(from.line, 'gutter', 'cm-line-folded'));
+}
+
 function attachMinimapClick() {
   for (const p of _minimapPanes()) {
     const inner = document.getElementById(p.inner);
@@ -6219,6 +6252,7 @@ async function openFileRight(path) {
     });
     _rightEditor.on('scroll', () => { if (PREFS.minimap) updateMinimapViewport(); });
     attachMinimapClick();
+    attachFoldIndicator(_rightEditor);
   }
   _rightEditor.setValue(file.content || '');
   _rightEditor.setOption('mode', file.mode);

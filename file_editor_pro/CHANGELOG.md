@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.11.35 — Folded sections: line numbers tint + show a ▸ glyph
+
+When you fold a region (block scalar, automation, function), the line where the fold collapses now shows its number in the accent colour and gets a small `▸` glyph after it — so collapsed sections are visible at a glance even when the foldgutter column is partially clipped or you're scrolling fast.
+
+- New `attachFoldIndicator(cm)` listens for CodeMirror's `fold` and `unfold` events and toggles a `cm-line-folded` class on that line's gutter via `cm.addLineClass`.
+- Two CSS selectors cover both possible class placements (gutter wrapper vs. linenumber elt) since CodeMirror's line layout differs slightly per gutter configuration.
+- Wired on both the main editor and the right pane editor, so split view gets the same indicator.
+
 ## 1.11.34 — Jinja autofix with comment-backup of the original line
 
 The Jinja errors modal now offers a one-click **Apply autofix** button on rows whose body has doubled single quotes (`''`) — the YAML escape that makes long Jinja templates hard to read. Applying the fix:
