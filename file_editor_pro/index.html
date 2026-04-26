@@ -274,15 +274,21 @@
     .tab{
       height:32px;display:flex;align-items:center;gap:6px;padding:0 10px;
       border-right:1px solid var(--border);cursor:pointer;white-space:nowrap;
-      flex:1 1 140px;min-width:42px;max-width:180px;overflow:hidden;
+      /* `0 1 auto` = don't grow past the filename, can shrink when
+         the bar runs out of space. The .tab-empty spacer (flex:1)
+         absorbs the leftover when there's room. */
+      flex:0 1 auto;min-width:42px;max-width:180px;overflow:hidden;
       font-family:var(--font-mono);font-size:12px;color:var(--text-muted);
       background:var(--bg-dark);position:relative;user-select:none;
       transition:max-width .18s ease, min-width .18s ease,
                  flex-basis .18s ease, background .1s, color .1s
     }
     .tab > span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
-    .tab:hover{color:var(--text-secondary);background:var(--bg-mid);
-               max-width:320px;min-width:140px;z-index:2}
+    /* Hover only changes colour by default — width is only forced when
+       the tab is actually being squeezed (label truncated). JS adds
+       .is-squeezed after render based on scrollWidth > clientWidth. */
+    .tab:hover{color:var(--text-secondary);background:var(--bg-mid);z-index:2}
+    .tab.is-squeezed:hover{max-width:320px;min-width:140px}
     .tab.active{color:var(--text-primary);background:var(--bg-darkest);
                 border-bottom:1px solid var(--bg-darkest);margin-bottom:-1px;
                 max-width:360px;min-width:140px;flex:0 1 auto}
@@ -2799,6 +2805,31 @@ function renderTabs() {
     if (activeEl && activeEl.scrollIntoView) {
       activeEl.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     }
+  }
+
+  // Mark which tabs are actually squeezed so the hover-expand only
+  // fires on those. Without this, hovering any tab triggers a layout
+  // change even when the filename is already fully visible.
+  _markSqueezedTabs();
+}
+
+let _squeezeRO = null;
+function _markSqueezedTabs() {
+  const bar = document.getElementById('tab-bar');
+  if (!bar) return;
+  bar.querySelectorAll('.tab').forEach(el => {
+    const span = el.querySelector('span');
+    if (!span) return;
+    // Truncated when the filename's natural width exceeds what the
+    // span renders into. 1px slack avoids subpixel false positives.
+    const squeezed = span.scrollWidth - span.clientWidth > 1;
+    el.classList.toggle('is-squeezed', squeezed);
+  });
+  // Re-mark on resize (sidebar drag, window size). One observer for
+  // the whole bar; don't keep stacking them on every render.
+  if (!_squeezeRO && typeof ResizeObserver !== 'undefined') {
+    _squeezeRO = new ResizeObserver(() => _markSqueezedTabs());
+    _squeezeRO.observe(bar);
   }
 }
 

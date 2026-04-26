@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.11.31 — Tab bar: hover only expands tabs that are actually squeezed
+
+Two related fixes for the tab bar.
+
+- **Hover no longer enlarges tabs that already fit.** Previously every `:hover` widened a tab to 320 px regardless of whether the filename was truncated, so hovering a short-named tab caused a needless layout reflow. JS now marks each tab with `.is-squeezed` only when its name actually overflows (`scrollWidth > clientWidth`), and the hover-to-expand rule applies only to those. A single `ResizeObserver` on the tab bar re-marks when sidebar/window size changes.
+- **Tabs no longer grow wider than their filename.** The flex shorthand was `1 1 140px` which made tabs *grow* to fill empty space — even with three tabs open, each ended up far wider than its name. Changed to `0 1 auto`, so tabs are content-sized at most (capped at 180 px) and the existing `.tab-empty` spacer absorbs the leftover space. Squeeze-on-overflow still works because `flex-shrink: 1` is preserved.
+
 ## 1.11.30 — Upload overwrite uses the in-app confirm dialog
 
 The "file already exists" prompt during uploads now uses the same styled `.confirm-overlay` modal as the delete and unsaved-changes dialogs, instead of `window.confirm()`. Matches the rest of the UI and adds a couple of niceties:
