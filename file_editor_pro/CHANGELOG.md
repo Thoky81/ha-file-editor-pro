@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.11.33 — Jinja: notes vs errors + always-fresh status bar
+
+Two regressions from 1.11.32 fixed.
+
+- **Context-var expressions used to silently disappear** — `{{ repeat.item }}` and `{{ trigger.foo }}` were being skipped entirely after 1.11.32 introduced the runtime-context-var skip. They now show as **info notes** (blue tag, blue line-number) in the Jinja errors modal alongside any real errors, with a hint explaining that they can only be tested in HA's Developer Tools → Template with the right context. So you still see them.
+- **Status-bar count would get stuck.** The overwrite regex required the existing text to start with `Valid YAML`, `–`, or `Jinja:`. Once it said `5 Jinja errors`, it never updated — even if the count changed or dropped to zero. Refactored to always overwrite unless a YAML parse error is on display (those start with `Line N:` and take priority). The status bar also stays clickable when there are notes-only.
+- New status-bar formats: `3 Jinja errors`, `3 Jinja errors · 2 notes`, `2 Jinja notes`, or `Valid YAML`.
+- Each row in the errors modal now starts with a small `error` or `note` tag so the two are distinguishable at a glance.
+
 ## 1.11.32 — Smarter Jinja validator + fix hints in the errors modal
 
 Two false-positive sources fixed plus inline "how to fix it" suggestions in the Jinja errors panel.

@@ -554,6 +554,11 @@
     .jinja-hint-label{font-size:9.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);padding-top:1px;flex-shrink:0}
     .jinja-hint-text{flex:1}
     .jinja-hint-code{font-family:var(--font-mono);font-size:11px;padding:1px 4px;border-radius:3px;background:var(--bg-darkest);color:var(--text-primary);border:1px solid var(--border-light)}
+    /* Severity tag prefix on each error/note row */
+    .jinja-sev-tag{display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:1px 5px;border-radius:3px;margin-right:6px;vertical-align:middle}
+    .jinja-sev-tag.error{background:color-mix(in srgb, var(--accent-red) 18%, transparent);color:var(--accent-red);border:1px solid color-mix(in srgb, var(--accent-red) 35%, transparent)}
+    .jinja-sev-tag.info{background:color-mix(in srgb, var(--accent-blue) 18%, transparent);color:var(--accent-blue);border:1px solid color-mix(in srgb, var(--accent-blue) 35%, transparent)}
+    .logs-row.info .ts{color:var(--accent-blue)}
     .logs-empty{padding:30px;text-align:center;color:var(--text-muted);font-size:12px;font-family:var(--font-ui)}
     .logs-badge{display:none;background:var(--accent-red);color:#fff;border-radius:8px;padding:0 5px;font-family:var(--font-mono);font-size:10px;margin-left:2px}
 
@@ -3105,13 +3110,24 @@ async function validateJinjaNow() {
   const signal = _jinjaAbort.signal;
 
   const seen = new Map();   // body → error message ("" = valid)
-  const errors = [];
+  const findings = [];
   for (const e of exprs) {
     if (signal.aborted) return;
 
-    // Skip expressions that reference HA-only runtime context vars —
-    // they can never validate standalone (would always be "undefined").
-    if (_usesHAContextVar(e.body)) continue;
+    // Expressions that reference HA-only runtime context vars are
+    // surfaced as "notes" (severity=info) with an explanation, rather
+    // than silently skipped. They can never validate standalone, so we
+    // don't fire a request — the note explains why.
+    if (_usesHAContextVar(e.body)) {
+      const used = _HA_CONTEXT_VARS.find(v => new RegExp(`\\b${v}\\b`).test(e.body));
+      findings.push({
+        from: e.from, to: e.to,
+        message: `Uses '${used}' (HA runtime context) — cannot be validated standalone.`,
+        severity: 'info',
+        body: e.body,
+      });
+      continue;
+    }
 
     if (!seen.has(e.body)) {
       let msg = '';
@@ -3124,9 +3140,6 @@ async function validateJinjaNow() {
         let data = await r.json();
         // Second attempt: if the first failed and the body has doubled
         // single quotes, retry with YAML escape undone (`''` → `'`).
-        // This catches expressions that live inside a single-quoted
-        // YAML scalar — the raw text contains the YAML escaping but
-        // the rendered template doesn't.
         if (!data.ok && e.body.includes("''")) {
           const unesc = e.body.replace(/''/g, "'");
           r = await fetch(API.url('/api/ha/template'), {
@@ -3143,59 +3156,71 @@ async function validateJinjaNow() {
       seen.set(e.body, msg);
     }
     const msg = seen.get(e.body);
-    if (msg) errors.push({ from: e.from, to: e.to, message: msg, severity: 'error', body: e.body });
+    if (msg) findings.push({
+      from: e.from, to: e.to, message: msg, severity: 'error', body: e.body,
+    });
   }
   _jinjaAbort = null;
-  _jinjaCache = errors;
+  _jinjaCache = findings;
   editor.performLint?.();
-  updateJinjaStatus(errors.length);
+  const errN  = findings.filter(f => f.severity === 'error').length;
+  const infoN = findings.filter(f => f.severity === 'info').length;
+  updateJinjaStatus(errN, infoN);
 }
 
-function updateJinjaStatus(n, state) {
-  // Piggy-back on the existing YAML status item: if Jinja errors
-  // exist and YAML is valid, surface the count there instead.
+function updateJinjaStatus(errN, infoN, state) {
+  // Piggy-back on the existing YAML status item. We always overwrite
+  // unless a YAML parse error is currently displayed (those start with
+  // "Line N:" and take priority). Previous versions of this function
+  // had a too-strict regex that silently no-op'd when the count
+  // changed — so once the bar said "3 Jinja errors" it never updated.
   const errTxt = document.getElementById('status-errors-text');
   const errEl  = document.getElementById('status-errors');
   if (!errTxt || !errEl) return;
   const cur = errTxt.textContent || '';
+  if (cur.startsWith('Line ')) return;   // YAML errors take priority
 
   if (state === 'skipped') {
-    // Only overwrite if nothing more important is showing.
-    if (/^Valid YAML|^–/.test(cur)) {
-      errTxt.textContent = 'Jinja: skipped (complex template)';
-      errEl.className = 'status-item status-clickable';
-      errEl.title = fmtInline(
-        'File contains control-flow or scope-introducing Jinja tags ' +
-        '({% if %}, {% for %}, {% macro %}, {% set x = … %}) that cannot ' +
-        'be validated in isolation. Use Ctrl+Alt+J to preview a template, ' +
-        'or Check Config for HA\'s full validation.'
-      );
-      errEl.onclick = () => showToast(fmtInline(
-        'Complex template — use Ctrl+Alt+J or Check Config to validate'
-      ));
-    }
+    errTxt.textContent = 'Jinja: skipped (complex template)';
+    errEl.className = 'status-item status-clickable';
+    errEl.title = fmtInline(
+      'File contains control-flow or scope-introducing Jinja tags ' +
+      '({% if %}, {% for %}, {% macro %}, {% set x = … %}) that cannot ' +
+      'be validated in isolation. Use Ctrl+Alt+J to preview a template, ' +
+      'or Check Config for HA\'s full validation.'
+    );
+    errEl.onclick = () => showToast(fmtInline(
+      'Complex template — use Ctrl+Alt+J or Check Config to validate'
+    ));
     return;
   }
 
-  if (!n) {
-    // Clear any leftover Jinja message if we now have no errors.
-    if (/^\d+ Jinja error|^Jinja: skipped/.test(cur)) {
-      errTxt.textContent = 'Valid YAML';
-      errEl.className = 'status-item status-ok-state';
-      errEl.title = '';
-      errEl.onclick = null;
-    }
+  // Backward-compat: callers that used to pass (n) only.
+  if (typeof infoN !== 'number') infoN = 0;
+  errN  = errN  || 0;
+  infoN = infoN || 0;
+
+  if (!errN && !infoN) {
+    errTxt.textContent = 'Valid YAML';
+    errEl.className = 'status-item status-ok-state';
+    errEl.title = '';
+    errEl.onclick = null;
     return;
   }
 
-  if (/^Valid YAML|^–|^Jinja:/.test(cur)) {
-    errTxt.textContent = `${n} Jinja error${n > 1 ? 's' : ''}`;
-    errEl.className = 'status-item status-error-state status-clickable';
-    errEl.title = `Click to see the ${n === 1 ? 'error' : 'errors'}`;
-    // Wire the click — previously the item said "status-clickable" but
-    // had no handler, so clicking it did nothing.
-    errEl.onclick = openJinjaErrorsModal;
+  let label, cls;
+  if (errN > 0) {
+    label = `${errN} Jinja error${errN > 1 ? 's' : ''}`;
+    if (infoN > 0) label += ` · ${infoN} note${infoN > 1 ? 's' : ''}`;
+    cls = 'status-item status-error-state status-clickable';
+  } else {
+    label = `${infoN} Jinja note${infoN > 1 ? 's' : ''}`;
+    cls = 'status-item status-clickable';
   }
+  errTxt.textContent = label;
+  errEl.className = cls;
+  errEl.title = `Click to see the Jinja ${errN ? 'errors' : 'notes'}`;
+  errEl.onclick = openJinjaErrorsModal;
 }
 
 function openJinjaErrorsModal() {
@@ -3233,19 +3258,21 @@ function renderJinjaErrors() {
   const sorted = _jinjaCache.slice().sort((a, b) =>
     a.from.line - b.from.line || a.from.ch - b.from.ch);
   body.innerHTML = sorted.map((e, i) => {
+    const sev = e.severity === 'info' ? 'info' : 'error';
     const hint = jinjaErrorHint(e.message, e.body || '');
     const snippet = e.body ? `<div style="color:var(--text-muted);font-size:11px;margin-top:3px">${escapeHtml(e.body.length > 140 ? e.body.slice(0, 140) + '…' : e.body)}</div>` : '';
-    // Hint rendered with a "Fix:" prefix and minimal markdown for inline
-    // code (`x` → <code>x</code>) so suggestions read clearly.
     const hintHtml = hint
       ? `<div class="jinja-hint-row">
            <span class="jinja-hint-label">Fix</span>
            <span class="jinja-hint-text">${_renderInlineCode(hint)}</span>
          </div>`
       : '';
-    return `<div class="logs-row error" data-i="${i}" style="grid-template-columns:90px 1fr;cursor:pointer">
+    const sevLabel = sev === 'info'
+      ? '<span class="jinja-sev-tag info">note</span>'
+      : '<span class="jinja-sev-tag error">error</span>';
+    return `<div class="logs-row ${sev}" data-i="${i}" style="grid-template-columns:90px 1fr;cursor:pointer">
       <span class="ts">Ln ${e.from.line + 1}:${e.from.ch + 1}</span>
-      <span class="msg">${escapeHtml(e.message)}${snippet}${hintHtml}</span>
+      <span class="msg">${sevLabel}${escapeHtml(e.message)}${snippet}${hintHtml}</span>
     </div>`;
   }).join('');
   body.querySelectorAll('.logs-row').forEach(row => {
