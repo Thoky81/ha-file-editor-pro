@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.11.29 — Find bar: Whole-entity toggle + regex toggle fix
+
+- **New `.id` toggle** on the floating search bar (Alt+E) — *Whole entity* mode that treats letters + digits + `_` + `.` as one identifier, so a search for `sensor.foo` won't match `sensor.foo_bar` or `binary_sensor.foo`. Same matching rule the Find & Replace modal already had; now reachable from Ctrl/Cmd+F too. Takes precedence over Whole-word (`\b`) when both are on.
+- **Bug fix**: the regex (`.*`) toggle in the search bar was calling `_esearchToggle('rx', …)` but the option key is `regex`, so clicking it never actually enabled regex mode. Now it does.
+
 ## 1.11.28 — Floating Find-in-file bar (Ctrl/Cmd+F)
 
 Replaces CodeMirror's tiny built-in find dialog with a compact floating bar at the top-right of the active editor.

@@ -998,7 +998,8 @@
           <span class="esearch-count" id="esearch-count"></span>
         </div>
         <button class="esearch-tog" id="esearch-case" type="button" title="Match case (Alt+C)" aria-label="Match case">Aa</button>
-        <button class="esearch-tog" id="esearch-word" type="button" title="Whole word (Alt+W)" aria-label="Whole word">\b</button>
+        <button class="esearch-tog" id="esearch-word" type="button" title="Whole word — \b boundaries (Alt+W)" aria-label="Whole word">\b</button>
+        <button class="esearch-tog" id="esearch-ent"  type="button" title="Whole entity — sensor.foo ≠ sensor.foo_bar (Alt+E)" aria-label="Whole entity">.id</button>
         <button class="esearch-tog" id="esearch-rx"   type="button" title="Regex (Alt+R)" aria-label="Regex">.*</button>
         <button class="esearch-btn" id="esearch-prev" type="button" title="Previous match (Shift+Enter)" aria-label="Previous">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg>
@@ -3318,7 +3319,7 @@ const ES = {
   overlay: null,       // overlay attached for cm-search-hit highlighting
   matches: [],         // [{from, to}] for navigation
   idx: -1,             // current selected match index
-  opts: { case: false, word: false, regex: false },
+  opts: { case: false, word: false, entity: false, regex: false },
 };
 
 function openEditorSearch() {
@@ -3361,7 +3362,14 @@ function _esearchBuildRegex() {
       return new RegExp(q, 'g' + (ES.opts.case ? '' : 'i'));
     }
     let pat = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    if (ES.opts.word) pat = `\\b${pat}\\b`;
+    // Entity mode treats letters + digits + _ + . as one identifier,
+    // so "sensor.foo" won't match "sensor.foo_bar" or "binary_sensor.foo".
+    // Takes precedence over word mode when both are on.
+    if (ES.opts.entity) {
+      pat = `(?<![A-Za-z0-9_.])${pat}(?![A-Za-z0-9_.])`;
+    } else if (ES.opts.word) {
+      pat = `\\b${pat}\\b`;
+    }
     return new RegExp(pat, 'g' + (ES.opts.case ? '' : 'i'));
   } catch (e) {
     return e;   // signal invalid pattern back to esearchUpdate
@@ -3495,20 +3503,23 @@ document.addEventListener('DOMContentLoaded', () => {
       e.preventDefault();
       closeEditorSearch();
     } else if (e.altKey && (e.key === 'c' || e.key === 'C')) {
-      e.preventDefault(); _esearchToggle('case', 'esearch-case');
+      e.preventDefault(); _esearchToggle('case',   'esearch-case');
     } else if (e.altKey && (e.key === 'w' || e.key === 'W')) {
-      e.preventDefault(); _esearchToggle('word', 'esearch-word');
+      e.preventDefault(); _esearchToggle('word',   'esearch-word');
+    } else if (e.altKey && (e.key === 'e' || e.key === 'E')) {
+      e.preventDefault(); _esearchToggle('entity', 'esearch-ent');
     } else if (e.altKey && (e.key === 'r' || e.key === 'R')) {
-      e.preventDefault(); _esearchToggle('rx',   'esearch-rx');
+      e.preventDefault(); _esearchToggle('regex',  'esearch-rx');
     }
   });
 
   document.getElementById('esearch-prev').addEventListener('click', esearchPrev);
   document.getElementById('esearch-next').addEventListener('click', esearchNext);
   document.getElementById('esearch-close').addEventListener('click', closeEditorSearch);
-  document.getElementById('esearch-case').addEventListener('click', () => _esearchToggle('case', 'esearch-case'));
-  document.getElementById('esearch-word').addEventListener('click', () => _esearchToggle('word', 'esearch-word'));
-  document.getElementById('esearch-rx').addEventListener('click',   () => _esearchToggle('rx',   'esearch-rx'));
+  document.getElementById('esearch-case').addEventListener('click', () => _esearchToggle('case',   'esearch-case'));
+  document.getElementById('esearch-word').addEventListener('click', () => _esearchToggle('word',   'esearch-word'));
+  document.getElementById('esearch-ent').addEventListener('click',  () => _esearchToggle('entity', 'esearch-ent'));
+  document.getElementById('esearch-rx').addEventListener('click',   () => _esearchToggle('regex',  'esearch-rx'));
 });
 
 // ═══════════════════════════════════════════════════════════════
