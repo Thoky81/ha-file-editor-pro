@@ -1588,6 +1588,32 @@ class MySensor(Entity):
   </div>
 </div>
 
+<!-- Overwrite confirm dialog (file upload) -->
+<div class="confirm-overlay" id="overwrite-modal">
+  <div class="confirm-modal">
+    <div class="confirm-body">
+      <div class="confirm-title">File already exists</div>
+      <div class="confirm-message">
+        <span class="confirm-filename" id="overwrite-filename"></span>
+        already exists in <span id="overwrite-dir" style="font-family:var(--font-mono);color:var(--text-secondary)"></span>
+        (<span id="overwrite-size" style="color:var(--text-muted)"></span>).<br>
+        <span style="color:var(--text-muted);font-size:11px">Replacing will overwrite the existing file.</span>
+        <div id="overwrite-batch-row" style="margin-top:10px;display:none">
+          <label style="font-size:12px;color:var(--text-secondary);display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="checkbox" id="overwrite-batch-cb" style="accent-color:var(--accent)">
+            Apply to all remaining files in this upload
+          </label>
+        </div>
+      </div>
+    </div>
+    <div class="confirm-footer">
+      <button class="confirm-btn"         id="overwrite-cancel-btn"  onclick="_overwriteResolve('cancel')">Cancel</button>
+      <button class="confirm-btn"         id="overwrite-skip-btn"    onclick="_overwriteResolve('skip')">Skip</button>
+      <button class="confirm-btn primary" id="overwrite-replace-btn" onclick="_overwriteResolve('replace')">Replace</button>
+    </div>
+  </div>
+</div>
+
 <!-- Unsaved-changes confirm dialog -->
 <div class="confirm-overlay" id="confirm-modal">
   <div class="confirm-modal">
@@ -2690,6 +2716,41 @@ function _confirmClose(action) {
 }
 document.getElementById('confirm-modal').addEventListener('click', e => {
   if (e.target.id === 'confirm-modal') _confirmClose('cancel');
+});
+
+// ── Overwrite confirm (file upload) ───────────────────────────
+let _overwriteResolver = null;
+
+function confirmOverwrite({ name, dir, size, batchVisible }) {
+  return new Promise(resolve => {
+    _overwriteResolver = resolve;
+    document.getElementById('overwrite-filename').textContent = name || '';
+    document.getElementById('overwrite-dir').textContent      = dir || '/';
+    document.getElementById('overwrite-size').textContent     = size || '';
+    document.getElementById('overwrite-batch-row').style.display = batchVisible ? 'block' : 'none';
+    document.getElementById('overwrite-batch-cb').checked = false;
+    document.getElementById('overwrite-modal').classList.add('show');
+    // Focus Skip — pressing Enter without thinking is the safer outcome.
+    setTimeout(() => document.getElementById('overwrite-skip-btn')?.focus(), 30);
+  });
+}
+
+function _overwriteResolve(action) {
+  document.getElementById('overwrite-modal').classList.remove('show');
+  const applyAll = document.getElementById('overwrite-batch-cb').checked;
+  const r = _overwriteResolver; _overwriteResolver = null;
+  if (r) r({ action, applyAll });
+}
+
+document.getElementById('overwrite-modal').addEventListener('click', e => {
+  if (e.target.id === 'overwrite-modal') _overwriteResolve('cancel');
+});
+document.addEventListener('keydown', e => {
+  const m = document.getElementById('overwrite-modal');
+  if (m && m.classList.contains('show')) {
+    if (e.key === 'Escape') { e.preventDefault(); _overwriteResolve('cancel'); }
+    // Enter triggers whichever button is focused (default = Skip).
+  }
 });
 
 function renderTabs() {
@@ -4434,24 +4495,29 @@ async function _doUpload(file, dirPath, overwrite) {
 document.getElementById('upload-input').addEventListener('change', async (e) => {
   const files = Array.from(e.target.files || []);
   const dir = _uploadTargetDir;
-  // Snapshot of "yes to all / no to all" so multi-file uploads don't
-  // ping the user for every duplicate.
-  let bulkOverwrite = null;   // null → ask each time, true/false → apply to rest
+  // 'replace' / 'skip' / null. When the user ticks "apply to all
+  // remaining" we pin the answer here so subsequent duplicates in the
+  // same batch don't re-prompt.
+  let bulkAnswer = null;
+
   for (const f of files) {
     try {
       let res = await _doUpload(f, dir, false);
       if (res.kind === 'exists') {
-        let ow = bulkOverwrite;
-        if (ow === null) {
+        let action = bulkAnswer;
+        if (!action) {
           const where = dir ? `/${dir}` : '/config';
-          const more = files.length > 1 ? '\n\n(Cancel applies to the rest of this batch.)' : '';
-          ow = window.confirm(
-            `"${f.name}" already exists in ${where} (${_humanSize(res.size)}).\n\n` +
-            `Replace it with the file you're uploading?` + more
-          );
-          if (files.length > 1) bulkOverwrite = ow;   // remember for the rest
+          const r = await confirmOverwrite({
+            name: f.name,
+            dir: where,
+            size: _humanSize(res.size),
+            batchVisible: files.length > 1,
+          });
+          if (r.action === 'cancel') break;            // abort whole batch
+          action = r.action;                            // 'replace' or 'skip'
+          if (r.applyAll) bulkAnswer = action;          // remember for rest
         }
-        if (!ow) { showToast(`Skipped ${f.name}`); continue; }
+        if (action === 'skip') { showToast(`Skipped ${f.name}`); continue; }
         res = await _doUpload(f, dir, true);
       }
       showToast(res.overwritten ? `Replaced ${f.name}` : `Uploaded ${f.name}`);

@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.11.30 — Upload overwrite uses the in-app confirm dialog
+
+The "file already exists" prompt during uploads now uses the same styled `.confirm-overlay` modal as the delete and unsaved-changes dialogs, instead of `window.confirm()`. Matches the rest of the UI and adds a couple of niceties:
+
+- **Three buttons** instead of OK/Cancel: *Cancel* (abort the rest of the upload), *Skip* (this one only), *Replace*.
+- **"Apply to all remaining files in this upload"** checkbox appears for multi-file batches, so a yes-to-all decision is one click instead of repeating Replace per file.
+- Skip is focused by default — pressing Enter without thinking does the safer thing.
+- Escape and click-outside both Cancel.
+- Shows the existing file's path and size, same info the native dialog had.
+
 ## 1.11.29 — Find bar: Whole-entity toggle + regex toggle fix
 
 - **New `.id` toggle** on the floating search bar (Alt+E) — *Whole entity* mode that treats letters + digits + `_` + `.` as one identifier, so a search for `sensor.foo` won't match `sensor.foo_bar` or `binary_sensor.foo`. Same matching rule the Find & Replace modal already had; now reachable from Ctrl/Cmd+F too. Takes precedence over Whole-word (`\b`) when both are on.
