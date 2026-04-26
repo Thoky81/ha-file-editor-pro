@@ -319,6 +319,25 @@
     .breadcrumb-part:last-child{color:var(--text-secondary)}
     .breadcrumb-sep{color:var(--border-light)}
     .editor-wrapper{flex:1;overflow:hidden;position:relative}
+
+    /* ── In-editor search bar (Ctrl/Cmd+F) ── */
+    .esearch{position:absolute;top:8px;right:14px;z-index:30;display:none;align-items:center;gap:4px;background:var(--bg-light);border:1px solid var(--border-light);border-radius:6px;padding:4px;box-shadow:0 6px 20px rgba(0,0,0,.45)}
+    .esearch.show{display:flex}
+    .esearch-input-wrap{position:relative;display:flex;align-items:center}
+    .esearch-input{background:var(--bg-mid);border:1px solid var(--border-light);border-radius:4px;padding:4px 60px 4px 8px;color:var(--text-primary);font-family:var(--font-mono);font-size:12px;outline:none;width:240px}
+    .esearch-input:focus{border-color:var(--accent)}
+    .esearch-input.invalid{border-color:var(--accent-red)}
+    .esearch-count{position:absolute;right:6px;top:50%;transform:translateY(-50%);font-family:var(--font-mono);font-size:10.5px;color:var(--text-muted);pointer-events:none;letter-spacing:.02em}
+    .esearch-count.zero{color:var(--accent-red)}
+    .esearch-tog{height:24px;min-width:24px;padding:0 5px;background:transparent;border:1px solid transparent;color:var(--text-muted);border-radius:4px;cursor:pointer;font-family:var(--font-mono);font-size:11px;display:flex;align-items:center;justify-content:center}
+    .esearch-tog:hover{background:var(--bg-hover);color:var(--text-primary)}
+    .esearch-tog.on{background:var(--accent-dim);border-color:var(--accent);color:var(--accent)}
+    .esearch-btn{width:24px;height:24px;background:transparent;border:none;color:var(--text-muted);border-radius:4px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+    .esearch-btn:hover{background:var(--bg-hover);color:var(--text-primary)}
+    .esearch-btn svg{width:14px;height:14px}
+    .esearch-btn[disabled]{opacity:.35;cursor:default;pointer-events:none}
+    .cm-search-hit{background:rgba(255,210,0,.30);border-radius:2px}
+    [data-theme*="light"] .cm-search-hit{background:rgba(255,180,0,.35)}
     .no-file-open{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text-muted);gap:12px}
     .no-file-open svg{width:48px;height:48px;opacity:.3}
     .no-file-open p{font-size:13px}
@@ -970,6 +989,27 @@
     <div class="tab-bar" id="tab-bar"><div class="tab-empty"></div></div>
     <div class="breadcrumb" id="breadcrumb"></div>
     <div class="editor-wrapper" id="editor-wrapper">
+      <!-- Floating in-editor search bar (Ctrl/Cmd+F). Live highlights
+           every match in the active editor; arrows step prev/next. -->
+      <div class="esearch" id="esearch">
+        <div class="esearch-input-wrap">
+          <input type="text" class="esearch-input" id="esearch-input"
+                 placeholder="Find in file…" autocomplete="off" spellcheck="false">
+          <span class="esearch-count" id="esearch-count"></span>
+        </div>
+        <button class="esearch-tog" id="esearch-case" type="button" title="Match case (Alt+C)" aria-label="Match case">Aa</button>
+        <button class="esearch-tog" id="esearch-word" type="button" title="Whole word (Alt+W)" aria-label="Whole word">\b</button>
+        <button class="esearch-tog" id="esearch-rx"   type="button" title="Regex (Alt+R)" aria-label="Regex">.*</button>
+        <button class="esearch-btn" id="esearch-prev" type="button" title="Previous match (Shift+Enter)" aria-label="Previous">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg>
+        </button>
+        <button class="esearch-btn" id="esearch-next" type="button" title="Next match (Enter)" aria-label="Next">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <button class="esearch-btn" id="esearch-close" type="button" title="Close (Esc)" aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
       <div class="sticky-scroll" id="sticky-scroll"></div>
       <div class="minimap" id="minimap">
         <div class="minimap-inner" id="minimap-inner"></div>
@@ -1767,7 +1807,7 @@ class MySensor(Entity):
     Paste <span class="context-shortcut">⌘V</span>
   </div>
   <div class="context-divider"></div>
-  <div class="context-item" onclick="editor&&editor.execCommand('findPersistent')">
+  <div class="context-item" onclick="openEditorSearch()">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
     Find <span class="context-shortcut">⌘F</span>
   </div>
@@ -2135,8 +2175,8 @@ function initEditor() {
       'Cmd-S':   saveCurrentFile,
       'Ctrl-/':  'toggleComment',
       'Cmd-/':   'toggleComment',
-      'Ctrl-F':  'findPersistent',
-      'Cmd-F':   'findPersistent',
+      'Ctrl-F':  () => openEditorSearch(),
+      'Cmd-F':   () => openEditorSearch(),
       // Ctrl-H / Cmd-H is handled by the unified Find & Replace modal,
       // wired in the document keydown handler so it works whether or
       // not the editor has focus. CodeMirror's default replace dialog
@@ -3267,6 +3307,211 @@ function ctxPaste() {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// IN-EDITOR SEARCH BAR  (Ctrl/Cmd+F)
+// ═══════════════════════════════════════════════════════════════
+// Floating compact bar at the top-right of the active editor with
+// live highlighting of every match, prev/next nav, a counter, and
+// case / whole-word / regex toggles. Replaces CodeMirror's tiny
+// built-in dialog.
+const ES = {
+  active: null,        // CodeMirror instance the bar is currently driving
+  overlay: null,       // overlay attached for cm-search-hit highlighting
+  matches: [],         // [{from, to}] for navigation
+  idx: -1,             // current selected match index
+  opts: { case: false, word: false, regex: false },
+};
+
+function openEditorSearch() {
+  const cm = (typeof _rightEditor !== 'undefined' && _rightEditor && _rightEditor.hasFocus())
+             ? _rightEditor : editor;
+  if (!cm) { showToast('No file open'); return; }
+  const bar = document.getElementById('esearch');
+  if (!bar) return;
+  ES.active = cm;
+  bar.classList.add('show');
+  const input = document.getElementById('esearch-input');
+  // Pre-fill from selection if it's a single-line snippet.
+  const sel = cm.getSelection();
+  if (sel && !sel.includes('\n')) input.value = sel;
+  setTimeout(() => { input.focus(); input.select(); }, 20);
+  esearchUpdate();
+}
+
+function closeEditorSearch() {
+  document.getElementById('esearch')?.classList.remove('show');
+  _esearchClearOverlay();
+  ES.matches = [];
+  ES.idx = -1;
+  if (ES.active) ES.active.focus();
+  ES.active = null;
+}
+
+function _esearchClearOverlay() {
+  if (ES.overlay && ES.active) {
+    try { ES.active.removeOverlay(ES.overlay); } catch {}
+  }
+  ES.overlay = null;
+}
+
+function _esearchBuildRegex() {
+  const q = document.getElementById('esearch-input').value;
+  if (!q) return null;
+  try {
+    if (ES.opts.regex) {
+      return new RegExp(q, 'g' + (ES.opts.case ? '' : 'i'));
+    }
+    let pat = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (ES.opts.word) pat = `\\b${pat}\\b`;
+    return new RegExp(pat, 'g' + (ES.opts.case ? '' : 'i'));
+  } catch (e) {
+    return e;   // signal invalid pattern back to esearchUpdate
+  }
+}
+
+function esearchUpdate() {
+  if (!ES.active) return;
+  _esearchClearOverlay();
+  ES.matches = [];
+  ES.idx = -1;
+
+  const input  = document.getElementById('esearch-input');
+  const count  = document.getElementById('esearch-count');
+  const prev   = document.getElementById('esearch-prev');
+  const next   = document.getElementById('esearch-next');
+
+  const rx = _esearchBuildRegex();
+  if (rx instanceof Error) {
+    input.classList.add('invalid');
+    count.textContent = 'invalid';
+    count.classList.add('zero');
+    prev.disabled = next.disabled = true;
+    return;
+  }
+  input.classList.remove('invalid');
+  if (!rx) {
+    count.textContent = '';
+    count.classList.remove('zero');
+    prev.disabled = next.disabled = true;
+    return;
+  }
+
+  // Collect matches for navigation by walking line-by-line.
+  const cm = ES.active;
+  const lines = cm.getValue().split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    rx.lastIndex = 0;
+    let m;
+    while ((m = rx.exec(lines[i]))) {
+      ES.matches.push({
+        from: CodeMirror.Pos(i, m.index),
+        to:   CodeMirror.Pos(i, m.index + m[0].length),
+      });
+      if (m[0].length === 0) rx.lastIndex++;   // guard zero-length
+    }
+  }
+
+  // Live overlay for paint highlighting (.cm-search-hit on every match).
+  // Build a fresh regex object since the overlay tokenizer mutates it.
+  ES.overlay = _esearchOverlay(_esearchBuildRegex());
+  cm.addOverlay(ES.overlay);
+
+  if (!ES.matches.length) {
+    count.textContent = '0/0';
+    count.classList.add('zero');
+    prev.disabled = next.disabled = true;
+    return;
+  }
+  count.classList.remove('zero');
+  prev.disabled = next.disabled = false;
+  // Pick first match at or after the cursor as the "current".
+  const cur = cm.getCursor();
+  ES.idx = 0;
+  for (let i = 0; i < ES.matches.length; i++) {
+    const f = ES.matches[i].from;
+    if (f.line > cur.line || (f.line === cur.line && f.ch >= cur.ch)) { ES.idx = i; break; }
+  }
+  _esearchSelectCurrent();
+}
+
+function _esearchOverlay(rx) {
+  if (!rx || rx instanceof Error) return null;
+  return {
+    token(stream) {
+      rx.lastIndex = stream.pos;
+      const m = rx.exec(stream.string);
+      if (m && m.index === stream.pos) {
+        const len = m[0].length || 1;
+        for (let i = 0; i < len; i++) stream.next();
+        return 'search-hit';
+      }
+      if (m) {
+        // Skip ahead to next potential match start
+        while (stream.pos < m.index) stream.next();
+        return null;
+      }
+      stream.skipToEnd();
+      return null;
+    }
+  };
+}
+
+function _esearchSelectCurrent() {
+  if (ES.idx < 0 || !ES.matches[ES.idx] || !ES.active) return;
+  const m = ES.matches[ES.idx];
+  ES.active.setSelection(m.from, m.to);
+  ES.active.scrollIntoView(m.from, 80);
+  const count = document.getElementById('esearch-count');
+  if (count) count.textContent = `${ES.idx + 1}/${ES.matches.length}`;
+}
+
+function esearchNext() {
+  if (!ES.matches.length) return;
+  ES.idx = (ES.idx + 1) % ES.matches.length;
+  _esearchSelectCurrent();
+}
+function esearchPrev() {
+  if (!ES.matches.length) return;
+  ES.idx = (ES.idx - 1 + ES.matches.length) % ES.matches.length;
+  _esearchSelectCurrent();
+}
+
+function _esearchToggle(name, btnId) {
+  ES.opts[name] = !ES.opts[name];
+  document.getElementById(btnId)?.classList.toggle('on', ES.opts[name]);
+  esearchUpdate();
+}
+
+// Wire DOM hooks once.
+document.addEventListener('DOMContentLoaded', () => {
+  const input = document.getElementById('esearch-input');
+  if (!input) return;
+
+  input.addEventListener('input', esearchUpdate);
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      e.shiftKey ? esearchPrev() : esearchNext();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      closeEditorSearch();
+    } else if (e.altKey && (e.key === 'c' || e.key === 'C')) {
+      e.preventDefault(); _esearchToggle('case', 'esearch-case');
+    } else if (e.altKey && (e.key === 'w' || e.key === 'W')) {
+      e.preventDefault(); _esearchToggle('word', 'esearch-word');
+    } else if (e.altKey && (e.key === 'r' || e.key === 'R')) {
+      e.preventDefault(); _esearchToggle('rx',   'esearch-rx');
+    }
+  });
+
+  document.getElementById('esearch-prev').addEventListener('click', esearchPrev);
+  document.getElementById('esearch-next').addEventListener('click', esearchNext);
+  document.getElementById('esearch-close').addEventListener('click', closeEditorSearch);
+  document.getElementById('esearch-case').addEventListener('click', () => _esearchToggle('case', 'esearch-case'));
+  document.getElementById('esearch-word').addEventListener('click', () => _esearchToggle('word', 'esearch-word'));
+  document.getElementById('esearch-rx').addEventListener('click',   () => _esearchToggle('rx',   'esearch-rx'));
+});
+
+// ═══════════════════════════════════════════════════════════════
 // FIND & REPLACE  (unified — plain text + entity-bounded mode)
 // ═══════════════════════════════════════════════════════════════
 const _ENTITY_RX = /^[a-z][a-z0-9_]*\.[a-z0-9_]+$/i;
@@ -3695,6 +3940,14 @@ document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === 'h' || e.key === 'H')) {
     e.preventDefault();
     openFindReplace();
+  }
+  // Ctrl/Cmd+F opens the in-editor search bar (not CodeMirror's
+  // built-in dialog). Pre-empts the browser's native page Find too.
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === 'f' || e.key === 'F')) {
+    // Don't intercept when typing inside our own search input.
+    if (document.activeElement?.id === 'esearch-input') return;
+    e.preventDefault();
+    openEditorSearch();
   }
 });
 
@@ -5353,7 +5606,7 @@ function fabAction(cmd) {
     case 'fold':      editor.foldCode(editor.getCursor()); break;
     case 'foldAll':   editor.execCommand('foldAll'); break;
     case 'unfoldAll': editor.execCommand('unfoldAll'); break;
-    case 'find':      editor.execCommand('find'); break;
+    case 'find':      openEditorSearch(); break;
     case 'replace':   openFindReplace(); break;
   }
 }
@@ -6373,6 +6626,7 @@ const COMMANDS = [
   { cat: 'HA',     title: 'Validate Jinja in current file',                    run: () => validateJinjaNow() },
   { cat: 'HA',     title: 'Show Jinja error list',                              run: () => openJinjaErrorsModal() },
   { cat: 'HA',     title: 'Rename entity in this file…',                         run: () => renameEntityInFile() },
+  { cat: 'View',   title: 'Find in file…',           shortcut: 'Ctrl+F',         run: () => openEditorSearch() },
   { cat: 'View',   title: 'Find & Replace…',          shortcut: 'Ctrl+H',         run: () => openFindReplace() },
   { cat: 'HA',     title: 'Refresh entity/service cache',                      run: () => loadHAData(true).then(() => showToast('HA cache refreshed')) },
   { cat: 'Snippet',title: 'Insert: Automation skeleton',                       run: () => insertSnippet('automation') },

@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.11.28 — Floating Find-in-file bar (Ctrl/Cmd+F)
+
+Replaces CodeMirror's tiny built-in find dialog with a compact floating bar at the top-right of the active editor.
+
+- **Live highlight** of every match in the file (yellow tint via a CodeMirror overlay) as you type. Updates instantly on every keystroke.
+- **Match counter** *(`3/12`)* in the input field; turns red when there are zero matches and again when the regex is invalid.
+- **Prev / Next navigation** with the arrow buttons or **Enter** / **Shift+Enter**. The current match is selected so the cursor lands there when you close the bar.
+- **Three toggles**: *Match case* (`Aa`), *Whole word* (`\b`), *Regex* (`.*`). Active toggle highlights blue. Keyboard shortcuts: **Alt+C / Alt+W / Alt+R** while the input has focus.
+- **Pre-fills from the current selection** if you had something selected.
+- **Esc** closes the bar and returns focus to the editor.
+- Works against **either editor pane** — opens the bar against whichever pane has focus.
+- Find & Replace (Ctrl/Cmd+H) is unchanged; this is for the much more common find-only case.
+
+Entry points: **Ctrl/Cmd+F**, right-click → *Find*, FAB → *Find*, or palette → *View: Find in file…*.
+
 ## 1.11.27 — Theme editor: every swatch verified against the previews
 
 Audited each of the 21 customisable variables to confirm the previews actually demonstrate them, then tightened two labels that were misleading users:
