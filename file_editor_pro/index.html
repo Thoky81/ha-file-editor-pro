@@ -559,6 +559,10 @@
     .jinja-sev-tag.error{background:color-mix(in srgb, var(--accent-red) 18%, transparent);color:var(--accent-red);border:1px solid color-mix(in srgb, var(--accent-red) 35%, transparent)}
     .jinja-sev-tag.info{background:color-mix(in srgb, var(--accent-blue) 18%, transparent);color:var(--accent-blue);border:1px solid color-mix(in srgb, var(--accent-blue) 35%, transparent)}
     .logs-row.info .ts{color:var(--accent-blue)}
+    /* "Apply autofix" button rendered inside the Fix hint row */
+    .jinja-fix-btn{display:inline-block;margin-top:6px;background:var(--accent);color:#fff;border:none;border-radius:4px;padding:4px 10px;font-family:var(--font-ui);font-size:11px;font-weight:600;cursor:pointer;transition:opacity .1s}
+    .jinja-fix-btn:hover{opacity:.9}
+    .jinja-fix-btn:active{transform:translateY(1px)}
     .logs-empty{padding:30px;text-align:center;color:var(--text-muted);font-size:12px;font-family:var(--font-ui)}
     .logs-badge{display:none;background:var(--accent-red);color:#fff;border-radius:8px;padding:0 5px;font-family:var(--font-mono);font-size:10px;margin-left:2px}
 
@@ -3246,6 +3250,74 @@ function _renderInlineCode(s) {
   return esc.replace(/`([^`]+)`/g, '<code class="jinja-hint-code">$1</code>');
 }
 
+// ── Autofix ───────────────────────────────────────────────────
+// Returns { kind, line, oldText, newText, summary } when the finding
+// is auto-fixable, or null. Conservative: only handles YAML single-
+// quoted scalars whose inner text uses the `''` escape and contains
+// no literal `"` (so the new double-quoted form needs no escaping).
+function _jinjaAutoFix(finding) {
+  if (!editor || !finding) return null;
+  const tab = tabs.find(t => t.id === activeTabId);
+  if (!tab || tab.mode !== 'yaml') return null;
+  // Autofix is offered for any finding (error or note) whose body has
+  // doubled single quotes — those are YAML escape artefacts and the
+  // line can be rewritten as a double-quoted scalar regardless of why
+  // the validator flagged it.
+  if (!finding.body || !finding.body.includes("''")) return null;
+
+  const lineNum = finding.from.line;
+  const line = editor.getLine(lineNum);
+  if (line == null) return null;
+
+  // Match  <indent><key>: '<content possibly with ''>'<optional comment>
+  // Restrictive on purpose — we don't try to handle keys that aren't a
+  // simple identifier-with-colon shape.
+  const m = line.match(/^(\s*[^:#'\n][^:#\n]*:\s*)'((?:[^']|'')*)'(\s*(?:#.*)?)$/);
+  if (!m) return null;
+  const [, prefix, content, suffix] = m;
+  if (!content.includes("''")) return null;                  // nothing to unescape
+  if (content.includes('"'))   return null;                  // would need escaping in "…"
+
+  const unescaped = content.replace(/''/g, "'");
+  return {
+    kind: 'yaml-quote-unescape',
+    line: lineNum,
+    oldText: line,
+    newText: `${prefix}"${unescaped}"${suffix}`,
+    summary: 'Switch single-quoted scalar to double-quoted (avoids \'\'-escaping)',
+  };
+}
+
+function _applyJinjaAutoFix(finding) {
+  const fix = _jinjaAutoFix(finding);
+  if (!fix) { showToast('No autofix available for this error'); return; }
+  const cm = editor;
+  // Preserve the original line as a comment above the new line so the
+  // user can revert by uncommenting + deleting the new one. Indent of
+  // the comment matches the original line so YAML structure stays clean.
+  const indent = (fix.oldText.match(/^\s*/) || [''])[0];
+  const backup = `${indent}# (autofix backup) ${fix.oldText.trim()}`;
+  const replacement = `${backup}\n${fix.newText}`;
+
+  cm.operation(() => {
+    cm.replaceRange(
+      replacement,
+      CodeMirror.Pos(fix.line, 0),
+      CodeMirror.Pos(fix.line, fix.oldText.length),
+    );
+  });
+  // Remove this finding from the in-memory cache so the modal updates
+  // immediately. Validator's normal debounce will reconcile after.
+  const idx = _jinjaCache.indexOf(finding);
+  if (idx >= 0) _jinjaCache.splice(idx, 1);
+  renderJinjaErrors();
+  const errN  = _jinjaCache.filter(f => f.severity === 'error').length;
+  const infoN = _jinjaCache.filter(f => f.severity === 'info').length;
+  updateJinjaStatus(errN, infoN);
+  showToast(`Autofix applied to line ${fix.line + 1} (original kept as a comment above).`);
+  scheduleJinjaValidation();
+}
+
 function renderJinjaErrors() {
   const body = document.getElementById('jinja-errors-body');
   if (!body) return;
@@ -3261,10 +3333,14 @@ function renderJinjaErrors() {
     const sev = e.severity === 'info' ? 'info' : 'error';
     const hint = jinjaErrorHint(e.message, e.body || '');
     const snippet = e.body ? `<div style="color:var(--text-muted);font-size:11px;margin-top:3px">${escapeHtml(e.body.length > 140 ? e.body.slice(0, 140) + '…' : e.body)}</div>` : '';
-    const hintHtml = hint
+    const fix = _jinjaAutoFix(e);
+    const fixBtn = fix
+      ? `<button class="jinja-fix-btn" data-i="${i}" title="${escapeHtml(fix.summary)}. Original line is preserved as a comment.">Apply autofix</button>`
+      : '';
+    const hintHtml = (hint || fix)
       ? `<div class="jinja-hint-row">
            <span class="jinja-hint-label">Fix</span>
-           <span class="jinja-hint-text">${_renderInlineCode(hint)}</span>
+           <span class="jinja-hint-text">${hint ? _renderInlineCode(hint) : ''}${fixBtn ? (hint ? '<br>' : '') + fixBtn : ''}</span>
          </div>`
       : '';
     const sevLabel = sev === 'info'
@@ -3275,6 +3351,17 @@ function renderJinjaErrors() {
       <span class="msg">${sevLabel}${escapeHtml(e.message)}${snippet}${hintHtml}</span>
     </div>`;
   }).join('');
+  // Autofix button click — apply fix, don't bubble up to the row's
+  // jump-to-line handler. The body is captured before the button is
+  // wired so it's stable across re-renders.
+  body.querySelectorAll('.jinja-fix-btn').forEach(btn => {
+    btn.addEventListener('click', ev => {
+      ev.stopPropagation();
+      const i = Number(btn.dataset.i);
+      const finding = sorted[i];
+      if (finding) _applyJinjaAutoFix(finding);
+    });
+  });
   body.querySelectorAll('.logs-row').forEach(row => {
     row.addEventListener('click', () => {
       const e = sorted[Number(row.dataset.i)];

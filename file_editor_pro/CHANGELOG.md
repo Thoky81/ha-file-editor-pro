@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.11.34 — Jinja autofix with comment-backup of the original line
+
+The Jinja errors modal now offers a one-click **Apply autofix** button on rows whose body has doubled single quotes (`''`) — the YAML escape that makes long Jinja templates hard to read. Applying the fix:
+
+- Rewrites the YAML scalar from single-quoted (`'…'`) to double-quoted (`"…"`) and unescapes every inner `''` back to `'`.
+- **Keeps the original line as a comment** above the new one (`# (autofix backup) <original>`), so reverting is just deleting the new line and uncommenting.
+- Applies under one CodeMirror operation (single Cmd/Ctrl+Z reverts both the comment-backup and the new line at once).
+- Removes the finding from the cache + re-renders so the modal updates instantly; the validator runs after the usual 1.5 s debounce.
+
+The detector is conservative: only matches single-line YAML mappings (`<key>: '<content>'` with optional trailing comment), and refuses to fix when the inner content contains a literal `"` (would need additional escaping in the new form). That keeps formatting/comments around the line untouched in every other case.
+
+The button shows up on both **error** and **note** rows whose body has `''` — so even templates skipped because of HA runtime context vars (`repeat`, `trigger`, …) get the cleanup option.
+
 ## 1.11.33 — Jinja: notes vs errors + always-fresh status bar
 
 Two regressions from 1.11.32 fixed.
