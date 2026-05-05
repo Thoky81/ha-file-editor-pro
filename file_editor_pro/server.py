@@ -819,6 +819,122 @@ async def git_remote_list():
     return {"remotes": remotes}
 
 
+# ──────────────────────────── Git history ─────────────────────────────
+
+@app.get("/api/git/log")
+async def git_log(limit: int = 100):
+    """Recent commits, newest first. Each entry has hash + short hash +
+    author + ISO date + subject line."""
+    if not has_git():
+        raise HTTPException(400, "Not a git repository")
+    fmt = "%H%x09%h%x09%an%x09%aI%x09%s"
+    code, out, err = await run_git("log", f"--pretty=format:{fmt}", f"-{int(limit)}")
+    if code != 0:
+        raise HTTPException(500, f"git log failed: {err}")
+    commits = []
+    for line in out.split("\n"):
+        if not line:
+            continue
+        parts = line.split("\t", 4)
+        if len(parts) < 5:
+            continue
+        commits.append({
+            "hash": parts[0], "short": parts[1],
+            "author": parts[2], "date": parts[3], "message": parts[4],
+        })
+    return {"commits": commits}
+
+
+@app.get("/api/git/log-files")
+async def git_log_files(hash: str):
+    """List of files changed in a single commit, with status letter
+    (A=added, M=modified, D=deleted, R=renamed). Paths are returned
+    with the standard `config/` prefix the rest of the API uses."""
+    if not has_git():
+        raise HTTPException(400, "Not a git repository")
+    code, out, err = await run_git(
+        "show", "--name-status", "--pretty=format:", hash,
+    )
+    if code != 0:
+        raise HTTPException(500, f"git show failed: {err}")
+    files = []
+    for line in out.split("\n"):
+        line = line.strip()
+        if not line:
+            continue
+        parts = line.split("\t")
+        if len(parts) < 2:
+            continue
+        files.append({"status": parts[0], "path": f"config/{parts[-1]}"})
+    return {"files": files}
+
+
+@app.get("/api/git/show-commit")
+async def git_show_commit(hash: str, path: str | None = None):
+    """Unified diff for a commit, optionally limited to one file."""
+    if not has_git():
+        raise HTTPException(400, "Not a git repository")
+    args = ["show", "--no-color", hash]
+    if path:
+        args += ["--", _strip_config_prefix(path)]
+    code, out, err = await run_git(*args)
+    return {"ok": code == 0, "diff": out, "error": err}
+
+
+@app.get("/api/git/show-at")
+async def git_show_at(hash: str, path: str):
+    """File contents as they were at a specific commit."""
+    if not has_git():
+        raise HTTPException(400, "Not a git repository")
+    code, out, err = await run_git("show", f"{hash}:{_strip_config_prefix(path)}")
+    if code != 0:
+        raise HTTPException(500, f"git show failed: {err}")
+    return {"content": out}
+
+
+class RestoreFileBody(BaseModel):
+    hash: str
+    paths: list[str]
+
+
+@app.post("/api/git/restore-file")
+async def git_restore_file(body: RestoreFileBody):
+    """Restore one or more files to their state at `hash` without
+    touching the rest of the working tree. Equivalent to
+    `git checkout <hash> -- <paths>`."""
+    if not has_git():
+        raise HTTPException(400, "Not a git repository")
+    if not body.hash or not body.paths:
+        raise HTTPException(400, "Hash and paths required")
+    gp = [_strip_config_prefix(p) for p in body.paths]
+    code, out, err = await run_git("checkout", body.hash, "--", *gp)
+    if code != 0:
+        _raise_git_error("git restore", err or out)
+    return {"ok": True, "restored": body.paths}
+
+
+class ResetHardBody(BaseModel):
+    hash: str
+    confirm: str   # must equal `hash` (or its short prefix) to actually run
+
+
+@app.post("/api/git/reset-hard")
+async def git_reset_hard(body: ResetHardBody):
+    """Wind the whole working tree back to a commit. Destructive — any
+    uncommitted local changes are lost. Requires the caller to pass a
+    matching `confirm` field equal to the hash they're resetting to."""
+    if not has_git():
+        raise HTTPException(400, "Not a git repository")
+    if not body.hash:
+        raise HTTPException(400, "Hash required")
+    if body.confirm != body.hash and not body.hash.startswith(body.confirm or ""):
+        raise HTTPException(400, "Confirmation hash does not match")
+    code, out, err = await run_git("reset", "--hard", body.hash)
+    if code != 0:
+        _raise_git_error("git reset --hard", err or out)
+    return {"ok": True}
+
+
 # ──────────────────────────── HA API ──────────────────────────────────
 
 async def ha_call(method: str, path: str, json_body: dict | None = None) -> dict:

@@ -623,6 +623,30 @@
     .fr-picker-name{font-size:10.5px;color:var(--text-muted)}
     .fr-picker-empty{padding:12px;text-align:center;color:var(--text-muted);font-size:11px}
 
+    /* ── GIT HISTORY MODAL ── */
+    #gh-list .gh-empty{padding:24px;text-align:center;color:var(--text-muted);font-size:12px}
+    .gh-row{padding:9px 12px;border-bottom:1px solid var(--border);cursor:pointer;display:grid;grid-template-columns:78px 1fr 110px;gap:10px;align-items:start;transition:background .1s}
+    .gh-row:hover{background:var(--bg-hover)}
+    .gh-row.expanded{background:var(--bg-mid)}
+    .gh-hash{font-family:var(--font-mono);font-size:11px;color:var(--accent);font-weight:600}
+    .gh-msg{font-size:12.5px;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .gh-meta{font-size:10.5px;color:var(--text-muted);margin-top:2px}
+    .gh-date{font-family:var(--font-mono);font-size:10.5px;color:var(--text-muted);text-align:right;white-space:nowrap}
+    .gh-detail{padding:8px 14px 14px 78px;border-bottom:1px solid var(--border);background:var(--bg-mid)}
+    .gh-files{display:flex;flex-direction:column;gap:3px;margin-bottom:10px}
+    .gh-file{display:grid;grid-template-columns:18px 1fr auto auto;gap:8px;align-items:center;font-family:var(--font-mono);font-size:11.5px;padding:4px 8px;border-radius:3px;background:var(--bg-darkest);border:1px solid var(--border)}
+    .gh-file-status{display:inline-block;width:14px;height:14px;border-radius:3px;text-align:center;font-size:9px;font-weight:700;line-height:14px;color:#fff}
+    .gh-file-status.A{background:var(--accent-green)}
+    .gh-file-status.M{background:var(--accent-blue)}
+    .gh-file-status.D{background:var(--accent-red)}
+    .gh-file-status.R{background:var(--accent)}
+    .gh-file-path{color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .gh-file-btn{padding:3px 8px;background:transparent;border:1px solid var(--border-light);color:var(--text-secondary);border-radius:3px;font-size:10.5px;cursor:pointer;font-family:var(--font-ui)}
+    .gh-file-btn:hover{background:var(--bg-hover);color:var(--text-primary);border-color:var(--accent)}
+    .gh-actions{display:flex;justify-content:flex-end;gap:8px;padding-top:6px;border-top:1px dashed var(--border)}
+    .gh-reset-btn{background:transparent;color:var(--accent-red);border:1px solid var(--accent-red);border-radius:4px;padding:5px 10px;font-size:11px;cursor:pointer;font-family:var(--font-ui)}
+    .gh-reset-btn:hover{background:color-mix(in srgb, var(--accent-red) 14%, transparent)}
+
     /* ── HELP MODAL ── */
     .help-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1950;display:none;align-items:center;justify-content:center;backdrop-filter:blur(2px);padding:6vh 3vw}
     .help-overlay.show{display:flex}
@@ -958,6 +982,9 @@
           </button>
           <button class="icon-btn" title="Push" onclick="gitPush()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 5v14"/><polyline points="19 12 12 5 5 12"/></svg>
+          </button>
+          <button class="icon-btn" title="History — browse commits, restore files" onclick="openGitHistory()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
           </button>
           <button class="icon-btn" title="Clear stale .git/index.lock (use only if git reports 'Another git process seems to be running')" onclick="gitClearLock()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 1 1 8 0"/><line x1="12" y1="15" x2="12" y2="17"/></svg>
@@ -1499,6 +1526,47 @@ class MySensor(Entity):
          position:fixed so the viewport-relative coordinates from
          getBoundingClientRect() in _openColorPickerFor() match. -->
     <input type="color" id="te-color-input" style="position:fixed;width:1px;height:1px;padding:0;border:0;opacity:0;pointer-events:none;z-index:2000">
+  </div>
+</div>
+
+<!-- Git history modal — list of commits, expand a row to see files
+     changed + restore actions. Reset-tree-here button lives at the
+     bottom of each expanded panel. -->
+<div class="te-overlay" id="git-history-modal">
+  <div class="te-modal" style="width:min(880px,100%);max-height:88vh">
+    <div class="te-header">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" style="width:16px;height:16px"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      <div class="te-title">Git history</div>
+      <button class="confirm-btn" id="gh-refresh" type="button" style="margin-left:auto">Refresh</button>
+      <button class="help-close" onclick="closeGitHistory()">×</button>
+    </div>
+    <div class="te-body" style="padding:0">
+      <div id="gh-list" style="padding:6px 4px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Reset-tree confirmation. Type the short hash to enable Reset. -->
+<div class="confirm-overlay" id="gh-reset-modal">
+  <div class="confirm-modal">
+    <div class="confirm-body">
+      <div class="confirm-title">Reset working tree?</div>
+      <div class="confirm-message">
+        <span style="color:var(--accent-red);font-weight:600">Destructive.</span>
+        Any uncommitted changes will be lost. Files will be rewritten to their state at
+        <span class="confirm-filename" id="gh-reset-target"></span>.
+        <div style="margin-top:10px">
+          <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:4px">
+            Type the short hash <code id="gh-reset-expected" style="color:var(--accent);font-family:var(--font-mono)"></code> to confirm:
+          </label>
+          <input type="text" id="gh-reset-input" style="width:100%;background:var(--bg-mid);border:1px solid var(--border-light);color:var(--text-primary);border-radius:5px;padding:6px 9px;font-family:var(--font-mono);font-size:12px;outline:none" autocomplete="off" spellcheck="false">
+        </div>
+      </div>
+    </div>
+    <div class="confirm-footer">
+      <button class="confirm-btn"        id="gh-reset-cancel"  onclick="_ghResetResolve('cancel')">Cancel</button>
+      <button class="confirm-btn danger" id="gh-reset-confirm" onclick="_ghResetResolve('reset')" disabled>Reset</button>
+    </div>
   </div>
 </div>
 
@@ -4279,6 +4347,7 @@ document.addEventListener('keydown', e => {
     if (document.getElementById('logs-modal')?.classList.contains('show')) closeLogs();
     if (document.getElementById('jinja-errors-modal')?.classList.contains('show')) closeJinjaErrorsModal();
     if (document.getElementById('theme-editor-modal')?.classList.contains('show')) closeThemeEditor();
+    if (document.getElementById('git-history-modal')?.classList.contains('show')) closeGitHistory();
     const fr = document.getElementById('fr-modal');
     if (fr?.classList.contains('show')) {
       // First Escape closes the entity picker if it's open; second
@@ -4714,6 +4783,225 @@ async function gitClearLock() {
     refreshGit();
   } catch (e) { showToast('Clear lock failed: ' + e.message); }
 }
+
+// ── Git history modal ─────────────────────────────────────────
+let _ghCommits = [];
+let _ghExpanded = null;   // currently-expanded commit hash
+
+async function openGitHistory() {
+  if (!API.available) { showToast('Demo mode — no backend'); return; }
+  document.getElementById('git-history-modal').classList.add('show');
+  await _ghLoadCommits();
+}
+function closeGitHistory() {
+  document.getElementById('git-history-modal')?.classList.remove('show');
+  _ghExpanded = null;
+}
+
+async function _ghLoadCommits() {
+  const list = document.getElementById('gh-list');
+  list.innerHTML = '<div class="gh-empty">Loading history…</div>';
+  try {
+    const r = await fetch(API.url('/api/git/log?limit=200'));
+    if (!r.ok) throw new Error((await r.json()).detail || r.status);
+    const data = await r.json();
+    _ghCommits = data.commits || [];
+  } catch (e) {
+    list.innerHTML = `<div class="gh-empty">${escapeHtml('Could not load history: ' + e.message)}</div>`;
+    return;
+  }
+  if (!_ghCommits.length) {
+    list.innerHTML = '<div class="gh-empty">No commits yet.</div>';
+    return;
+  }
+  _ghRenderCommits();
+}
+
+function _ghRenderCommits() {
+  const list = document.getElementById('gh-list');
+  list.innerHTML = _ghCommits.map(c => `
+    <div class="gh-row" data-hash="${escapeHtml(c.hash)}">
+      <span class="gh-hash">${escapeHtml(c.short)}</span>
+      <div>
+        <div class="gh-msg">${escapeHtml(c.message)}</div>
+        <div class="gh-meta">${escapeHtml(c.author)}</div>
+      </div>
+      <span class="gh-date">${_ghShortDate(c.date)}</span>
+    </div>
+  `).join('');
+  list.querySelectorAll('.gh-row').forEach(row => {
+    row.addEventListener('click', () => _ghToggleRow(row.dataset.hash, row));
+  });
+}
+
+function _ghShortDate(iso) {
+  if (!iso) return '';
+  // ISO format like 2026-04-26T12:34:56+02:00 → "Apr 26 12:34"
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const pad = n => String(n).padStart(2, '0');
+  return `${months[d.getMonth()]} ${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+async function _ghToggleRow(hash, row) {
+  // Already expanded — collapse.
+  if (_ghExpanded === hash) {
+    _ghExpanded = null;
+    row.classList.remove('expanded');
+    row.nextElementSibling?.classList.contains('gh-detail') && row.nextElementSibling.remove();
+    return;
+  }
+  // Collapse any other expansion first.
+  document.querySelectorAll('.gh-row.expanded').forEach(r => {
+    r.classList.remove('expanded');
+    if (r.nextElementSibling?.classList.contains('gh-detail')) r.nextElementSibling.remove();
+  });
+  _ghExpanded = hash;
+  row.classList.add('expanded');
+
+  // Insert a placeholder detail block while files load.
+  const detail = document.createElement('div');
+  detail.className = 'gh-detail';
+  detail.dataset.hash = hash;
+  detail.innerHTML = '<div style="font-size:11px;color:var(--text-muted)">Loading files…</div>';
+  row.parentNode.insertBefore(detail, row.nextSibling);
+
+  try {
+    const r = await fetch(API.url('/api/git/log-files?hash=' + encodeURIComponent(hash)));
+    if (!r.ok) throw new Error((await r.json()).detail || r.status);
+    const data = await r.json();
+    const files = data.files || [];
+    detail.innerHTML = `
+      <div class="gh-files">
+        ${files.length ? files.map(f => `
+          <div class="gh-file" data-path="${escapeHtml(f.path)}">
+            <span class="gh-file-status ${escapeHtml(f.status[0] || 'M')}" title="${escapeHtml(f.status)}">${escapeHtml(f.status[0] || 'M')}</span>
+            <span class="gh-file-path" title="${escapeHtml(f.path)}">${escapeHtml(f.path)}</span>
+            <button class="gh-file-btn" data-act="diff">Diff</button>
+            <button class="gh-file-btn" data-act="restore">Restore</button>
+          </div>`).join('')
+          : '<div style="font-size:11px;color:var(--text-muted)">No files in this commit (merge/empty).</div>'}
+      </div>
+      <div class="gh-actions">
+        <button class="gh-reset-btn" data-act="reset">Reset working tree to this commit…</button>
+      </div>`;
+    detail.querySelectorAll('.gh-file-btn').forEach(btn => {
+      btn.addEventListener('click', ev => {
+        ev.stopPropagation();
+        const path = btn.closest('.gh-file').dataset.path;
+        if (btn.dataset.act === 'restore') _ghRestoreFile(hash, path);
+        else if (btn.dataset.act === 'diff') _ghShowFileDiff(hash, path);
+      });
+    });
+    detail.querySelector('.gh-reset-btn')?.addEventListener('click', ev => {
+      ev.stopPropagation();
+      _ghResetTree(hash);
+    });
+  } catch (e) {
+    detail.innerHTML = `<div style="font-size:11px;color:var(--accent-red)">Could not load files: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+async function _ghShowFileDiff(hash, path) {
+  // Side-by-side merge view comparing the working-tree current vs the
+  // file as it was at this commit. Reuses the existing diff modal.
+  try {
+    const r = await fetch(API.url(
+      '/api/git/show-at?hash=' + encodeURIComponent(hash) +
+      '&path=' + encodeURIComponent(path)));
+    if (!r.ok) throw new Error((await r.json()).detail || r.status);
+    const data = await r.json();
+    const atCommit = data.content || '';
+    let current = '';
+    try {
+      const fresh = await API.read(path);
+      current = fresh.content || '';
+    } catch { /* file may have been deleted since */ }
+    _openDiff(`${path} · current ↔ ${hash.slice(0,7)}`, current, atCommit, modeForPath(path));
+  } catch (e) { showToast('Diff failed: ' + e.message); }
+}
+
+async function _ghRestoreFile(hash, path) {
+  if (!window.confirm(`Restore ${path} to its state at ${hash.slice(0,7)}?\n\nThe file will be overwritten in your working tree (you can revert with Cmd/Ctrl+Z if you re-open it).`)) return;
+  try {
+    const r = await fetch(API.url('/api/git/restore-file'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hash, paths: [path] }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      throw new Error(typeof d.detail === 'object' ? d.detail.message : d.detail || r.status);
+    }
+    showToast(`Restored ${path} from ${hash.slice(0,7)}`);
+    refreshGit();
+    refreshTree();
+  } catch (e) { showToast('Restore failed: ' + e.message); }
+}
+
+// Type-to-confirm reset flow. Uses the gh-reset-modal from the HTML.
+let _ghResetResolver = null;
+async function _ghResetTree(hash) {
+  const short = hash.slice(0, 7);
+  const result = await new Promise(resolve => {
+    _ghResetResolver = resolve;
+    document.getElementById('gh-reset-target').textContent = short;
+    document.getElementById('gh-reset-expected').textContent = short;
+    const inp = document.getElementById('gh-reset-input');
+    inp.value = '';
+    document.getElementById('gh-reset-confirm').disabled = true;
+    document.getElementById('gh-reset-modal').classList.add('show');
+    setTimeout(() => inp.focus(), 30);
+  });
+  if (result !== 'reset') return;
+  try {
+    const r = await fetch(API.url('/api/git/reset-hard'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hash, confirm: hash }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      throw new Error(typeof d.detail === 'object' ? d.detail.message : d.detail || r.status);
+    }
+    showToast(`Working tree reset to ${short}`);
+    closeGitHistory();
+    refreshGit();
+    refreshTree();
+  } catch (e) { showToast('Reset failed: ' + e.message); }
+}
+function _ghResetResolve(action) {
+  document.getElementById('gh-reset-modal').classList.remove('show');
+  const r = _ghResetResolver; _ghResetResolver = null;
+  if (r) r(action);
+}
+
+// Wire DOM hooks once.
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('gh-refresh')?.addEventListener('click', _ghLoadCommits);
+  document.getElementById('git-history-modal')?.addEventListener('click', e => {
+    if (e.target.id === 'git-history-modal') closeGitHistory();
+  });
+  // Type-to-confirm: only enable Reset when input matches the short hash.
+  const inp = document.getElementById('gh-reset-input');
+  if (inp) {
+    inp.addEventListener('input', () => {
+      const expected = document.getElementById('gh-reset-expected').textContent;
+      document.getElementById('gh-reset-confirm').disabled = inp.value.trim() !== expected;
+    });
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Escape') { e.preventDefault(); _ghResetResolve('cancel'); }
+      else if (e.key === 'Enter') {
+        const expected = document.getElementById('gh-reset-expected').textContent;
+        if (inp.value.trim() === expected) { e.preventDefault(); _ghResetResolve('reset'); }
+      }
+    });
+  }
+  document.getElementById('gh-reset-modal')?.addEventListener('click', e => {
+    if (e.target.id === 'gh-reset-modal') _ghResetResolve('cancel');
+  });
+});
 
 // ═══════════════════════════════════════════════════════════════
 // TREE REFRESH / FILE OPS
@@ -7018,6 +7306,7 @@ const COMMANDS = [
   { cat: 'Git',    title: 'Push',                                              run: () => gitPush() },
   { cat: 'Git',    title: 'Commit (focus message)',                            run: () => { switchPanel('git'); document.getElementById('git-commit-msg').focus(); } },
   { cat: 'Git',    title: 'Refresh status',                                    run: () => refreshGit() },
+  { cat: 'Git',    title: 'Show history…',                                     run: () => openGitHistory() },
   { cat: 'Git',    title: 'Clear stale index.lock',                             run: () => gitClearLock() },
   { cat: 'Git',    title: 'Initialise repository here',                         run: () => gitInit() },
   { cat: 'Git',    title: 'Create default .gitignore (HA-appropriate patterns)',run: () => gitSeedGitignore(false) },

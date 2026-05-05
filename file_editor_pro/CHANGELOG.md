@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.11.39 — Git history browser with restore + reset
+
+Click the new clock icon in the Source Control header (or palette → *Git: Show history…*) to open a modal with the last 200 commits. Each row shows the short hash, message, author, and date in a compact `Apr 26 12:34` form.
+
+**Click a row to expand it.** You get a list of every file changed in that commit, each tagged with `A` / `M` / `D` / `R` (added / modified / deleted / renamed) and two buttons:
+
+- **Diff** — opens the existing side-by-side merge view comparing the working-tree current to the file at that commit.
+- **Restore** — overwrites just that file with its state at the commit. Other files in your working tree are untouched. Native confirm prompt before applying.
+
+**Reset working tree to this commit** is also at the bottom of each expanded row. Destructive — uncommitted changes are lost — so it requires a **type-to-confirm** dialog: you have to type the short hash exactly to enable the *Reset* button. Escape cancels, click-outside cancels, click-anywhere on the wrong text leaves the button disabled.
+
+### Backend endpoints
+- `GET /api/git/log?limit=N` — recent commits with hash, short, author, ISO date, subject.
+- `GET /api/git/log-files?hash=…` — files changed in one commit, with status.
+- `GET /api/git/show-commit?hash=…&path=…` — unified diff text (raw `git show` output).
+- `GET /api/git/show-at?hash=…&path=…` — file contents at a commit.
+- `POST /api/git/restore-file` — `git checkout <hash> -- <paths>` for one or more files.
+- `POST /api/git/reset-hard` — `git reset --hard <hash>`. Requires a `confirm` field that must equal the hash; the frontend sends both, so a misuse from a hand-rolled curl needs the same confirmation.
+
 ## 1.11.38 — Insert-panel + entity autocomplete fixes
 
 ### Insert panel
