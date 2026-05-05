@@ -6186,18 +6186,47 @@ function haHintSource(cm) {
   const word = line.slice(start, end);
   const list = [];
 
-  // Entity completion — when a partial entity id (with a dot) is being typed,
-  // or after entity_id:/target:/device_tracker:/etc.
+  // Entity completion when the cursor sits right after one of the keys
+  // that takes an entity_id, even if the user hasn't typed the dot yet.
+  // Matches both empty value (offer all entities) and partial value
+  // (filter by entity_id-prefix or friendly-name-substring).
+  const entityKeyHint = /(?:entity_id|target|device_id|area_id|floor_id|service):\s*([a-z0-9_.]*)$/.exec(prefix);
+  if (entityKeyHint) {
+    const q = entityKeyHint[1].toLowerCase();
+    // Service key uses services not entities. Falls through to the
+    // service-specific block below if no entities matched.
+    const isServiceKey = /^service:/.test(prefix.match(/(?:entity_id|target|device_id|area_id|floor_id|service):/i)?.[0] || '');
+    if (!isServiceKey) {
+      for (const e of HA_CACHE.entities) {
+        if (!q || e.entity_id.startsWith(q) || (e.name && e.name.toLowerCase().includes(q))) {
+          list.push({
+            text: e.entity_id,
+            displayText: e.entity_id,
+            render(el) {
+              el.innerHTML = `<span>${e.entity_id}</span><span class="hint-entity-domain">${e.name || ''}</span>`;
+            },
+          });
+        }
+        if (list.length >= 40) break;
+      }
+      if (list.length) {
+        return { list, from: CodeMirror.Pos(cur.line, cur.ch - q.length), to: cur };
+      }
+    }
+  }
+
+  // Entity completion when a partial entity id (with a dot) is being typed
+  // anywhere — e.g. inside a Jinja {{ states('light.li...') }} expression.
   const entityHint = /([a-z_]+\.[a-z0-9_]*)$/.exec(prefix);
   if (entityHint) {
     const q = entityHint[1].toLowerCase();
     for (const e of HA_CACHE.entities) {
-      if (e.entity_id.startsWith(q) || e.name.toLowerCase().includes(q)) {
+      if (e.entity_id.startsWith(q) || (e.name && e.name.toLowerCase().includes(q))) {
         list.push({
           text: e.entity_id,
           displayText: e.entity_id,
           render(el) {
-            el.innerHTML = `<span>${e.entity_id}</span><span class="hint-entity-domain">${e.name}</span>`;
+            el.innerHTML = `<span>${e.entity_id}</span><span class="hint-entity-domain">${e.name || ''}</span>`;
           },
         });
       }
@@ -6729,16 +6758,21 @@ function renderInsertList() {
   let items = [];
 
   if (_insertKind === 'entity') {
+    // Insert just the entity_id — most contexts (`target:`,
+    // `entity_id:`, autocomplete on existing keys) already provide
+    // the surrounding YAML, and adding a "entity_id:" prefix here
+    // would double up. Use the snippets panel for full skeletons.
     items = HA_CACHE.entities.map(e => ({
       name: e.entity_id,
       desc: e.name && e.name !== e.entity_id ? e.name : e.domain,
-      insert: `entity_id: ${e.entity_id}`,
+      insert: e.entity_id,
     }));
   } else if (_insertKind === 'service') {
+    // Same reasoning — the value alone, no "service:" prefix.
     items = HA_CACHE.services.map(s => ({
       name: s.full,
       desc: s.description || s.name,
-      insert: `service: ${s.full}`,
+      insert: s.full,
     }));
   } else if (_insertKind === 'trigger') {
     items = TRIGGER_TEMPLATES.map(t => ({ name: t.name, desc: t.desc, insert: t.tpl }));
@@ -7303,14 +7337,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     'Ctrl-Space': 'autocomplete',
     'Cmd-Space': 'autocomplete',
   });
-  // Auto-trigger hints on typing when a pattern likely wants it
+  // Auto-trigger hints on typing when a pattern likely wants one.
   editor.on('inputRead', (cm, change) => {
     if (!HA_CACHE.loaded) return;
     const cur = cm.getCursor();
     const line = cm.getLine(cur.line).slice(0, cur.ch);
-    // Trigger when: just typed a dot in what looks like an entity/service id,
-    // or right after "service: " / "entity_id: "
-    if (/[a-z_]+\.[a-z0-9_]{0,3}$/.test(line) || /(service|entity_id):\s*$/.test(line)) {
+    // Triggers:
+    //   1) any partial entity-id-like fragment with a dot, anywhere
+    //      on the line — e.g. `{{ states('light.li`
+    //   2) right after `entity_id:` / `target:` / `device_id:` /
+    //      `area_id:` / `floor_id:` / `service:` with any partial
+    //      value (including empty) so typing `entity_id: l` opens
+    //      the dropdown immediately
+    if (/[a-z_]+\.[a-z0-9_]{0,3}$/.test(line) ||
+        /(?:service|entity_id|target|device_id|area_id|floor_id):\s*[a-z0-9_]*$/.test(line)) {
       cm.showHint({ hint: haHintSource, completeSingle: false });
     }
   });

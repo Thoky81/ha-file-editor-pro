@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.11.38 — Insert-panel + entity autocomplete fixes
+
+### Insert panel
+Clicking an **entity** or **service** in the *Insert* sidebar panel inserted the wrapped form (`entity_id: light.foo`, `service: light.turn_on`). That prefix was wrong in most places — when you click while inside a `target:` or after `entity_id:` you ended up with `entity_id: entity_id: …`. Now both entity and service inserts emit just the value.
+
+### Inline autocomplete (eager mode)
+The dropdown was only firing automatically once you'd typed enough to look like an entity ID with a dot (`light.li`). Fixed:
+
+- **Empty value triggers it.** `entity_id:` or `target:` or `device_id:` followed by a space — and one keystroke — opens the dropdown immediately, even before a dot.
+- **Substring match on friendly name** as well as entity-id prefix, so typing `entity_id: kitchen` finds `light.kitchen_main` even though you don't remember the slug.
+- **More keys recognised** — `area_id:` and `floor_id:` join `entity_id:` / `target:` / `device_id:` / `service:`.
+- Existing dot-anywhere completion (e.g. inside Jinja `{{ states('light.l…') }}`) still works.
+- Ctrl/Cmd+Space still triggers manually anywhere.
+
 ## 1.11.37 — Copy-all button in the Jinja errors modal
 
 The Jinja errors modal now has a **Copy all** button next to *Re-check*. It copies every finding (errors + notes) to the clipboard as plain text, prefixed with the file path and a count, formatted like:
