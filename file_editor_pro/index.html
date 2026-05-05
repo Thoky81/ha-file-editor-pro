@@ -1261,6 +1261,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" style="width:16px;height:16px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><circle cx="12" cy="16" r=".5" fill="currentColor"/></svg>
       <div class="logs-title">Jinja errors</div>
       <div class="logs-actions">
+        <button class="confirm-btn" onclick="copyJinjaErrors()">Copy all</button>
         <button class="confirm-btn" onclick="revalidateJinja()">Re-check</button>
         <button class="help-close" onclick="closeJinjaErrorsModal()" style="margin-left:4px">×</button>
       </div>
@@ -3271,6 +3272,33 @@ function closeJinjaErrorsModal() {
 
 function revalidateJinja() {
   validateJinjaNow().then(() => renderJinjaErrors());
+}
+
+// Copy every Jinja finding (errors + notes) to the clipboard as
+// plain text, formatted for pasting into a bug report or chat.
+function copyJinjaErrors() {
+  if (!_jinjaCache.length) { showToast('Nothing to copy — no Jinja findings'); return; }
+  const tab = tabs.find(t => t.id === activeTabId);
+  const sorted = _jinjaCache.slice().sort((a, b) =>
+    a.from.line - b.from.line || a.from.ch - b.from.ch);
+  const lines = [];
+  if (tab) lines.push(`# ${tab.path}`);
+  lines.push(`# ${sorted.length} Jinja finding${sorted.length > 1 ? 's' : ''}`);
+  lines.push('');
+  for (const e of sorted) {
+    const sev = (e.severity === 'info' ? 'NOTE' : 'ERROR');
+    lines.push(`[${sev}] Line ${e.from.line + 1}:${e.from.ch + 1} — ${e.message}`);
+    if (e.body) lines.push(`  ${e.body}`);
+    const hint = jinjaErrorHint(e.message, e.body || '');
+    // Strip backtick markdown for plain-text output.
+    if (hint) lines.push(`  Fix: ${hint.replace(/`/g, '')}`);
+    lines.push('');
+  }
+  const text = lines.join('\n').replace(/\n+$/, '\n');
+  try {
+    navigator.clipboard?.writeText(text);
+    showToast(`Copied ${sorted.length} Jinja finding${sorted.length > 1 ? 's' : ''} to clipboard`);
+  } catch { showToast('Copy failed'); }
 }
 
 // Tiny inline-code renderer: escapes the input, then converts

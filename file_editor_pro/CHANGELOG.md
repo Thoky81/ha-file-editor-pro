@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.11.37 — Copy-all button in the Jinja errors modal
+
+The Jinja errors modal now has a **Copy all** button next to *Re-check*. It copies every finding (errors + notes) to the clipboard as plain text, prefixed with the file path and a count, formatted like:
+
+```
+# config/automations.yaml
+# 2 Jinja findings
+
+[ERROR] Line 40:19 — 'response' is undefined
+  {{ response.content.data.cz | default('—') }}
+  Fix: response is an HA runtime variable …
+
+[NOTE] Line 9:26 — Uses 'value_json' …
+  {{ value_json.data.cz }}
+  Fix: value_json is an HA runtime variable …
+```
+
+Useful for pasting into a bug report, a chat, or `Developer Tools → Template` to debug. Hint markdown backticks are stripped for clean plain-text output.
+
 ## 1.11.36 — Add `response` to the HA runtime-context list
 
 `{{ response.content.* }}` was being flagged as a real error because `response` wasn't in the runtime-context-var skip list. It's set by `response_variable:` on service calls and only exists in the actions that follow that call, so it can never validate standalone — same shape as `trigger`/`repeat`/`wait` etc.
