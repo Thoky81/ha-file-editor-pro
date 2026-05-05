@@ -3344,7 +3344,7 @@ function revalidateJinja() {
 
 // Copy every Jinja finding (errors + notes) to the clipboard as
 // plain text, formatted for pasting into a bug report or chat.
-function copyJinjaErrors() {
+async function copyJinjaErrors() {
   if (!_jinjaCache.length) { showToast('Nothing to copy — no Jinja findings'); return; }
   const tab = tabs.find(t => t.id === activeTabId);
   const sorted = _jinjaCache.slice().sort((a, b) =>
@@ -3363,10 +3363,10 @@ function copyJinjaErrors() {
     lines.push('');
   }
   const text = lines.join('\n').replace(/\n+$/, '\n');
-  try {
-    navigator.clipboard?.writeText(text);
-    showToast(`Copied ${sorted.length} Jinja finding${sorted.length > 1 ? 's' : ''} to clipboard`);
-  } catch { showToast('Copy failed'); }
+  const ok = await _copyText(text);
+  showToast(ok
+    ? `Copied ${sorted.length} Jinja finding${sorted.length > 1 ? 's' : ''} to clipboard`
+    : 'Copy failed — clipboard blocked by the iframe sandbox');
 }
 
 // Tiny inline-code renderer: escapes the input, then converts
@@ -3711,14 +3711,23 @@ function mockCommit() { gitCommit(); }
 // ═══════════════════════════════════════════════════════════════
 // CONTEXT MENU ACTIONS
 // ═══════════════════════════════════════════════════════════════
-function ctxCopy() {
-  if (editor) { const s = editor.getSelection(); if(s) navigator.clipboard?.writeText(s); }
+async function ctxCopy() {
+  if (!editor) return;
+  const s = editor.getSelection();
+  if (s) await _copyText(s);   // _copyText handles iframe-sandbox fallback
 }
-function ctxCut() {
-  if (editor) { const s = editor.getSelection(); if(s){ navigator.clipboard?.writeText(s); editor.replaceSelection(''); } }
+async function ctxCut() {
+  if (!editor) return;
+  const s = editor.getSelection();
+  if (!s) return;
+  const ok = await _copyText(s);
+  if (ok) editor.replaceSelection('');   // only delete if the copy succeeded
 }
 function ctxPaste() {
-  if (editor) navigator.clipboard?.readText().then(t => editor.replaceSelection(t));
+  if (!editor) return;
+  // Read still requires Clipboard API permission (no exec-command
+  // equivalent for paste). Best-effort: try, fall back silently.
+  navigator.clipboard?.readText().then(t => editor.replaceSelection(t)).catch(() => {});
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -4309,15 +4318,42 @@ function renderLogs() {
       <span class="msg">${escapeHtml(l.message)}</span>
     </div>`).join('');
 }
-function copyLogs() {
+// Robust clipboard write. The HA add-on runs inside an ingress iframe
+// where `navigator.clipboard.writeText` is often blocked (no
+// `clipboard-write` permission policy granted), and the call returns
+// a Promise that rejects asynchronously — without `await` the failure
+// is silent and the toast lies. Fallback to the legacy textarea +
+// execCommand('copy'), which still works in sandboxed iframes.
+async function _copyText(text) {
+  if (navigator.clipboard?.writeText) {
+    try { await navigator.clipboard.writeText(text); return true; }
+    catch { /* fall through */ }
+  }
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.top = '-1000px';
+  ta.style.left = '0';
+  ta.style.opacity = '0';
+  ta.setAttribute('readonly', '');
+  document.body.appendChild(ta);
+  ta.select();
+  ta.setSelectionRange(0, ta.value.length);
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch {}
+  ta.remove();
+  return ok;
+}
+
+async function copyLogs() {
   if (!_APP_LOGS.length) { showToast('No messages to copy'); return; }
   const text = _APP_LOGS.map(l =>
     `[${l.ts.toISOString()}] ${l.level.toUpperCase()} ${l.message}`
   ).join('\n');
-  try {
-    navigator.clipboard?.writeText(text);
-    showToast(`Copied ${_APP_LOGS.length} log line${_APP_LOGS.length>1?'s':''}`);
-  } catch { showToast('Copy failed'); }
+  const ok = await _copyText(text);
+  showToast(ok
+    ? `Copied ${_APP_LOGS.length} log line${_APP_LOGS.length > 1 ? 's' : ''}`
+    : 'Copy failed — clipboard blocked by the iframe sandbox');
 }
 function clearLogs() {
   _APP_LOGS.length = 0;

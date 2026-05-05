@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.11.40 — Clipboard fix: copy actually copies in the HA ingress iframe
+
+The Jinja errors *Copy all* button (and the Logs panel's *Copy all*, and the editor's right-click *Copy* / *Cut*) were silently failing in the HA add-on. Inside an ingress iframe `navigator.clipboard.writeText` returns a Promise that rejects when the host doesn't grant `clipboard-write` — and the calls weren't `await`-ed, so the rejection was swallowed and the toast claimed success while the clipboard stayed empty.
+
+- New `_copyText(text)` helper: tries the Clipboard API first, awaits the promise, and on failure falls back to the legacy `<textarea>` + `document.execCommand('copy')` trick which still works in sandboxed iframes.
+- *Copy all* in the **Jinja errors** modal, *Copy all* in the **Logs** modal, and the editor's right-click **Copy** / **Cut** all route through it.
+- Toasts now report accurately — *"Copied X log lines"* only when the write actually succeeded; otherwise *"Copy failed — clipboard blocked by the iframe sandbox"*.
+- **Cut** only deletes the selection if the copy succeeded (no more accidental data loss when the clipboard write fails).
+
 ## 1.11.39 — Git history browser with restore + reset
 
 Click the new clock icon in the Source Control header (or palette → *Git: Show history…*) to open a modal with the last 200 commits. Each row shows the short hash, message, author, and date in a compact `Apr 26 12:34` form.
