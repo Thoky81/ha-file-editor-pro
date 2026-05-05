@@ -3063,7 +3063,17 @@ function _fileHasJinjaContext(text) {
 // self-reference, MQTT payload, event handler), so an expression that
 // references one cannot be validated standalone — /api/template would
 // always return "'<name>' is undefined".
-const _HA_CONTEXT_VARS = ['trigger', 'this', 'wait', 'repeat', 'value', 'value_json', 'event'];
+// Each name listed here is a variable HA injects only inside a
+// specific runtime scope:
+//   trigger      — automation / script trigger context
+//   this         — template-entity self-reference
+//   wait         — wait_template / wait_for_trigger result
+//   repeat       — repeat: block iteration
+//   value        — helper template (e.g. value_template on a sensor)
+//   value_json   — MQTT payloads, scrape sensors, etc.
+//   event        — event triggers / fired event handlers
+//   response     — service call response_variable
+const _HA_CONTEXT_VARS = ['trigger', 'this', 'wait', 'repeat', 'value', 'value_json', 'event', 'response'];
 const _HA_CONTEXT_RX = new RegExp(`\\b(?:${_HA_CONTEXT_VARS.join('|')})\\b`);
 
 function _usesHAContextVar(body) {
@@ -3079,7 +3089,7 @@ function jinjaErrorHint(message, body) {
   if (mm) {
     const name = mm[1];
     if (_HA_CONTEXT_VARS.includes(name)) {
-      return `\`${name}\` is an HA runtime variable — only defined inside its parent scope (trigger / repeat / wait / template entity / MQTT payload). Templates that use it can only be tested with HA's *Developer Tools → Template* in the right context.`;
+      return `\`${name}\` is an HA runtime variable — only defined inside its parent scope (trigger handler / repeat block / wait result / template entity / MQTT payload / service response). Test with HA's *Developer Tools → Template* in the right context.`;
     }
     return `\`${name}\` is not in scope. Check the spelling, or ensure the template is rendered in a context where it's defined.`;
   }

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.11.36 — Add `response` to the HA runtime-context list
+
+`{{ response.content.* }}` was being flagged as a real error because `response` wasn't in the runtime-context-var skip list. It's set by `response_variable:` on service calls and only exists in the actions that follow that call, so it can never validate standalone — same shape as `trigger`/`repeat`/`wait` etc.
+
+- `response` is now treated as a context variable: those expressions render as **note** rows with the contextual hint, not red errors.
+- Hint copy now also mentions *service response* alongside the other scopes (trigger handler / repeat block / wait result / template entity / MQTT payload).
+
 ## 1.11.35 — Folded sections: line numbers tint + show a ▸ glyph
 
 When you fold a region (block scalar, automation, function), the line where the fold collapses now shows its number in the accent colour and gets a small `▸` glyph after it — so collapsed sections are visible at a glance even when the foldgutter column is partially clipped or you're scrolling fast.
