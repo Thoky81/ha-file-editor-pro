@@ -5650,18 +5650,26 @@ const _bpOverlay = {
   startState() { return { _bpDepth: 0 }; },
   copyState(s) { return { _bpDepth: s._bpDepth }; },
 };
-let _bpActive = false;
+// Helper: walk every CodeMirror instance currently on screen so the
+// overlay-apply functions can keep both panes in sync without each
+// caller having to remember the second editor.
+function _eachEditor(fn) {
+  if (editor)        fn(editor);
+  if (_rightEditor)  fn(_rightEditor);
+}
+
 function applyBracketColors() {
-  if (!editor) return;
-  try {
-    if (PREFS.bracketColors && !_bpActive) {
-      editor.addOverlay(_bpOverlay); _bpActive = true;
-    } else if (!PREFS.bracketColors && _bpActive) {
-      editor.removeOverlay(_bpOverlay); _bpActive = false;
+  _eachEditor(cm => {
+    try {
+      if (PREFS.bracketColors && !cm._bpActive) {
+        cm.addOverlay(_bpOverlay); cm._bpActive = true;
+      } else if (!PREFS.bracketColors && cm._bpActive) {
+        cm.removeOverlay(_bpOverlay); cm._bpActive = false;
+      }
+    } catch (e) {
+      console.error('[bracket-colors] failed to toggle overlay:', e);
     }
-  } catch (e) {
-    console.error('[bracket-colors] failed to toggle overlay:', e);
-  }
+  });
 }
 function toggleBracketColors() {
   PREFS.bracketColors = !PREFS.bracketColors;
@@ -6328,11 +6336,14 @@ const _wsOverlay = {
     return null;
   }
 };
-let _wsActive = false;
 function applyWhitespace() {
-  if (!editor) return;
-  if (PREFS.showWhitespace && !_wsActive) { editor.addOverlay(_wsOverlay); _wsActive = true; }
-  else if (!PREFS.showWhitespace && _wsActive) { editor.removeOverlay(_wsOverlay); _wsActive = false; }
+  _eachEditor(cm => {
+    if (PREFS.showWhitespace && !cm._wsActive) {
+      cm.addOverlay(_wsOverlay); cm._wsActive = true;
+    } else if (!PREFS.showWhitespace && cm._wsActive) {
+      cm.removeOverlay(_wsOverlay); cm._wsActive = false;
+    }
+  });
 }
 function toggleWhitespace() {
   PREFS.showWhitespace = !PREFS.showWhitespace;
@@ -6432,34 +6443,31 @@ const _igOverlay = {
 };
 
 // Two overlays can be active at once for rainbow (colors + guides).
-let _currentStyleOverlay = null;
-let _currentGuidesOverlay = null;
-
 function applyIndentStyle() {
-  if (!editor) return;
-  if (_currentStyleOverlay)  { editor.removeOverlay(_currentStyleOverlay);  _currentStyleOverlay = null; }
-  if (_currentGuidesOverlay) { editor.removeOverlay(_currentGuidesOverlay); _currentGuidesOverlay = null; }
-
-  switch (PREFS.indentStyle) {
-    case 'guides':
-      editor.addOverlay(_guidesOverlay);
-      _currentGuidesOverlay = _guidesOverlay;
-      break;
-    case 'rainbow':
-      // Rainbow + grey tab-stop lines (like the VS Code Indent Rainbow
-      // extension).
-      editor.addOverlay(_irOverlay);    _currentStyleOverlay  = _irOverlay;
-      editor.addOverlay(_guidesOverlay);_currentGuidesOverlay = _guidesOverlay;
-      break;
-    case 'bars':
-      editor.addOverlay(_ibOverlay);    _currentStyleOverlay = _ibOverlay;
-      break;
-    case 'gradient':
-      editor.addOverlay(_igOverlay);    _currentStyleOverlay = _igOverlay;
-      break;
-    case 'none':
-    default: /* nothing */ break;
-  }
+  _eachEditor(cm => {
+    if (cm._currentStyleOverlay)  { cm.removeOverlay(cm._currentStyleOverlay);  cm._currentStyleOverlay = null; }
+    if (cm._currentGuidesOverlay) { cm.removeOverlay(cm._currentGuidesOverlay); cm._currentGuidesOverlay = null; }
+    switch (PREFS.indentStyle) {
+      case 'guides':
+        cm.addOverlay(_guidesOverlay);
+        cm._currentGuidesOverlay = _guidesOverlay;
+        break;
+      case 'rainbow':
+        // Rainbow + grey tab-stop lines (like the VS Code Indent
+        // Rainbow extension).
+        cm.addOverlay(_irOverlay);     cm._currentStyleOverlay  = _irOverlay;
+        cm.addOverlay(_guidesOverlay); cm._currentGuidesOverlay = _guidesOverlay;
+        break;
+      case 'bars':
+        cm.addOverlay(_ibOverlay);     cm._currentStyleOverlay  = _ibOverlay;
+        break;
+      case 'gradient':
+        cm.addOverlay(_igOverlay);     cm._currentStyleOverlay  = _igOverlay;
+        break;
+      case 'none':
+      default: /* nothing */ break;
+    }
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -6647,6 +6655,14 @@ async function openFileRight(path) {
   }
   _rightEditor.setValue(file.content || '');
   _rightEditor.setOption('mode', file.mode);
+  // Apply the same overlays the main editor uses so the right pane
+  // matches indent-style / whitespace dots / rainbow brackets prefs
+  // immediately. The apply* fns walk both editors via _eachEditor,
+  // so calling here covers a freshly-created right pane that didn't
+  // exist when applyPrefs ran at boot.
+  applyWhitespace();
+  applyIndentStyle();
+  applyBracketColors();
   setTimeout(() => {
     _rightEditor.refresh();
     if (editor) editor.refresh();

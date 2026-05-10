@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.11.41 — Right pane respects indent-style / whitespace / bracket-colour prefs
+
+Opening a file *to the right* (split view) gave you a plain pane with no overlays — the indent rainbow / bars / gradient / guides, the visible-whitespace dots, and rainbow bracket colours all stayed off in the right pane regardless of your prefs.
+
+Root cause: `applyIndentStyle()`, `applyWhitespace()`, and `applyBracketColors()` only ever operated on the main `editor` instance, and the on/off state was tracked in module-level variables, so adding the right pane to the iteration would have double-counted state.
+
+Fix:
+
+- New `_eachEditor(fn)` helper that walks every CodeMirror instance currently on screen.
+- All three apply functions now use it; per-pane state lives on the CodeMirror instance itself (`cm._bpActive`, `cm._wsActive`, `cm._currentStyleOverlay`, `cm._currentGuidesOverlay`) so each pane tracks its own overlay state independently.
+- The right pane's first-time init now calls all three apply functions so the freshly-created CodeMirror picks up your current settings the moment it appears.
+- Toggling any of these prefs (Settings → Indent style / Show whitespace / Rainbow brackets) now updates both panes in lockstep.
+
 ## 1.11.40 — Clipboard fix: copy actually copies in the HA ingress iframe
 
 The Jinja errors *Copy all* button (and the Logs panel's *Copy all*, and the editor's right-click *Copy* / *Cut*) were silently failing in the HA add-on. Inside an ingress iframe `navigator.clipboard.writeText` returns a Promise that rejects when the host doesn't grant `clipboard-write` — and the calls weren't `await`-ed, so the rejection was swallowed and the toast claimed success while the clipboard stayed empty.
