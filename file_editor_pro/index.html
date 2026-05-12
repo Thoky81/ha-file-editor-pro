@@ -284,6 +284,9 @@
                  flex-basis .18s ease, background .1s, color .1s
     }
     .tab > span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
+    /* Preview tab (VS Code style) — italic title, opening another file
+       replaces it. Editing / double-clicking promotes to permanent. */
+    .tab.preview > span{font-style:italic}
     /* Hover only changes colour by default — width is only forced when
        the tab is actually being squeezed (label truncated). JS adds
        .is-squeezed after render based on scrollWidth > clientWidth. */
@@ -1848,6 +1851,14 @@ class MySensor(Entity):
             <div class="settings-toggle" id="set-minimap" onclick="toggleMinimap(); refreshSettingsUI()"></div>
           </div>
         </div>
+        <div class="settings-row">
+          <div class="settings-label">Preview tabs
+            <span class="settings-help">Single-click a file → opens in a temporary "preview" tab (italic title); opening another file replaces it. Edit it or double-click to keep it open. Off = every open is a permanent tab.</span>
+          </div>
+          <div class="settings-control">
+            <div class="settings-toggle" id="set-preview-tabs" onclick="togglePreviewTabs(); refreshSettingsUI()"></div>
+          </div>
+        </div>
       </div>
 
       <div class="settings-section">
@@ -2343,7 +2354,14 @@ function initEditor() {
   editor.on('change', () => {
     if (!activeTabId) return;
     const tab = tabs.find(t => t.id === activeTabId);
-    if (tab && !tab.modified) { tab.modified = true; renderTabs(); }
+    if (tab) {
+      // Editing a preview tab promotes it to permanent — you don't
+      // want your edits to vanish when you open the next file.
+      let changed = false;
+      if (tab.preview)  { tab.preview = false; changed = true; }
+      if (!tab.modified) { tab.modified = true; changed = true; }
+      if (changed) renderTabs();
+    }
     validateYAML();
     if (activePanel === 'outline') {
       clearTimeout(_outlineDebounce);
@@ -2507,6 +2525,7 @@ function filterFileTree(q) {
       <span class="tree-open-dot"></span>
       ${gs ? `<span class="tree-git-badge git-${gs}">${gs}</span>` : ''}`;
     item.onclick = () => openFile(n.path, item);
+    item.ondblclick = () => openFile(n.path, item, { permanent: true });
     container.appendChild(item);
   }
 }
@@ -2617,7 +2636,14 @@ function renderNodes(nodes, container, depth) {
         <span class="tree-name">${node.name}</span>
         <span class="tree-open-dot"></span>
         ${gs ? `<span class="tree-git-badge git-${gs}">${gs}</span>` : ''}`;
-      if (node.path) item.onclick = () => openFile(node.path, item);
+      if (node.path) {
+        // Single click → preview tab; double click → permanent tab
+        // (VS Code style). The dblclick fires after two clicks, so
+        // the first click already opened it as preview; the dblclick
+        // just promotes it.
+        item.onclick = () => openFile(node.path, item);
+        item.ondblclick = () => openFile(node.path, item, { permanent: true });
+      }
     }
     container.appendChild(item);
 
@@ -2668,26 +2694,64 @@ function fileIcon() {
 // ═══════════════════════════════════════════════════════════════
 // FILE OPERATIONS
 // ═══════════════════════════════════════════════════════════════
-function openFile(path, treeItem) {
+// opts.permanent — when true, the tab is a regular pinned tab.
+// When false (the default for a single tree click), it opens as a
+// "preview" tab: there's at most one preview tab at a time, and
+// opening another file as preview replaces it. A preview tab gets
+// promoted to permanent when you edit it, double-click it, or
+// double-click the tree entry. Preview behaviour is disabled when
+// PREFS.previewTabs is false — then every open is permanent.
+function openFile(path, treeItem, opts = {}) {
   const file = FILES[path];
   if (!file) return;
+  const previewEnabled = PREFS.previewTabs !== false;
+  const wantPreview = previewEnabled && !opts.permanent;
 
   const existing = tabs.find(t => t.path === path);
-  if (existing) { switchTab(existing.id); return; }
+  if (existing) {
+    // Already open. If it's a preview tab and we now want it
+    // permanent, promote it.
+    if (existing.preview && opts.permanent) {
+      existing.preview = false;
+      renderTabs();
+    }
+    switchTab(existing.id);
+    return;
+  }
 
   const tab = {
     id: 'tab-' + Date.now(),
     name: path.split('/').pop(),
     path,
     modified: false,
+    preview: wantPreview,
     doc: CodeMirror.Doc(file.content, file.mode),
     mode: file.mode,
   };
-  tabs.push(tab);
+
+  if (wantPreview) {
+    // Replace the current preview tab in place (keeps ordering stable
+    // — the preview slot stays where it was) instead of appending.
+    const prevIdx = tabs.findIndex(t => t.preview);
+    if (prevIdx >= 0) {
+      tabs.splice(prevIdx, 1, tab);
+    } else {
+      tabs.push(tab);
+    }
+  } else {
+    tabs.push(tab);
+  }
+
   renderTabs();
   switchTab(tab.id);
   renderFileTree();
   savePersistedTabs();
+}
+
+// Promote a preview tab to a permanent one (called on edit / dblclick).
+function promoteTabToPermanent(id) {
+  const t = tabs.find(x => x.id === id);
+  if (t && t.preview) { t.preview = false; renderTabs(); savePersistedTabs(); }
 }
 
 function switchTab(id) {
@@ -2868,11 +2932,15 @@ function renderTabs() {
   bar.innerHTML = '';
   tabs.forEach(tab => {
     const el = document.createElement('div');
-    el.className = 'tab' + (tab.id === activeTabId ? ' active' : '');
+    el.className = 'tab'
+      + (tab.id === activeTabId ? ' active' : '')
+      + (tab.preview ? ' preview' : '');
     el.onclick = () => switchTab(tab.id);
+    // Double-click promotes a preview tab to permanent (VS Code style).
+    el.ondblclick = () => promoteTabToPermanent(tab.id);
     // Middle-click closes the tab (common browser/editor gesture).
     el.onmousedown = (e) => { if (e.button === 1) { e.preventDefault(); closeTab(tab.id); } };
-    el.title = tab.path;
+    el.title = tab.path + (tab.preview ? '  (preview — double-click to keep open)' : '');
     el.innerHTML = `
       ${tab.modified ? '<div class="tab-dot"></div>' : ''}
       <span>${tab.name}</span>
@@ -5380,6 +5448,7 @@ const PREFS = {
   sidebarVisible: true,          // Ctrl+B toggles the sidebar
   defaultFolder: '',             // drill into this path on startup (empty = full tree)
   showHidden: false,             // dotfiles/dotdirs in Explorer + search
+  previewTabs: true,             // VS Code-style preview tab on single click
 };
 
 function loadPrefs() {
@@ -5405,6 +5474,7 @@ function savePersistedTabs() {
     const snap = {
       paths: tabs.map(t => t.path).filter(Boolean),
       active: tabs.find(t => t.id === activeTabId)?.path || null,
+      preview: tabs.find(t => t.preview)?.path || null,
     };
     localStorage.setItem(TABS_KEY, JSON.stringify(snap));
   } catch {}
@@ -5416,13 +5486,21 @@ async function restorePersistedTabs() {
   // even if the user had closed every tab — don't auto-open one.
   if (!snap) return false;
   const paths = Array.isArray(snap.paths) ? snap.paths : [];
+  // Restore everything as permanent first so the preview-replace logic
+  // doesn't collapse the set during restore, then re-mark the one tab
+  // that was a preview tab.
   for (const p of paths) {
-    if (FILES[p]) await openFile(p);
+    if (FILES[p]) await openFile(p, null, { permanent: true });
+  }
+  if (snap.preview && PREFS.previewTabs !== false) {
+    const t = tabs.find(tab => tab.path === snap.preview);
+    if (t) t.preview = true;
   }
   if (snap.active) {
     const t = tabs.find(tab => tab.path === snap.active);
     if (t) switchTab(t.id);
   }
+  renderTabs();
   return true;
 }
 function applyPrefs() {
@@ -5689,6 +5767,20 @@ function toggleMinimap() {
   PREFS.minimap = !PREFS.minimap;
   savePrefs(); applyMinimap();
   showToast(`Minimap: ${PREFS.minimap ? 'on' : 'off'}`);
+}
+
+function togglePreviewTabs() {
+  PREFS.previewTabs = !PREFS.previewTabs;
+  savePrefs();
+  // Turning it off: promote any current preview tab so it doesn't get
+  // unexpectedly replaced the next time a file is opened.
+  if (!PREFS.previewTabs) {
+    let changed = false;
+    tabs.forEach(t => { if (t.preview) { t.preview = false; changed = true; } });
+    if (changed) { renderTabs(); savePersistedTabs(); }
+  }
+  _setToggle('set-preview-tabs', PREFS.previewTabs);
+  showToast(`Preview tabs: ${PREFS.previewTabs ? 'on' : 'off'}`);
 }
 
 function toggleShowHidden() {
@@ -6278,6 +6370,7 @@ function refreshSettingsUI() {
   _setToggle('set-bp',      PREFS.bracketColors);
   _setToggle('set-minimap', PREFS.minimap);
   _setToggle('set-wrap',    PREFS.lineWrapping);
+  _setToggle('set-preview-tabs', PREFS.previewTabs !== false);
 }
 
 // Dismiss on backdrop click

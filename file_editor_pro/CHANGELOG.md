@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.11.42 — Preview tabs (VS Code style) — stop the tab list from piling up
+
+Single-clicking a file in the tree (or the filtered tree) now opens it in a **preview tab** — the title shows in *italic*, and opening another file *replaces* it rather than adding a new tab. So browsing through files doesn't leave a trail of tabs behind.
+
+A preview tab becomes a permanent tab the moment you:
+
+- **edit the file** (so your changes can never vanish when the next file opens),
+- **double-click the tree entry**, or
+- **double-click the tab** itself.
+
+There's at most one preview tab at a time. The preview slot stays where it is in the tab order when it gets replaced — no reshuffling. The preview state persists across page reloads.
+
+- New **Settings → Appearance → Preview tabs** toggle (default **on**). Turning it off makes every open a permanent tab and promotes any current preview tab so it isn't surprisingly replaced.
+- Hover tooltip on a preview tab reads *"(preview — double-click to keep open)"*.
+
 ## 1.11.41 — Right pane respects indent-style / whitespace / bracket-colour prefs
 
 Opening a file *to the right* (split view) gave you a plain pane with no overlays — the indent rainbow / bars / gradient / guides, the visible-whitespace dots, and rainbow bracket colours all stayed off in the right pane regardless of your prefs.
