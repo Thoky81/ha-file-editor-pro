@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.11.43 — Modals don't dismiss on stray outside clicks
+
+Click-outside-to-close used to apply to nearly every modal, which silently threw away whatever you had typed if your cursor drifted. Audited and removed the behaviour from every modal that holds user state or content. Escape and the explicit close (× / Cancel) button still work everywhere.
+
+**Removed outside-click dismiss from:**
+
+- New file / new folder / rename prompt (the one you specifically called out)
+- Find & Replace
+- Logs panel · Jinja errors · Help
+- Git history · Reset-tree confirm (was eating typed hashes)
+- Theme editor (lost hex inputs + open colour picker)
+- Settings · Diff viewer
+- Command palette · Jinja template preview
+
+**Kept outside-click dismiss on:**
+
+- Delete confirm · Unsaved-changes prompt · Upload-overwrite prompt
+
+Those are tiny yes/no dialogs where clicking outside *means* "cancel" — universal convention, no state to lose.
+
 ## 1.11.42 — Preview tabs (VS Code style) — stop the tab list from piling up
 
 Single-clicking a file in the tree (or the filtered tree) now opens it in a **preview tab** — the title shows in *italic*, and opening another file *replaces* it rather than adding a new tab. So browsing through files doesn't leave a trail of tabs behind.

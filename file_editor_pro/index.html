@@ -2838,9 +2838,8 @@ function _inputResolve(value) {
   const r = _inputPromise; _inputPromise = null;
   if (r) r(value == null ? null : value.trim() || null);
 }
-document.getElementById('input-modal').addEventListener('click', e => {
-  if (e.target.id === 'input-modal') _inputResolve(null);
-});
+// Click-outside used to dismiss the prompt — that silently discarded
+// whatever the user had typed. Use Esc or the Cancel button instead.
 document.getElementById('input-field').addEventListener('keydown', e => {
   if (e.key === 'Enter') { e.preventDefault(); _inputResolve(e.target.value); }
   if (e.key === 'Escape') { e.preventDefault(); _inputResolve(null); }
@@ -4297,11 +4296,11 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('fr-picker-search')
     .addEventListener('input', renderEntityPickerList);
 
-  // Click outside the modal closes it; click outside the picker
-  // (but inside the modal) closes only the picker.
-  document.getElementById('fr-modal').addEventListener('click', e => {
-    if (e.target.id === 'fr-modal') closeFindReplace();
-  });
+  // The modal no longer dismisses on outside click — clicking the
+  // overlay used to discard in-progress find/replace inputs by
+  // accident. Use the × button or Escape to close.
+  // Clicks inside the modal but outside the entity picker still
+  // close the picker only, so typing in the main fields keeps working.
   document.querySelector('.fr-modal').addEventListener('click', e => {
     const picker = document.getElementById('fr-picker');
     if (picker.classList.contains('show') &&
@@ -4428,15 +4427,9 @@ function clearLogs() {
   renderLogs();
   _updateLogsBadge();
 }
-// Click outside the inner modal dismisses it.
-document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('logs-modal')?.addEventListener('click', e => {
-    if (e.target.id === 'logs-modal') closeLogs();
-  });
-  document.getElementById('jinja-errors-modal')?.addEventListener('click', e => {
-    if (e.target.id === 'jinja-errors-modal') closeJinjaErrorsModal();
-  });
-});
+// Logs / Jinja-errors modals: no click-outside-close. The Esc shortcut
+// and the × button still dismiss them. Outside-click used to dismiss
+// in the middle of reading a long log, which was annoying.
 
 // ═══════════════════════════════════════════════════════════════
 // KEYBOARD
@@ -5084,10 +5077,9 @@ function _ghResetResolve(action) {
 // Wire DOM hooks once.
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('gh-refresh')?.addEventListener('click', _ghLoadCommits);
-  document.getElementById('git-history-modal')?.addEventListener('click', e => {
-    if (e.target.id === 'git-history-modal') closeGitHistory();
-  });
-  // Type-to-confirm: only enable Reset when input matches the short hash.
+  // Git history + reset confirm: no click-outside-close. The reset
+  // modal in particular has a typed-hash field that would be lost.
+  // Use Esc or the explicit Cancel button.
   const inp = document.getElementById('gh-reset-input');
   if (inp) {
     inp.addEventListener('input', () => {
@@ -5102,9 +5094,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
-  document.getElementById('gh-reset-modal')?.addEventListener('click', e => {
-    if (e.target.id === 'gh-reset-modal') _ghResetResolve('cancel');
-  });
 });
 
 // ═══════════════════════════════════════════════════════════════
@@ -5903,9 +5892,7 @@ function updateMinimapViewport() {
 // ═══════════════════════════════════════════════════════════════
 function openHelp()  { document.getElementById('help-modal').classList.add('show'); }
 function closeHelp() { document.getElementById('help-modal').classList.remove('show'); }
-document.getElementById('help-modal').addEventListener('click', e => {
-  if (e.target.id === 'help-modal') closeHelp();
-});
+// Help modal: closes only via Esc or its × button.
 
 function openSettings() {
   const modal = document.getElementById('settings-modal');
@@ -6245,9 +6232,8 @@ function _openColorPickerFor(varName, swatchEl) {
 // ── Wire DOM hooks once ────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('te-reset')?.addEventListener('click', resetThemeOverrides);
-  document.getElementById('theme-editor-modal')?.addEventListener('click', e => {
-    if (e.target.id === 'theme-editor-modal') closeThemeEditor();
-  });
+  // No outside-click dismiss: theme editor has hex inputs and an open
+  // colour picker that would be lost. Esc / × dismiss instead.
 });
 
 function buildSettingsUI() {
@@ -6373,10 +6359,8 @@ function refreshSettingsUI() {
   _setToggle('set-preview-tabs', PREFS.previewTabs !== false);
 }
 
-// Dismiss on backdrop click
-document.getElementById('settings-modal').addEventListener('click', e => {
-  if (e.target.id === 'settings-modal') closeSettings();
-});
+// Settings modal: no backdrop-click dismiss — too many inputs to lose
+// state from. Use the × button or Escape instead.
 
 // ═══════════════════════════════════════════════════════════════
 // FAB (pencil) menu — editor actions
@@ -6960,9 +6944,8 @@ function closeDiff() {
   _diffMV = null;
 }
 
-document.getElementById('diff-modal').addEventListener('click', e => {
-  if (e.target.id === 'diff-modal') closeDiff();
-});
+// Diff modal: no backdrop dismiss — you might be scrolling through a
+// long diff. Use Esc or the × button.
 
 // ═══════════════════════════════════════════════════════════════
 // OUTLINE PANEL — walks the active YAML document and lists its
@@ -7742,12 +7725,9 @@ document.addEventListener('keydown', e => {
 });
 
 document.getElementById('cmdpal-input').addEventListener('input', e => renderCmdPal(e.target.value));
-document.getElementById('cmdpal').addEventListener('click', e => {
-  if (e.target.id === 'cmdpal') closeCmdPal();
-});
-document.getElementById('jinja-modal').addEventListener('click', e => {
-  if (e.target.id === 'jinja-modal') closeTemplatePreview();
-});
+// Command palette + Jinja template preview: no backdrop-click dismiss.
+// The palette has a focused query; the Jinja preview has a typed
+// template. Esc still closes both.
 
 // ═══════════════════════════════════════════════════════════════
 // BOOT
