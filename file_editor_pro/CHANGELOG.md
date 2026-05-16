@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.11.44 — Fix click-to-cursor mapping after the web font finishes loading
+
+Reports of *"clicking lands on a different row than I aimed at, especially further down the file"*. Root cause: JetBrains Mono is loaded from Google Fonts with `display=swap`, so CodeMirror initially measures line height against the fallback `monospace`. When the real font swaps in, lines render at a slightly different height — but CM still believes the old height, so click→line mapping drifts (and the drift accumulates as you scroll).
+
+Fixed by re-measuring at every plausible moment fonts settle:
+
+1. `document.fonts.ready` resolves (the standards-defined signal).
+2. The `loadingdone` event on the `fontfaceset` fires (catches late-loading weights).
+3. A safety-net timer at 1 s and 3 s in case neither of the above fires in this browser / iframe environment.
+
+`editor.refresh()` is cheap, so the redundant calls are harmless. The right pane is refreshed in the same callback.
+
 ## 1.11.43 — Modals don't dismiss on stray outside clicks
 
 Click-outside-to-close used to apply to nearly every modal, which silently threw away whatever you had typed if your cursor drifted. Audited and removed the behaviour from every modal that holds user state or content. Escape and the explicit close (× / Cancel) button still work everywhere.

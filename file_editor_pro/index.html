@@ -7744,6 +7744,31 @@ document.addEventListener('DOMContentLoaded', async () => {
   attachSidebarResizer();
   attachMinimapClick();
 
+  // JetBrains Mono is loaded from Google Fonts with display=swap, so
+  // CodeMirror initially measures line height against the fallback
+  // monospace font. When the real font swaps in, the rendered lines
+  // shift slightly but CM still believes the old height — mouse clicks
+  // then map to a row above or below the one you visually targeted,
+  // and the drift grows with scroll position.
+  //
+  // We force CM to re-measure at every plausible moment fonts settle:
+  //   1. fonts.ready resolves (the documented signal).
+  //   2. fontfaceset 'loadingdone' fires (late-loading weights).
+  //   3. A 1s safety timer in case neither of the above fires in this
+  //      browser/iframe environment.
+  // Re-measuring is cheap; redundant calls are harmless.
+  const refreshBothEditors = () => {
+    try { editor?.refresh(); _rightEditor?.refresh(); } catch {}
+  };
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(refreshBothEditors);
+    if (typeof document.fonts.addEventListener === 'function') {
+      document.fonts.addEventListener('loadingdone', refreshBothEditors);
+    }
+  }
+  setTimeout(refreshBothEditors, 1000);
+  setTimeout(refreshBothEditors, 3000);
+
   // Wire show-hint with our HA-aware source
   editor.setOption('hintOptions', { hint: haHintSource, completeSingle: false });
   editor.setOption('extraKeys', {
