@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.11.47 — Settings → Source control tab
+
+The big "Most of these changes come from a few folders" box in the Source Control panel has moved to Settings.
+
+- **Settings now has tabs**: *Editor* (everything that was there before) and *Source control*.
+- **Source control tab**:
+  - **Folders with the most changes**: up to 10 folders, each with **Stop tracking** (spinner while it runs).
+  - **Ignored by git**: every active rule in `/config/.gitignore`. Click **×** to remove a rule (files it covered show up again as untracked; nothing is committed), or use **Edit .gitignore** to open the file.
+- **Source Control panel**: only a single line remains, e.g. *"16,360 of 18,498 changes are in 3 large folders · Manage…"*, which opens the new tab.
+- **Command palette**: new *Git: Manage ignored folders…* command.
+
 ## 1.11.46 — Stop tracking shows progress
 
 Un-tracking a large HACS folder can take a while on slower hosts, and the button gave no sign anything was happening, so it was easy to click again.

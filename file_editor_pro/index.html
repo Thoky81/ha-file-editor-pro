@@ -257,16 +257,12 @@
     .git-file .git-file-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
     .git-file-name{color:var(--text-secondary);flex:1}
     .git-more{padding:6px 8px;color:var(--text-muted);font-size:11px;font-style:italic}
-    .git-noisy{margin:2px 0 8px;padding:8px;border:1px solid var(--border-light);border-radius:6px;background:var(--bg-mid)}
-    .git-noisy-title{font-size:12px;font-weight:600;color:var(--text-primary)}
-    .git-noisy-hint{font-size:11px;color:var(--text-muted);margin:3px 0 6px;line-height:1.4}
-    .git-noisy-row{display:flex;align-items:center;gap:6px;padding:3px 0;font-family:var(--font-mono);font-size:11px}
-    .git-noisy-path{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-secondary)}
-    .git-noisy-count{color:var(--text-muted)}
+    .git-noisy-bar{display:flex;align-items:center;gap:6px;margin:0 0 6px;padding:5px 8px;border-radius:4px;background:var(--bg-mid);font-size:11px;color:var(--text-secondary);cursor:pointer}
+    .git-noisy-bar:hover{background:var(--bg-hover)}
+    .git-noisy-bar b{color:var(--accent);font-weight:500;margin-left:auto;white-space:nowrap}
     .git-noisy-btn{flex-shrink:0;padding:2px 8px;background:var(--accent-dim);border:1px solid rgba(240,165,0,.3);border-radius:4px;color:var(--accent);font-family:var(--font-ui);font-size:11px;cursor:pointer}
     .git-noisy-btn:disabled{opacity:.5;cursor:default}
-    .git-noisy-row.busy .git-noisy-btn{opacity:1;display:inline-flex;align-items:center;gap:5px}
-    .git-noisy-row.busy .git-noisy-path{color:var(--text-muted)}
+    .git-noisy-btn.busy{opacity:1;display:inline-flex;align-items:center;gap:5px}
     .git-spin{width:9px;height:9px;border:1.5px solid currentColor;border-right-color:transparent;border-radius:50%;animation:git-spin .7s linear infinite}
     @keyframes git-spin{to{transform:rotate(360deg)}}
     .git-noisy-btn:not(:disabled):hover{background:rgba(240,165,0,.25);border-color:rgba(240,165,0,.5)}
@@ -717,6 +713,20 @@
     .settings-close{margin-left:auto;background:none;border:none;color:var(--text-muted);font-size:22px;cursor:pointer;line-height:1;padding:0 6px;border-radius:4px}
     .settings-close:hover{background:var(--bg-hover);color:var(--text-primary)}
     .settings-body{padding:16px 20px;overflow-y:auto}
+    .settings-tabs{display:flex;gap:2px;padding:0 14px;border-bottom:1px solid var(--border)}
+    .settings-tab{background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;padding:9px 10px;color:var(--text-muted);font-family:var(--font-ui);font-size:12px;cursor:pointer}
+    .settings-tab:hover{color:var(--text-primary)}
+    .settings-tab.active{color:var(--text-primary);border-bottom-color:var(--accent)}
+    .settings-pane{display:none}
+    .settings-pane.active{display:block}
+    .settings-empty{font-size:12px;color:var(--text-muted);padding:6px 0}
+    .settings-list-row{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);font-family:var(--font-mono);font-size:12px}
+    .settings-list-row:last-child{border-bottom:none}
+    .settings-list-path{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-primary)}
+    .settings-list-meta{color:var(--text-muted);font-size:11px}
+    .settings-list-x{background:none;border:none;color:var(--text-muted);font-size:16px;line-height:1;cursor:pointer;padding:0 4px;border-radius:4px}
+    .settings-list-x:hover{background:var(--bg-hover);color:var(--accent-red)}
+    .settings-section-actions{display:flex;justify-content:flex-end;margin-top:8px}
     .settings-section{margin-bottom:18px}
     .settings-section-title{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin-bottom:10px;font-weight:600}
     .settings-row{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:9px 0;border-bottom:1px solid var(--border)}
@@ -1769,7 +1779,12 @@ class MySensor(Entity):
       <div class="settings-title">Settings</div>
       <button class="settings-close" onclick="closeSettings()">×</button>
     </div>
+    <div class="settings-tabs">
+      <button class="settings-tab" data-tab="editor" onclick="setSettingsTab('editor')">Editor</button>
+      <button class="settings-tab" data-tab="git" onclick="setSettingsTab('git')">Source control</button>
+    </div>
     <div class="settings-body">
+     <div class="settings-pane" data-pane="editor">
       <div class="settings-section">
         <div class="settings-section-title">Appearance</div>
         <div class="settings-row">
@@ -1907,6 +1922,8 @@ class MySensor(Entity):
           </div>
         </div>
       </div>
+     </div>
+     <div class="settings-pane" data-pane="git" id="settings-git-pane"></div>
     </div>
   </div>
 </div>
@@ -3783,6 +3800,7 @@ function renderGitPanel() {
   }).join('') + (hidden ? `
     <div class="git-more">+ ${hidden.toLocaleString()} more not listed — still included in the commit</div>` : '');
   _renderStagedCount();
+  if (_settingsGitVisible()) renderSettingsGit();
 }
 
 const GIT_RENDER_CAP = 300;
@@ -3790,8 +3808,8 @@ const GIT_RENDER_CAP = 300;
 // Folders that dominate a large change set, e.g. a HACS integration
 // that rewrote thousands of files on update. Grouped two levels deep
 // ("custom_components/foo") since that's where such bulk lives.
-function _gitNoisyFolders() {
-  if (GIT_CHANGES.length < 100) return [];
+function _gitNoisyFolders(minTotal = 100, limit = 5) {
+  if (GIT_CHANGES.length < minTotal) return [];
   const counts = new Map();
   for (const f of GIT_CHANGES) {
     const rel = f.path.replace(/^config\//, '');
@@ -3805,27 +3823,93 @@ function _gitNoisyFolders() {
   return Array.from(counts, ([path, n]) => ({ path, n }))
     .filter(x => x.n >= 20)
     .sort((a, b) => b.n - a.n)
-    .slice(0, 5);
+    .slice(0, limit);
 }
 
+// One-line pointer from the panel to Settings → Source control, where
+// the folders can be dealt with.
 function _gitNoisyFoldersHtml() {
   const folders = _gitNoisyFolders();
   if (!folders.length) return '';
+  const n = folders.reduce((a, x) => a + x.n, 0);
   return `
-    <div class="git-noisy">
-      <div class="git-noisy-title">Most of these changes come from a few folders</div>
-      <div class="git-noisy-hint">Folders managed by HACS or Home Assistant are reinstalled on update and usually don't need version control.</div>
-      ${folders.map(x => {
-        const mine = _gitStopBusy.includes(x.path);
-        return `
-        <div class="git-noisy-row${mine ? ' busy' : ''}">
-          <span class="git-noisy-path" title="${escapeHtml(x.path)}">${escapeHtml(x.path)}/</span>
-          <span class="git-noisy-count">${x.n.toLocaleString()}</span>
-          <button class="git-noisy-btn" ${_gitStopBusy.length ? 'disabled' : ''}
-                  onclick="gitStopTracking([${escapeHtml(JSON.stringify(x.path))}])">${mine ? '<span class="git-spin"></span>Stopping…' : 'Stop tracking'}</button>
-        </div>`;
-      }).join('')}
+    <div class="git-noisy-bar" onclick="openSettings('git')"
+         title="${escapeHtml(folders.map(x => x.path + '/ (' + x.n + ')').join('\n'))}">
+      <span>${n.toLocaleString()} of ${GIT_CHANGES.length.toLocaleString()} changes are in ${folders.length} large folder${folders.length > 1 ? 's' : ''}</span>
+      <b>Manage…</b>
     </div>`;
+}
+
+let _gitIgnoreRules = null;   // null = not loaded yet
+
+async function _loadGitIgnoreRules() {
+  if (!API.available) { _gitIgnoreRules = []; return; }
+  try {
+    const r = await fetch(API.url('/api/git/ignore-rules'));
+    _gitIgnoreRules = r.ok ? (await r.json()).rules : [];
+  } catch { _gitIgnoreRules = []; }
+}
+
+function _settingsGitVisible() {
+  return document.getElementById('settings-modal')?.classList.contains('show')
+      && document.getElementById('settings-git-pane')?.classList.contains('active');
+}
+
+function renderSettingsGit() {
+  const el = document.getElementById('settings-git-pane');
+  if (!el) return;
+  const folders = _gitNoisyFolders(0, 10);
+  const busy = _gitStopBusy.length > 0;
+  const folderRows = folders.length ? folders.map(x => {
+    const mine = _gitStopBusy.includes(x.path);
+    return `
+      <div class="settings-list-row">
+        <span class="settings-list-path" title="${escapeHtml(x.path)}">${escapeHtml(x.path)}/</span>
+        <span class="settings-list-meta">${x.n.toLocaleString()} change${x.n > 1 ? 's' : ''}</span>
+        <button class="git-noisy-btn${mine ? ' busy' : ''}" ${busy ? 'disabled' : ''}
+                onclick="gitStopTracking([${escapeHtml(JSON.stringify(x.path))}])">${mine ? '<span class="git-spin"></span>Stopping…' : 'Stop tracking'}</button>
+      </div>`;
+  }).join('') : `<div class="settings-empty">No folder has 20 or more pending changes.</div>`;
+
+  const rules = _gitIgnoreRules;
+  const ruleRows = rules === null ? `<div class="settings-empty">Loading…</div>`
+    : rules.length ? rules.map(r => `
+      <div class="settings-list-row">
+        <span class="settings-list-path" title="${escapeHtml(r)}">${escapeHtml(r)}</span>
+        <button class="settings-list-x" title="Remove rule — matching files become visible to git again"
+                onclick="gitUnignore(${escapeHtml(JSON.stringify(r))})">×</button>
+      </div>`).join('')
+    : `<div class="settings-empty">No .gitignore rules yet.</div>`;
+
+  el.innerHTML = `
+    <div class="settings-section">
+      <div class="settings-section-title">Folders with the most changes</div>
+      <div class="settings-help" style="margin:-4px 0 6px">Folders managed by HACS or Home Assistant are reinstalled on update and usually don't need version control. Stop tracking adds the folder to .gitignore and commits its removal; files on disk stay. Any other file or folder: right-click it in the Explorer.</div>
+      ${folderRows}
+    </div>
+    <div class="settings-section">
+      <div class="settings-section-title">Ignored by git (/config/.gitignore)</div>
+      ${ruleRows}
+      <div class="settings-section-actions">
+        <button class="git-noisy-btn" onclick="closeSettings(); openFile('config/.gitignore')">Edit .gitignore</button>
+      </div>
+    </div>`;
+}
+
+async function gitUnignore(rule) {
+  if (!API.available) { showToast('Demo mode — no backend'); return; }
+  try {
+    const r = await fetch(API.url('/api/git/unignore'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rule }),
+    });
+    if (!r.ok) throw new Error((await r.json()).detail || r.status);
+    showToast('Removed ' + rule + ' from .gitignore');
+  } catch (e) { showToast('Remove rule failed: ' + e.message); }
+  await _loadGitIgnoreRules();
+  renderSettingsGit();
+  refreshGit();
 }
 
 // Repo-relative paths of the Stop tracking request in flight. Un-tracking
@@ -3871,6 +3955,7 @@ async function gitStopTracking(paths) {
   } finally {
     _gitStopBusy = [];
   }
+  await _loadGitIgnoreRules();
   renderGitPanel();
   refreshGit();
 }
@@ -6010,14 +6095,25 @@ function openHelp()  { document.getElementById('help-modal').classList.add('show
 function closeHelp() { document.getElementById('help-modal').classList.remove('show'); }
 // Help modal: closes only via Esc or its × button.
 
-function openSettings() {
+function openSettings(tab = 'editor') {
   const modal = document.getElementById('settings-modal');
   if (!modal) { console.error('[settings] modal element not found'); return; }
   // Always show the modal first — setup failures below shouldn't
   // prevent the user from seeing it.
   modal.classList.add('show');
+  setSettingsTab(tab);
   try { buildSettingsUI(); }   catch (e) { console.error('[settings] buildSettingsUI failed:', e); }
   try { refreshSettingsUI(); } catch (e) { console.error('[settings] refreshSettingsUI failed:', e); }
+}
+function setSettingsTab(tab) {
+  document.querySelectorAll('#settings-modal .settings-tab')
+    .forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('#settings-modal .settings-pane')
+    .forEach(p => p.classList.toggle('active', p.dataset.pane === tab));
+  if (tab === 'git') {
+    renderSettingsGit();
+    _loadGitIgnoreRules().then(renderSettingsGit);
+  }
 }
 function closeSettings() {
   document.getElementById('settings-modal').classList.remove('show');
@@ -7550,6 +7646,7 @@ const COMMANDS = [
   { cat: 'Git',    title: 'Push',                                              run: () => gitPush() },
   { cat: 'Git',    title: 'Commit (focus message)',                            run: () => { switchPanel('git'); document.getElementById('git-commit-msg').focus(); } },
   { cat: 'Git',    title: 'Refresh status',                                    run: () => refreshGit() },
+  { cat: 'Git',    title: 'Manage ignored folders…',                           run: () => openSettings('git') },
   { cat: 'Git',    title: 'Show history…',                                     run: () => openGitHistory() },
   { cat: 'Git',    title: 'Clear stale index.lock',                             run: () => gitClearLock() },
   { cat: 'Git',    title: 'Initialise repository here',                         run: () => gitInit() },

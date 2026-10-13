@@ -691,6 +691,36 @@ async def _git_ignore_paths(body: IgnorePathsBody):
             "commit_skipped": body.commit and not can_commit}
 
 
+@app.get("/api/git/ignore-rules")
+async def git_ignore_rules():
+    """Active (non-comment, non-blank) lines of /config/.gitignore."""
+    gi = CONFIG_ROOT / ".gitignore"
+    lines = gi.read_text().splitlines() if gi.exists() else []
+    rules = [ln.strip() for ln in lines if ln.strip() and not ln.lstrip().startswith("#")]
+    return {"exists": gi.exists(), "rules": rules}
+
+
+class IgnoreRuleBody(BaseModel):
+    rule: str
+
+
+@app.post("/api/git/unignore")
+async def git_unignore(body: IgnoreRuleBody):
+    """Remove one rule from /config/.gitignore. Files it covered show up
+    as untracked again; nothing is committed."""
+    gi = CONFIG_ROOT / ".gitignore"
+    rule = body.rule.strip()
+    if not gi.exists() or not rule:
+        raise HTTPException(404, "Rule not found")
+    async with _IGNORE_LOCK:
+        lines = gi.read_text().splitlines()
+        kept = [ln for ln in lines if ln.strip() != rule]
+        if len(kept) == len(lines):
+            raise HTTPException(404, "Rule not found")
+        gi.write_text("\n".join(kept) + "\n")
+    return {"ok": True}
+
+
 @app.post("/api/git/clear-lock")
 async def git_clear_lock():
     """Force-remove .git/index.lock regardless of age.
