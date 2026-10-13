@@ -61,6 +61,7 @@ Available from the command palette — `Snippet: Insert…`:
 - **M / A / U / D** badges in the file tree
 - Commit via panel or `Git: Commit` command
 - Commit author configurable per add-on option
+- **Stop tracking** a folder (e.g. a HACS integration) via right-click in the Explorer or the banner shown for large change sets — adds it to `.gitignore` and commits the removal; files stay on disk
 
 ### File management
 - **Upload** from the Explorer header or via right-click → Upload File

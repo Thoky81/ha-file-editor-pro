@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.11.45 — Source Control stays responsive with huge change sets, plus "Stop tracking"
+
+Reported: *"the editor is kind of unresponsive, and Source Control shows CHANGES (18472)"*. Cause: HACS integrations committed to the config repo (e.g. `custom_components/material_symbols`, ~16k icon files) rewrite thousands of files on every update. The panel built one DOM row per change, and startup waited for that before restoring your tabs.
+
+- **Change list is capped at 300 rendered rows.** The count and the commit still cover every change. A "+ N more" line shows what was left out.
+- **Startup no longer waits for git status.** Tabs restore straight away, and the panel fills in when git finishes.
+- **"Most of these changes come from a few folders"** banner appears once there are 100+ changes. It lists the biggest folders, each with a **Stop tracking** button.
+- **Right-click → Stop tracking in git…** in the Explorer works on any file or folder (e.g. all of `custom_components`).
+- **Stop tracking** adds a rule to `/config/.gitignore`, removes the path from the index and commits that in one step, so the list actually shrinks. Files on disk are untouched. If something else is already staged, it only updates `.gitignore` and leaves the commit to you.
+- The default `.gitignore` for new repos now also excludes `.cache/` and `www/community/`.
+- File tree M/A/U/D badges now clear when a file leaves the change list.
+
 ## 1.11.44 — Fix click-to-cursor mapping after the web font finishes loading
 
 Reports of *"clicking lands on a different row than I aimed at, especially further down the file"*. Root cause: JetBrains Mono is loaded from Google Fonts with `display=swap`, so CodeMirror initially measures line height against the fallback `monospace`. When the real font swaps in, lines render at a slightly different height — but CM still believes the old height, so click→line mapping drifts (and the drift accumulates as you scroll).

@@ -256,6 +256,15 @@
     .git-stage-cb{accent-color:var(--accent);cursor:pointer;flex-shrink:0;margin:0}
     .git-file .git-file-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
     .git-file-name{color:var(--text-secondary);flex:1}
+    .git-more{padding:6px 8px;color:var(--text-muted);font-size:11px;font-style:italic}
+    .git-noisy{margin:2px 0 8px;padding:8px;border:1px solid var(--border-light);border-radius:6px;background:var(--bg-mid)}
+    .git-noisy-title{font-size:12px;font-weight:600;color:var(--text-primary)}
+    .git-noisy-hint{font-size:11px;color:var(--text-muted);margin:3px 0 6px;line-height:1.4}
+    .git-noisy-row{display:flex;align-items:center;gap:6px;padding:3px 0;font-family:var(--font-mono);font-size:11px}
+    .git-noisy-path{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-secondary)}
+    .git-noisy-count{color:var(--text-muted)}
+    .git-noisy-btn{flex-shrink:0;padding:2px 8px;background:var(--accent-dim);border:1px solid rgba(240,165,0,.3);border-radius:4px;color:var(--accent);font-family:var(--font-ui);font-size:11px;cursor:pointer}
+    .git-noisy-btn:hover{background:rgba(240,165,0,.25);border-color:rgba(240,165,0,.5)}
     .git-commit-area{margin-top:12px;border-top:1px solid var(--border);padding-top:12px}
     .git-commit-input{width:100%;background:var(--bg-mid);border:1px solid var(--border-light);border-radius:6px;padding:8px;color:var(--text-primary);font-family:var(--font-ui);font-size:12px;outline:none;resize:vertical;min-height:60px;transition:border-color .15s}
     .git-commit-input:focus{border-color:var(--accent)}
@@ -1198,6 +1207,7 @@
   <div class="context-item" onclick="treeCtxUpload()">Upload File…</div>
   <div class="context-divider"></div>
   <div class="context-item" onclick="treeCtxDownload()">Download</div>
+  <div class="context-item" onclick="treeCtxStopTracking()">Stop tracking in git…</div>
   <div class="context-item" onclick="treeCtxDelete()" style="color:var(--accent-red)">Delete</div>
 </div>
 
@@ -3748,7 +3758,13 @@ function renderGitPanel() {
   // Initialise new paths as staged.
   for (const f of GIT_CHANGES) if (!_gitStaged.has(f.path)) _gitStaged.set(f.path, true);
 
-  el.innerHTML = GIT_CHANGES.map(f => {
+  // Rendering tens of thousands of rows freezes the UI (a HACS update
+  // can easily touch 15k+ files). Show the first slice only — every
+  // change is still part of the staging map and the commit.
+  const shown = GIT_CHANGES.length > GIT_RENDER_CAP ? GIT_CHANGES.slice(0, GIT_RENDER_CAP) : GIT_CHANGES;
+  const hidden = GIT_CHANGES.length - shown.length;
+
+  el.innerHTML = _gitNoisyFoldersHtml() + shown.map(f => {
     const staged = !!_gitStaged.get(f.path);
     return `
     <div class="git-file" data-path="${escapeHtml(f.path)}">
@@ -3759,8 +3775,79 @@ function renderGitPanel() {
       <span class="git-file-name" onclick="openFile(${JSON.stringify(f.path)})">${escapeHtml(f.path)}</span>
       <span style="color:${colors[f.status]};font-family:var(--font-mono);font-size:10px;font-weight:600">${labels[f.status]}</span>
     </div>`;
-  }).join('');
+  }).join('') + (hidden ? `
+    <div class="git-more">+ ${hidden.toLocaleString()} more not listed — still included in the commit</div>` : '');
   _renderStagedCount();
+}
+
+const GIT_RENDER_CAP = 300;
+
+// Folders that dominate a large change set, e.g. a HACS integration
+// that rewrote thousands of files on update. Grouped two levels deep
+// ("custom_components/foo") since that's where such bulk lives.
+function _gitNoisyFolders() {
+  if (GIT_CHANGES.length < 100) return [];
+  const counts = new Map();
+  for (const f of GIT_CHANGES) {
+    const rel = f.path.replace(/^config\//, '');
+    const isDir = rel.endsWith('/');
+    const segs = rel.replace(/\/$/, '').split('/');
+    const depth = isDir ? Math.min(2, segs.length) : Math.min(2, segs.length - 1);
+    if (depth < 1) continue;
+    const key = segs.slice(0, depth).join('/');
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  return Array.from(counts, ([path, n]) => ({ path, n }))
+    .filter(x => x.n >= 20)
+    .sort((a, b) => b.n - a.n)
+    .slice(0, 5);
+}
+
+function _gitNoisyFoldersHtml() {
+  const folders = _gitNoisyFolders();
+  if (!folders.length) return '';
+  return `
+    <div class="git-noisy">
+      <div class="git-noisy-title">Most of these changes come from a few folders</div>
+      <div class="git-noisy-hint">Folders managed by HACS or Home Assistant are reinstalled on update and usually don't need version control.</div>
+      ${folders.map(x => `
+        <div class="git-noisy-row">
+          <span class="git-noisy-path" title="${escapeHtml(x.path)}">${escapeHtml(x.path)}/</span>
+          <span class="git-noisy-count">${x.n.toLocaleString()}</span>
+          <button class="git-noisy-btn" onclick="gitStopTracking([${escapeHtml(JSON.stringify(x.path))}])">Stop tracking</button>
+        </div>`).join('')}
+    </div>`;
+}
+
+// Add paths to /config/.gitignore, un-track them and commit that
+// straight away so the change list actually shrinks. Files stay on disk.
+async function gitStopTracking(paths) {
+  if (!API.available) { showToast('Demo mode — no backend'); return; }
+  const list = paths.map(p => '  • ' + p.replace(/^config\//, '')).join('\n');
+  const ok = window.confirm(
+    'Stop tracking in git:\n\n' + list + '\n\n' +
+    'Adds a rule to /config/.gitignore and removes the path from the repository ' +
+    'in a new commit. Files on disk are not touched. Earlier commits keep their copies.'
+  );
+  if (!ok) return;
+  showToast('Updating .gitignore…');
+  try {
+    const r = await fetch(API.url('/api/git/ignore-paths'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paths, commit: true }),
+    });
+    if (!r.ok) {
+      let d; try { d = (await r.json()).detail; } catch { d = r.statusText; }
+      throw new Error(typeof d === 'object' ? (d.message || JSON.stringify(d)) : d);
+    }
+    const res = await r.json();
+    if (res.commit_skipped) showToast('Added to .gitignore — other staged changes exist, so commit manually');
+    else showToast(res.committed ? 'Stopped tracking — committed' : 'Added to .gitignore');
+  } catch (e) {
+    showToast('Stop tracking failed: ' + e.message);
+  }
+  refreshGit();
 }
 
 function _renderStagedCount() {
@@ -4613,6 +4700,9 @@ async function refreshGit() {
       document.getElementById('git-repo-state').textContent = '';
       document.getElementById('git-commit-btn-label').textContent =
         data.branch ? `Commit to ${data.branch}` : 'Commit';
+      // Reset badges first so files that dropped out of the change
+      // set (committed, un-tracked) don't keep a stale M/A/U.
+      for (const k in FILES) if (FILES[k].gitStatus) FILES[k].gitStatus = null;
       for (const c of data.changes) {
         GIT_CHANGES.push({ path: c.path, status: c.status });
         if (FILES[c.path]) FILES[c.path].gitStatus = c.status;
@@ -5228,6 +5318,7 @@ function attachTreeContextMenu() {
 
 function treeCtxOpen() { if (_treeCtxTarget?.type === 'file') openFile(_treeCtxTarget.path); }
 function treeCtxOpenRight() { if (_treeCtxTarget?.type === 'file') openFileRight(_treeCtxTarget.path); }
+function treeCtxStopTracking() { if (_treeCtxTarget?.path) gitStopTracking([_treeCtxTarget.path]); }
 function treeCtxFocus() { if (_treeCtxTarget?.type === 'dir') setTreeFocus(_treeCtxTarget.path || ''); }
 
 async function treeCtxRename() {
@@ -7830,7 +7921,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   renderFileTree();
   attachTreeContextMenu();
-  await refreshGit();
+  // Not awaited: git status on a big /config can take seconds and
+  // shouldn't hold up restoring the user's tabs.
+  refreshGit();
 
   // Restore open tabs from the previous session. If there's no
   // snapshot, stay on the empty "Open a file from the explorer"

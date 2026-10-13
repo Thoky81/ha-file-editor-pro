@@ -512,6 +512,15 @@ class CommitBody(BaseModel):
     paths: list[str] | None = None
 
 
+async def _apply_git_identity() -> None:
+    name = OPTIONS.get("git_user_name") or ""
+    email = OPTIONS.get("git_user_email") or ""
+    if name:
+        await run_git("config", "user.name", name)
+    if email:
+        await run_git("config", "user.email", email)
+
+
 @app.post("/api/git/commit")
 async def git_commit(body: CommitBody):
     if not has_git():
@@ -519,12 +528,7 @@ async def git_commit(body: CommitBody):
     if not body.message.strip():
         raise HTTPException(400, "Commit message required")
 
-    name = OPTIONS.get("git_user_name") or ""
-    email = OPTIONS.get("git_user_email") or ""
-    if name:
-        await run_git("config", "user.name", name)
-    if email:
-        await run_git("config", "user.email", email)
+    await _apply_git_identity()
 
     if body.paths:
         # Strip the "config/" prefix the frontend uses; git works
@@ -601,6 +605,11 @@ def _raise_git_error(action: str, err: str) -> None:
 
 class IgnorePathsBody(BaseModel):
     paths: list[str]
+    # Also commit the .gitignore edit + the un-tracking right away.
+    # Without this, every previously-tracked file under the path stays
+    # in the change list as a staged deletion until the next commit —
+    # for a HACS integration that can be thousands of entries.
+    commit: bool = False
 
 
 @app.post("/api/git/ignore-paths")
@@ -609,15 +618,23 @@ async def git_ignore_paths(body: IgnorePathsBody):
 
     Also runs `git rm -r --cached` for any that were already tracked, so
     a previous index entry doesn't keep the path showing up as a change.
-    Paths are expected to be repo-relative (the frontend strips its
-    "config/" prefix before calling).
+    Paths may be repo-relative or carry the frontend's "config/" prefix.
+
+    With `commit=True` the result is committed immediately, but only
+    when nothing else was already staged — we never sweep unrelated
+    staged work into an automatic commit.
     """
     if not has_git():
         raise HTTPException(400, "Not a git repository")
-    paths = [_strip_config_prefix(p).rstrip("/") for p in body.paths if p.strip()]
-    paths = [p for p in paths if p]  # drop empties
+    paths = [_strip_config_prefix(p).strip("/") for p in body.paths if p.strip()]
+    paths = [p for p in paths if p and p != ".git" and not p.startswith(".git/")]
     if not paths:
         raise HTTPException(400, "No paths supplied")
+
+    can_commit = False
+    if body.commit:
+        code, _, _ = await run_git("diff", "--cached", "--quiet")
+        can_commit = code == 0
 
     gi = CONFIG_ROOT / ".gitignore"
     existing_lines = gi.read_text().splitlines() if gi.exists() else []
@@ -625,7 +642,7 @@ async def git_ignore_paths(body: IgnorePathsBody):
 
     added: list[str] = []
     for p in paths:
-        rule = f"/{p}/"
+        rule = f"/{p}/" if (CONFIG_ROOT / p).is_dir() else f"/{p}"
         if rule not in existing and p not in existing and f"/{p}" not in existing:
             existing_lines.append(rule)
             added.append(rule)
@@ -645,7 +662,21 @@ async def git_ignore_paths(body: IgnorePathsBody):
         if code == 0:
             removed.append(p)
 
-    return {"ok": True, "added": added, "removed": removed}
+    committed = False
+    if can_commit:
+        await run_git("add", "--", ".gitignore")
+        code, _, _ = await run_git("diff", "--cached", "--quiet")
+        if code != 0:  # something actually changed
+            await _apply_git_identity()
+            msg = "Stop tracking " + ", ".join(paths[:3]) + (" …" if len(paths) > 3 else "")
+            code, out, err = await run_git("commit", "-m", msg)
+            if code != 0:
+                _raise_git_error("git commit", err or out)
+            committed = True
+
+    return {"ok": True, "added": added, "removed": removed,
+            "committed": committed,
+            "commit_skipped": body.commit and not can_commit}
 
 
 @app.post("/api/git/clear-lock")
@@ -721,6 +752,10 @@ ssh_host_*
 deps/
 tts/
 backups/
+.cache/
+
+# ──── HACS-managed downloads (reinstallable, change on every update) ────
+www/community/
 
 # Databases and logs
 home-assistant_v2.db
