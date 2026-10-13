@@ -11,7 +11,8 @@ from pathlib import Path
 
 import httpx
 import uvicorn
-from fastapi import FastAPI, File, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -78,6 +79,10 @@ OPTIONS = load_options()
 SHOW_HIDDEN = bool(OPTIONS.get("show_hidden", False))
 
 app = FastAPI(title="File Editor Pro", docs_url=None, redoc_url=None)
+# The file tree of a /config with HACS integrations is easily several MB
+# of JSON, and index.html is ~400 KB. Both shrink >20x compressed, which
+# matters a lot through ingress / remote access.
+app.add_middleware(GZipMiddleware, minimum_size=1024, compresslevel=5)
 
 # Mount the bundled third-party assets (xterm.js etc.). HA ingress
 # plus a strict CSP means loading from external CDNs isn't reliable,
@@ -117,55 +122,61 @@ def build_tree(root: Path, prefix: str = "", show_hidden: bool | None = None) ->
     bool to override (used by the Explorer's runtime toggle)."""
     hidden = SHOW_HIDDEN if show_hidden is None else show_hidden
 
-    def walk(dirpath: Path, relbase: str) -> list[dict]:
-        out: list[dict] = []
+    # os.scandir gives the entry type from the directory listing itself,
+    # so we don't stat every file. With 30k+ files (HACS icon packs,
+    # ESPHome projects) that's the difference between ~0.1 s and
+    # several seconds on an SD card.
+    def walk(dirpath: str, relbase: str) -> list[dict]:
         try:
-            entries = sorted(
-                dirpath.iterdir(),
-                key=lambda p: (p.is_file(), p.name.lower()),
-            )
-        except (FileNotFoundError, PermissionError):
-            return out
-        for p in entries:
-            if p.name in SKIP_DIRS:
-                continue
-            if not hidden and p.name.startswith("."):
-                continue
-            rel = f"{relbase}/{p.name}" if relbase else p.name
+            with os.scandir(dirpath) as it:
+                entries = []
+                for e in it:
+                    if e.name in SKIP_DIRS:
+                        continue
+                    if not hidden and e.name.startswith("."):
+                        continue
+                    try:
+                        is_dir = e.is_dir()
+                        if not is_dir and not e.is_file():
+                            continue
+                    except OSError:
+                        continue
+                    entries.append((is_dir, e))
+        except (FileNotFoundError, PermissionError, NotADirectoryError):
+            return []
+        entries.sort(key=lambda t: (not t[0], t[1].name.lower()))
+        out: list[dict] = []
+        for is_dir, e in entries:
+            rel = f"{relbase}/{e.name}" if relbase else e.name
             full = f"{prefix}/{rel}" if prefix else rel
-            if p.is_dir():
-                out.append({
-                    "name": p.name,
-                    "type": "dir",
-                    "path": full,
-                    "children": walk(p, rel),
-                })
-            elif p.is_file():
-                out.append({
-                    "name": p.name,
-                    "type": "file",
-                    "path": full,
-                    "size": p.stat().st_size,
-                })
+            if is_dir:
+                out.append({"name": e.name, "type": "dir", "path": full,
+                            "children": walk(e.path, rel)})
+            else:
+                out.append({"name": e.name, "type": "file", "path": full})
         return out
 
-    return walk(root, "")
+    return walk(str(root), "")
 
 
 # ──────────────────────────── Index + health ──────────────────────────
 
 @app.get("/")
-async def index():
-    # Aggressive no-cache: HA ingress + browsers sometimes cache the
-    # shell HTML and miss UI updates after an add-on upgrade.
-    return FileResponse(
-        INDEX_HTML,
-        headers={
-            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
-            "Pragma": "no-cache",
-            "Expires": "0",
-        },
-    )
+async def index(request: Request):
+    # Always revalidate: HA ingress + browsers sometimes cache the shell
+    # HTML and miss UI updates after an add-on upgrade. "no-cache" (not
+    # "no-store") still lets the browser keep a copy and get a cheap 304
+    # via the ETag when the file hasn't changed.
+    headers = {
+        "Cache-Control": "no-cache, must-revalidate, max-age=0",
+        "Pragma": "no-cache",
+        "Expires": "0",
+    }
+    st = INDEX_HTML.stat()
+    etag = f'"{st.st_mtime_ns:x}-{st.st_size:x}"'
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers={**headers, "ETag": etag})
+    return FileResponse(INDEX_HTML, headers={**headers, "ETag": etag})
 
 
 @app.get("/api/health")
@@ -194,14 +205,18 @@ async def tree(hidden: int | None = None):
     `hidden=1` (query) overrides the add-on option at runtime so the
     Explorer's toggle button works without an add-on restart."""
     show_hidden = bool(hidden) if hidden is not None else None
-    nodes = []
-    for name, root in ROOTS.items():
-        nodes.append({
+
+    def build_all() -> list[dict]:
+        return [{
             "name": name,
             "type": "dir",
             "path": name,
             "children": build_tree(root, prefix=name, show_hidden=show_hidden),
-        })
+        } for name, root in ROOTS.items()]
+
+    # Walk in a worker thread so a big tree doesn't stall every other
+    # request (saves, git status) while it runs.
+    nodes = await asyncio.to_thread(build_all)
     return {"tree": nodes, "root": str(CONFIG_ROOT), "roots": list(ROOTS.keys())}
 
 
@@ -455,10 +470,19 @@ async def run_git(*args: str, cwd: Path = CONFIG_ROOT) -> tuple[int, str, str]:
         return proc.returncode or 0, out.decode(errors="replace"), err.decode(errors="replace")
 
 
+_GIT_TUNED = False
+
+
 @app.get("/api/git/status")
 async def git_status():
+    global _GIT_TUNED
     if not has_git():
         return {"repo": False, "changes": [], "branch": None}
+    if not _GIT_TUNED:
+        # Lets git skip re-scanning unchanged untracked directories on
+        # every status call. Stored in the repo's own config; harmless.
+        await run_git("config", "core.untrackedCache", "true")
+        _GIT_TUNED = True
     code, out, _ = await run_git("status", "--porcelain=v1", "-b")
     if code != 0:
         return {"repo": False, "changes": [], "branch": None}

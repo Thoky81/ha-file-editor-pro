@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.11.48 — Faster loading on large configs
+
+Profiled against a 30k-file `/config` (HACS icon packs, ESPHome projects). Nearly all the time was on the server side, not the browser.
+
+- **File tree walk is 5–15× faster.** Entry types now come from the directory listing (`os.scandir`), with no per-file `stat()`, and the unused per-file `size` field is gone. On a real config read over a network share: **117 s → 7 s**. The output is identical.
+- **The tree walk no longer blocks the server.** It runs in a worker thread, so saves and git calls aren't stuck behind it.
+- **Responses are compressed (gzip).** The file tree JSON goes from 3.3 MB to 135 KB and `index.html` from 388 KB to 95 KB. This matters most over ingress and remote access.
+- **`index.html` is revalidated, not re-downloaded.** Reopening the add-on gets a `304 Not Modified` when nothing changed. Updates are still picked up immediately.
+- **Faster `git status`.** `core.untrackedCache` is enabled on the config repo, so git skips untracked folders that haven't changed.
+
 ## 1.11.47 — Settings → Source control tab
 
 The big "Most of these changes come from a few folders" box in the Source Control panel has moved to Settings.
