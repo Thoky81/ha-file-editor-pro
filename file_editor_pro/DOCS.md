@@ -68,6 +68,7 @@ Available from the command palette — `Snippet: Insert…`:
 - **Download** any file via right-click → Download
 - **Rename**, **Duplicate**, **Delete** from the tree context menu
 - **New File…** / **New Folder…** relative to `/config`
+- **Hide from Explorer** (right-click a folder, or Settings → Explorer) — the folder stays visible but dimmed and isn't scanned or searched; useful for icon packs and other huge folders
 
 ### HA integration
 - **Check Config** button in the status bar — calls `/config/core/check_config`

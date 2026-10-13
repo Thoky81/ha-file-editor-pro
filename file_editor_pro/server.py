@@ -78,6 +78,28 @@ def load_options() -> dict:
 OPTIONS = load_options()
 SHOW_HIDDEN = bool(OPTIONS.get("show_hidden", False))
 
+# Add-on private storage (persists across restarts and updates). Falls
+# back to a folder next to server.py for local development.
+DATA_DIR = Path(os.environ.get("DATA_DIR", "/data"))
+if not DATA_DIR.is_dir():
+    DATA_DIR = APP_DIR / ".data"
+EXPLORER_FILE = DATA_DIR / "explorer.json"
+
+
+def load_explorer_hidden() -> set[str]:
+    """Root-prefixed folder paths ("config/custom_components/foo") the
+    user chose to hide from the Explorer. They're never walked, which
+    is the point: icon packs and similar can hold tens of thousands of
+    files nobody browses."""
+    try:
+        data = json.loads(EXPLORER_FILE.read_text())
+        return {p.strip("/") for p in data.get("hidden", []) if isinstance(p, str) and p.strip("/")}
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return set()
+
+
+EXPLORER_HIDDEN = load_explorer_hidden()
+
 app = FastAPI(title="File Editor Pro", docs_url=None, redoc_url=None)
 # The file tree of a /config with HACS integrations is easily several MB
 # of JSON, and index.html is ~400 KB. Both shrink >20x compressed, which
@@ -150,8 +172,12 @@ def build_tree(root: Path, prefix: str = "", show_hidden: bool | None = None) ->
             rel = f"{relbase}/{e.name}" if relbase else e.name
             full = f"{prefix}/{rel}" if prefix else rel
             if is_dir:
-                out.append({"name": e.name, "type": "dir", "path": full,
-                            "children": walk(e.path, rel)})
+                if full in EXPLORER_HIDDEN:
+                    out.append({"name": e.name, "type": "dir", "path": full,
+                                "children": [], "excluded": True})
+                else:
+                    out.append({"name": e.name, "type": "dir", "path": full,
+                                "children": walk(e.path, rel)})
             else:
                 out.append({"name": e.name, "type": "file", "path": full})
         return out
@@ -300,43 +326,76 @@ async def search_files(q: str, max_files: int = 100, max_per_file: int = 10,
         return {"results": []}
     show_hidden = bool(hidden) if hidden is not None else SHOW_HIDDEN
     q_lower = q.lower()
-    results = []
-    for root_name, root in ROOTS.items():
-        for p in root.rglob("*"):
-            if not p.is_file():
-                continue
-            rel_parts = p.relative_to(root).parts
-            if any(part in SKIP_DIRS or (part.startswith(".") and not show_hidden)
-                   for part in rel_parts):
-                continue
-            try:
-                if p.stat().st_size > MAX_READ_BYTES:
-                    continue
-            except OSError:
-                continue
-            try:
-                text = p.read_text(encoding="utf-8")
-            except (UnicodeDecodeError, OSError):
-                continue
-            matches = []
-            for i, line in enumerate(text.splitlines(), 1):
-                low = line.lower()
-                idx = low.find(q_lower)
-                if idx >= 0:
-                    matches.append({
-                        "line": i,
-                        "before": line[:idx],
-                        "match":  line[idx:idx + len(q)],
-                        "after":  line[idx + len(q):],
-                    })
-                    if len(matches) >= max_per_file:
-                        break
-            if matches:
-                rel = f"{root_name}/{p.relative_to(root).as_posix()}"
-                results.append({"path": rel, "matches": matches})
-                if len(results) >= max_files:
-                    return {"results": results}
-    return {"results": results}
+
+    def scan_file(path: str) -> list[dict]:
+        try:
+            if os.path.getsize(path) > MAX_READ_BYTES:
+                return []
+            with open(path, encoding="utf-8") as f:
+                text = f.read()
+        except (UnicodeDecodeError, OSError):
+            return []
+        matches = []
+        for i, line in enumerate(text.splitlines(), 1):
+            idx = line.lower().find(q_lower)
+            if idx >= 0:
+                matches.append({
+                    "line": i,
+                    "before": line[:idx],
+                    "match":  line[idx:idx + len(q)],
+                    "after":  line[idx + len(q):],
+                })
+                if len(matches) >= max_per_file:
+                    break
+        return matches
+
+    def scan() -> list[dict]:
+        results = []
+        for root_name, root in ROOTS.items():
+            # os.walk lets us prune skipped / hidden folders before
+            # descending into them instead of filtering every file after.
+            for dirpath, dirnames, filenames in os.walk(root):
+                rel_dir = os.path.relpath(dirpath, root)
+                base = root_name if rel_dir == "." else f"{root_name}/{Path(rel_dir).as_posix()}"
+                dirnames[:] = sorted(
+                    d for d in dirnames
+                    if d not in SKIP_DIRS
+                    and (show_hidden or not d.startswith("."))
+                    and f"{base}/{d}" not in EXPLORER_HIDDEN
+                )
+                for name in sorted(filenames):
+                    if not show_hidden and name.startswith("."):
+                        continue
+                    matches = scan_file(os.path.join(dirpath, name))
+                    if matches:
+                        results.append({"path": f"{base}/{name}", "matches": matches})
+                        if len(results) >= max_files:
+                            return results
+        return results
+
+    return {"results": await asyncio.to_thread(scan)}
+
+
+@app.get("/api/explorer/hidden")
+async def explorer_hidden_get():
+    return {"paths": sorted(EXPLORER_HIDDEN)}
+
+
+class ExplorerHiddenBody(BaseModel):
+    paths: list[str]
+
+
+@app.post("/api/explorer/hidden")
+async def explorer_hidden_set(body: ExplorerHiddenBody):
+    """Replace the hidden-folder list. Paths are root-prefixed."""
+    global EXPLORER_HIDDEN
+    paths = sorted({p.strip().strip("/") for p in body.paths if p.strip().strip("/")})
+    for p in paths:
+        resolve_safe(p)  # rejects anything escaping a root
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    EXPLORER_FILE.write_text(json.dumps({"hidden": paths}, indent=2))
+    EXPLORER_HIDDEN = set(paths)
+    return {"ok": True, "paths": paths}
 
 
 @app.get("/api/files/download")

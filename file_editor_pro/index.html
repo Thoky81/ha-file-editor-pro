@@ -218,6 +218,9 @@
        dot next to the name. The active one still wins visually via
        .active above. */
     .tree-item.open .tree-name{color:var(--text-primary);font-weight:500}
+    .tree-item.excluded{opacity:.55}
+    .tree-item.excluded .tree-name{font-style:italic}
+    .tree-excluded-tag{margin-left:6px;font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);border:1px solid var(--border-light);border-radius:3px;padding:0 4px}
     .tree-item.open .tree-open-dot{display:inline-block}
     .tree-open-dot{display:none;width:6px;height:6px;border-radius:50%;background:var(--accent);margin-left:6px;flex-shrink:0;opacity:.85}
     .tree-arrow{width:16px;height:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:transform .15s}
@@ -1223,6 +1226,7 @@
   <div class="context-divider"></div>
   <div class="context-item" onclick="treeCtxDownload()">Download</div>
   <div class="context-item" onclick="treeCtxStopTracking()">Stop tracking in git…</div>
+  <div class="context-item" id="tree-ctx-hide" onclick="treeCtxToggleHidden()">Hide from Explorer</div>
   <div class="context-item" onclick="treeCtxDelete()" style="color:var(--accent-red)">Delete</div>
 </div>
 
@@ -1781,6 +1785,7 @@ class MySensor(Entity):
     </div>
     <div class="settings-tabs">
       <button class="settings-tab" data-tab="editor" onclick="setSettingsTab('editor')">Editor</button>
+      <button class="settings-tab" data-tab="explorer" onclick="setSettingsTab('explorer')">Explorer</button>
       <button class="settings-tab" data-tab="git" onclick="setSettingsTab('git')">Source control</button>
     </div>
     <div class="settings-body">
@@ -1923,6 +1928,7 @@ class MySensor(Entity):
         </div>
       </div>
      </div>
+     <div class="settings-pane" data-pane="explorer" id="settings-explorer-pane"></div>
      <div class="settings-pane" data-pane="git" id="settings-git-pane"></div>
     </div>
   </div>
@@ -2647,7 +2653,15 @@ function renderNodes(nodes, container, depth) {
         <div class="tree-icon tree-icon-dir" style="color:#f0a500">
           <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
         </div>
-        <span class="tree-name">${node.name}</span>`;
+        <span class="tree-name">${node.name}</span>
+        ${node.excluded ? '<span class="tree-excluded-tag">hidden</span>' : ''}`;
+      if (node.excluded) {
+        item.classList.add('excluded');
+        item.title = 'Hidden from Explorer — not scanned. Right-click → Show in Explorer, or Settings → Explorer.';
+        item.onclick = () => showToast(node.path + ' is hidden from Explorer — right-click to show it again');
+        container.appendChild(item);
+        return;
+      }
       item.onclick = () => toggleDir(node, item, container, depth);
       // Double-click a directory to drill into it — only that folder's
       // contents are shown, with a breadcrumb to navigate back up.
@@ -3896,6 +3910,97 @@ function renderSettingsGit() {
     </div>`;
 }
 
+// ── Hide from Explorer ─────────────────────────────────────────
+// Folders on this list are skipped by the server's tree walk and file
+// search. Stored server-side so it applies on every device.
+function _explorerHiddenPaths() {
+  const out = [];
+  (function walk(list) {
+    for (const n of list || []) {
+      if (n.type !== 'dir') continue;
+      if (n.excluded) out.push(n.path);
+      else walk(n.children);
+    }
+  })(TREE);
+  return out;
+}
+
+// Biggest folders (by file count) two levels below each root — the
+// usual suspects are icon packs and HACS frontend bundles.
+function _explorerLargeFolders(limit = 8, min = 300) {
+  const rows = [];
+  function count(n) {
+    let c = 0;
+    for (const ch of n.children || []) c += ch.type === 'dir' ? count(ch) : 1;
+    return c;
+  }
+  for (const root of TREE) {
+    for (const a of root.children || []) {
+      if (a.type !== 'dir' || a.excluded) continue;
+      rows.push({ path: a.path, n: count(a) });
+      for (const b of a.children || []) {
+        if (b.type === 'dir' && !b.excluded) rows.push({ path: b.path, n: count(b) });
+      }
+    }
+  }
+  return rows.filter(r => r.n >= min).sort((x, y) => y.n - x.n).slice(0, limit);
+}
+
+let _explorerBusy = false;
+
+async function explorerSetHidden(path, hide) {
+  if (!API.available) { showToast('Demo mode — no backend'); return; }
+  if (_explorerBusy) return;
+  const cur = new Set(_explorerHiddenPaths());
+  if (hide) cur.add(path); else cur.delete(path);
+  _explorerBusy = true;
+  renderSettingsExplorer();
+  try {
+    const r = await fetch(API.url('/api/explorer/hidden'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paths: Array.from(cur) }),
+    });
+    if (!r.ok) throw new Error((await r.json()).detail || r.status);
+    await refreshTree();
+    showToast((hide ? 'Hidden from Explorer: ' : 'Showing in Explorer: ') + path);
+  } catch (e) {
+    showToast('Update failed: ' + e.message);
+  } finally {
+    _explorerBusy = false;
+    renderSettingsExplorer();
+  }
+}
+
+function renderSettingsExplorer() {
+  const el = document.getElementById('settings-explorer-pane');
+  if (!el) return;
+  const hidden = _explorerHiddenPaths();
+  const large = _explorerLargeFolders();
+  const dis = _explorerBusy ? 'disabled' : '';
+  el.innerHTML = `
+    <div class="settings-section">
+      <div class="settings-section-title">Hidden from Explorer</div>
+      <div class="settings-help" style="margin:-4px 0 6px">These folders still show in the tree (dimmed) but their contents aren't scanned, which keeps loading fast. Files inside can still be opened from search or Source Control. Right-click any folder in the Explorer to hide or show it.</div>
+      ${hidden.length ? hidden.map(p => `
+        <div class="settings-list-row">
+          <span class="settings-list-path" title="${escapeHtml(p)}">${escapeHtml(p)}/</span>
+          <button class="settings-list-x" ${dis} title="Show in Explorer again"
+                  onclick="explorerSetHidden(${escapeHtml(JSON.stringify(p))}, false)">×</button>
+        </div>`).join('') : `<div class="settings-empty">Nothing hidden.</div>`}
+    </div>
+    <div class="settings-section">
+      <div class="settings-section-title">Largest folders</div>
+      ${large.length ? large.map(x => `
+        <div class="settings-list-row">
+          <span class="settings-list-path" title="${escapeHtml(x.path)}">${escapeHtml(x.path)}/</span>
+          <span class="settings-list-meta">${x.n.toLocaleString()} files</span>
+          <button class="git-noisy-btn" ${dis}
+                  onclick="explorerSetHidden(${escapeHtml(JSON.stringify(x.path))}, true)">Hide</button>
+        </div>`).join('') : `<div class="settings-empty">No folder with 300 or more files.</div>`}
+    </div>`;
+}
+
 async function gitUnignore(rule) {
   if (!API.available) { showToast('Demo mode — no backend'); return; }
   try {
@@ -4742,7 +4847,8 @@ function ingestBackendTree(nodes) {
     return list.map(n => {
       if (n.type === 'dir') {
         return { name: n.name, type: 'dir',
-                 open: expanded.has(n.path),
+                 open: expanded.has(n.path) && !n.excluded,
+                 excluded: !!n.excluded,
                  path: n.path, children: walk(n.children || []) };
       }
       FILES[n.path] = { mode: modeForPath(n.name), gitStatus: null, content: null, loaded: false };
@@ -4761,8 +4867,13 @@ function ingestBackendTree(nodes) {
 }
 
 const __origOpenFile = openFile;
-window.openFile = async function(path, treeItem) {
+window.openFile = async function(path, treeItem, opts) {
   if (API.available) {
+    // Files under a folder hidden from Explorer aren't in FILES, but
+    // can still be opened from search, Source Control, etc.
+    if (!FILES[path] && /^[^/]+\/.+[^/]$/.test(path)) {
+      FILES[path] = { mode: modeForPath(path.split('/').pop()), gitStatus: null, content: null, loaded: false };
+    }
     const entry = FILES[path];
     if (entry && !entry.loaded) {
       try {
@@ -4775,7 +4886,7 @@ window.openFile = async function(path, treeItem) {
       }
     }
   }
-  return __origOpenFile(path, treeItem);
+  return __origOpenFile(path, treeItem, opts);
 };
 
 const __origSave = saveCurrentFile;
@@ -5419,6 +5530,14 @@ function attachTreeContextMenu() {
     const path = item.dataset.path;
     const type = item.dataset.type || 'file';
     _treeCtxTarget = { path, type };
+    const hideItem = document.getElementById('tree-ctx-hide');
+    if (hideItem) {
+      const node = type === 'dir' ? _findTreeNodeByPath(TREE, path) : null;
+      // Root folders ("config", "share") can't be hidden — that would
+      // empty the Explorer.
+      hideItem.style.display = (type === 'dir' && path.includes('/')) ? '' : 'none';
+      hideItem.textContent = node?.excluded ? 'Show in Explorer' : 'Hide from Explorer';
+    }
     const m = document.getElementById('tree-context-menu');
     m.style.left = e.clientX + 'px';
     m.style.top = e.clientY + 'px';
@@ -5428,6 +5547,12 @@ function attachTreeContextMenu() {
 
 function treeCtxOpen() { if (_treeCtxTarget?.type === 'file') openFile(_treeCtxTarget.path); }
 function treeCtxOpenRight() { if (_treeCtxTarget?.type === 'file') openFileRight(_treeCtxTarget.path); }
+function treeCtxToggleHidden() {
+  const t = _treeCtxTarget;
+  if (!t || t.type !== 'dir' || !t.path) return;
+  const node = _findTreeNodeByPath(TREE, t.path);
+  explorerSetHidden(t.path, !node?.excluded);
+}
 function treeCtxStopTracking() { if (_treeCtxTarget?.path) gitStopTracking([_treeCtxTarget.path]); }
 function treeCtxFocus() { if (_treeCtxTarget?.type === 'dir') setTreeFocus(_treeCtxTarget.path || ''); }
 
@@ -6114,6 +6239,7 @@ function setSettingsTab(tab) {
     renderSettingsGit();
     _loadGitIgnoreRules().then(renderSettingsGit);
   }
+  if (tab === 'explorer') renderSettingsExplorer();
 }
 function closeSettings() {
   document.getElementById('settings-modal').classList.remove('show');
@@ -7647,6 +7773,7 @@ const COMMANDS = [
   { cat: 'Git',    title: 'Commit (focus message)',                            run: () => { switchPanel('git'); document.getElementById('git-commit-msg').focus(); } },
   { cat: 'Git',    title: 'Refresh status',                                    run: () => refreshGit() },
   { cat: 'Git',    title: 'Manage ignored folders…',                           run: () => openSettings('git') },
+  { cat: 'File',   title: 'Manage folders hidden from Explorer…',              run: () => openSettings('explorer') },
   { cat: 'Git',    title: 'Show history…',                                     run: () => openGitHistory() },
   { cat: 'Git',    title: 'Clear stale index.lock',                             run: () => gitClearLock() },
   { cat: 'Git',    title: 'Initialise repository here',                         run: () => gitInit() },

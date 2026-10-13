@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.11.49 — Hide folders from the Explorer
+
+Icon packs and HACS bundles can hold tens of thousands of files you never browse, and the Explorer used to scan all of them on every load and refresh.
+
+- **Right-click a folder → Hide from Explorer.** It stays in the tree, dimmed and tagged *hidden*, but its contents are no longer scanned. Right-click → **Show in Explorer** undoes it.
+- **Settings → Explorer** (new tab) lists:
+  - the folders you've hidden, each with **×** to show it again;
+  - the **largest folders** by file count, each with a one-click **Hide**.
+- **File search also skips hidden folders**, and it now prunes skipped folders before descending into them. It also runs in a worker thread, so it no longer blocks other requests.
+- **Files inside hidden folders still open** from search, Source Control or restored tabs.
+- **The list is stored by the add-on** (`/data/explorer.json`), so it applies on every device and survives updates.
+- **Fix:** double-clicking a file in the Explorer now opens it as a permanent tab, as intended (the preview-tab flag was being dropped).
+- **Command palette:** new *File: Manage folders hidden from Explorer…* command.
+
+Measured on a 30k-file test config: hiding a 16k-file icon pack cuts the tree response from 3.0 MB to 1.25 MB and its build time by ~80%.
+
 ## 1.11.48 — Faster loading on large configs
 
 Profiled against a 30k-file `/config` (HACS icon packs, ESPHome projects). Nearly all the time was on the server side, not the browser.
