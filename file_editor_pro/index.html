@@ -264,7 +264,12 @@
     .git-noisy-path{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-secondary)}
     .git-noisy-count{color:var(--text-muted)}
     .git-noisy-btn{flex-shrink:0;padding:2px 8px;background:var(--accent-dim);border:1px solid rgba(240,165,0,.3);border-radius:4px;color:var(--accent);font-family:var(--font-ui);font-size:11px;cursor:pointer}
-    .git-noisy-btn:hover{background:rgba(240,165,0,.25);border-color:rgba(240,165,0,.5)}
+    .git-noisy-btn:disabled{opacity:.5;cursor:default}
+    .git-noisy-row.busy .git-noisy-btn{opacity:1;display:inline-flex;align-items:center;gap:5px}
+    .git-noisy-row.busy .git-noisy-path{color:var(--text-muted)}
+    .git-spin{width:9px;height:9px;border:1.5px solid currentColor;border-right-color:transparent;border-radius:50%;animation:git-spin .7s linear infinite}
+    @keyframes git-spin{to{transform:rotate(360deg)}}
+    .git-noisy-btn:not(:disabled):hover{background:rgba(240,165,0,.25);border-color:rgba(240,165,0,.5)}
     .git-commit-area{margin-top:12px;border-top:1px solid var(--border);padding-top:12px}
     .git-commit-input{width:100%;background:var(--bg-mid);border:1px solid var(--border-light);border-radius:6px;padding:8px;color:var(--text-primary);font-family:var(--font-ui);font-size:12px;outline:none;resize:vertical;min-height:60px;transition:border-color .15s}
     .git-commit-input:focus{border-color:var(--accent)}
@@ -3810,19 +3815,29 @@ function _gitNoisyFoldersHtml() {
     <div class="git-noisy">
       <div class="git-noisy-title">Most of these changes come from a few folders</div>
       <div class="git-noisy-hint">Folders managed by HACS or Home Assistant are reinstalled on update and usually don't need version control.</div>
-      ${folders.map(x => `
-        <div class="git-noisy-row">
+      ${folders.map(x => {
+        const mine = _gitStopBusy.includes(x.path);
+        return `
+        <div class="git-noisy-row${mine ? ' busy' : ''}">
           <span class="git-noisy-path" title="${escapeHtml(x.path)}">${escapeHtml(x.path)}/</span>
           <span class="git-noisy-count">${x.n.toLocaleString()}</span>
-          <button class="git-noisy-btn" onclick="gitStopTracking([${escapeHtml(JSON.stringify(x.path))}])">Stop tracking</button>
-        </div>`).join('')}
+          <button class="git-noisy-btn" ${_gitStopBusy.length ? 'disabled' : ''}
+                  onclick="gitStopTracking([${escapeHtml(JSON.stringify(x.path))}])">${mine ? '<span class="git-spin"></span>Stopping…' : 'Stop tracking'}</button>
+        </div>`;
+      }).join('')}
     </div>`;
 }
+
+// Repo-relative paths of the Stop tracking request in flight. Un-tracking
+// a big HACS folder takes a while on slower hosts, so the banner shows
+// progress and refuses a second click until it's done.
+let _gitStopBusy = [];
 
 // Add paths to /config/.gitignore, un-track them and commit that
 // straight away so the change list actually shrinks. Files stay on disk.
 async function gitStopTracking(paths) {
   if (!API.available) { showToast('Demo mode — no backend'); return; }
+  if (_gitStopBusy.length) { showToast('Still working on ' + _gitStopBusy.join(', ') + '…'); return; }
   const list = paths.map(p => '  • ' + p.replace(/^config\//, '')).join('\n');
   const ok = window.confirm(
     'Stop tracking in git:\n\n' + list + '\n\n' +
@@ -3830,7 +3845,10 @@ async function gitStopTracking(paths) {
     'in a new commit. Files on disk are not touched. Earlier commits keep their copies.'
   );
   if (!ok) return;
-  showToast('Updating .gitignore…');
+  const rel = paths.map(p => p.replace(/^config\//, '').replace(/\/+$/, ''));
+  _gitStopBusy = rel;
+  renderGitPanel();
+  showToast('Stopping tracking of ' + rel.join(', ') + '…');
   try {
     const r = await fetch(API.url('/api/git/ignore-paths'), {
       method: 'POST',
@@ -3842,11 +3860,18 @@ async function gitStopTracking(paths) {
       throw new Error(typeof d === 'object' ? (d.message || JSON.stringify(d)) : d);
     }
     const res = await r.json();
-    if (res.commit_skipped) showToast('Added to .gitignore — other staged changes exist, so commit manually');
-    else showToast(res.committed ? 'Stopped tracking — committed' : 'Added to .gitignore');
+    // Drop the folder's entries right away; the full git status that
+    // follows can take a few seconds on a large /config.
+    const under = c => rel.some(p => { const cp = c.path.replace(/^config\//, ''); return cp === p || cp.startsWith(p + '/'); });
+    for (let i = GIT_CHANGES.length - 1; i >= 0; i--) if (under(GIT_CHANGES[i])) GIT_CHANGES.splice(i, 1);
+    if (res.commit_skipped) showToast('Added ' + rel.join(', ') + ' to .gitignore — other staged changes exist, so commit manually');
+    else showToast(res.committed ? 'Stopped tracking ' + rel.join(', ') + ' — committed' : 'Added ' + rel.join(', ') + ' to .gitignore');
   } catch (e) {
     showToast('Stop tracking failed: ' + e.message);
+  } finally {
+    _gitStopBusy = [];
   }
+  renderGitPanel();
   refreshGit();
 }
 

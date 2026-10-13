@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.11.46 — Stop tracking shows progress
+
+Un-tracking a large HACS folder can take a while on slower hosts, and the button gave no sign anything was happening, so it was easy to click again.
+
+- The clicked row's button turns into **⟳ Stopping…** and the other Stop tracking buttons are disabled until it finishes.
+- When it's done, the folder's entries leave the change list right away. The full git refresh follows in the background.
+- Toasts name the folder ("Stopped tracking custom_components/spook — committed").
+- The server now runs Stop tracking requests one at a time, so two quick clicks each get their own commit.
+
 ## 1.11.45 — Source Control stays responsive with huge change sets, plus "Stop tracking"
 
 Reported: *"the editor is kind of unresponsive, and Source Control shows CHANGES (18472)"*. Cause: HACS integrations committed to the config repo (e.g. `custom_components/material_symbols`, ~16k icon files) rewrite thousands of files on every update. The panel built one DOM row per change, and startup waited for that before restoring your tabs.

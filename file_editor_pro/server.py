@@ -612,8 +612,20 @@ class IgnorePathsBody(BaseModel):
     commit: bool = False
 
 
+# Held for the whole ignore-paths operation. run_git only serializes
+# single commands, so two overlapping requests could otherwise
+# interleave: the second sees the first's staged removals, skips its own
+# commit, and its paths get folded into the first request's commit.
+_IGNORE_LOCK = asyncio.Lock()
+
+
 @app.post("/api/git/ignore-paths")
 async def git_ignore_paths(body: IgnorePathsBody):
+    async with _IGNORE_LOCK:
+        return await _git_ignore_paths(body)
+
+
+async def _git_ignore_paths(body: IgnorePathsBody):
     """Append the given paths to /config/.gitignore as directory rules.
 
     Also runs `git rm -r --cached` for any that were already tracked, so
